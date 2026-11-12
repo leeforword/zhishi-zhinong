@@ -97,8 +97,10 @@
      源一：BigDataCloud（免费、无需 key，稳定到乡镇/街道）
      ============================================================ */
   function fromBigDataCloud(lon, lat) {
+    // ⚠️ 必须用 zh-Hans：用 zh / zh-CN 时个别行政区会返回繁体（"競秀區"），
+    //    实测 zh-Hans 才是简体（"竞秀区"）
     var url = 'https://api.bigdatacloud.net/data/reverse-geocode-client' +
-      '?latitude=' + lat + '&longitude=' + lon + '&localityLanguage=zh';
+      '?latitude=' + lat + '&longitude=' + lon + '&localityLanguage=zh-Hans';
 
     return fetchJSON(url, 8000).then(function (j) {
       if (!j) return null;
@@ -159,7 +161,14 @@
             geo.getAddress(gcj, function (status, result) {
               clearTimeout(timer);
               if (status !== 'complete' || !result || !result.regeocode) {
-                var info = (result && result.info) || '';
+                /* 失败时 result 有时是对象（{info:...}），有时直接是字符串
+                   （实测 INVALID_USER_SCODE 就是以字符串形式回来的），两种都要接住 */
+                var info = (result && result.info) ||
+                  (typeof result === 'string' ? result : '') || '';
+
+                /* INVALID_USER_SCODE 说明安全密钥(securityJsCode)和 key 不匹配。
+                   这种情况下面会退到 BigDataCloud，只能到乡镇，
+                   所以要把原因带出去，让界面说清楚"为什么没有村名"。 */
                 finish(info ? { error: info } : null);
                 return;
               }
