@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知时智农 · 农事决策助手</title>
+<meta name="description" content="华北平原冬小麦 / 夏玉米农事决策助手：把天气预报翻译成哪天几点能打药、要不要浇水、能不能晾晒。">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="./site/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./site/icons/apple-touch-icon.png">
+<meta http-equiv="refresh" content="0; url=./site/">
+<link rel="canonical" href="./site/">
+<style>
+  html,body{height:100%}
+  body{
+    margin:0;display:flex;align-items:center;justify-content:center;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:linear-gradient(158deg,#dbe6ff 0%,#d8f5e6 44%,#fff1dd 100%);
+    color:#111827;padding:24px;box-sizing:border-box;
+  }
+  .c{text-align:center;max-width:320px}
+  .mark{
+    width:56px;height:56px;border-radius:14px;margin:0 auto 16px;
+    background:linear-gradient(150deg,#2563eb,#16a34a);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 8px 22px rgba(16,24,40,.16);
+  }
+  h1{font-size:17px;margin:0 0 6px;font-weight:600}
+  p{font-size:13px;line-height:1.7;color:#4b5563;margin:0 0 18px}
+  a{
+    display:inline-block;font-size:13px;font-weight:500;text-decoration:none;
+    color:#fff;background:#2563eb;padding:9px 20px;border-radius:8px;
+  }
+  a:active{transform:translateY(.5px)}
+</style>
+</head>
+<body>
+  <div class="c">
+    <div class="mark">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20.5V9"/><path d="M12 12c0-3.2 2.4-5.8 5.4-5.8 0 3.2-2.4 5.8-5.4 5.8z"/>
+        <path d="M12 15c0-2.8-2-5-4.6-5 0 2.8 2 5 4.6 5z"/>
+      </svg>
+    </div>
+    <h1>知时智农</h1>
+    <p>正在进入农事决策控制台…</p>
+    <a href="./site/">立即打开</a>
+  </div>
+  <script>location.replace('./site/' + location.search + location.hash);</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+{
+  "id": "./",
+  "name": "知时智农 · 农事决策助手",
+  "short_name": "知时智农",
+  "description": "把天气预报翻译成能执行的农事决定：未来 7 天哪天几点适合打药、要不要浇水、能不能晾晒。面向华北平原冬小麦与夏玉米种植。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#f7f8fa",
+  "theme_color": "#ffffff",
+  "categories": ["productivity", "weather", "utilities"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/01-desktop-overview.png",
+      "sizes": "1600x1200",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "桌面端：最佳打药窗口 + 未来七天 + 今日判读"
+    },
+    {
+      "src": "screenshots/12-mobile-iphone.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "手机端：单列堆叠，图表可左右滑动"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+# 推送到 main 分支 → 自动构建 site/ → 发布到 GitHub Pages
+# 也可以手动触发：仓库 Actions 页面 → Deploy to GitHub Pages → Run workflow
+name: 部署到 GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# GitHub Pages 部署需要的权限，多一个都不给
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 允许同时只有一个部署在跑：后推的代码覆盖前面没跑完的
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 构建
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 规则引擎的单元测试：不过就不发布。
+      # 这一步是零依赖的纯 Node 脚本，几秒钟跑完。
+      - name: 跑规则引擎测试
+        run: node web/test-logic.mjs
+
+      # 生成 site/。脚本自带自检：
+      # 产物里只要有 DeepSeek key、或者 Service Worker 预缓存清单对不上，
+      # 这里就会直接失败，不会把坏的东西发出去。
+      - name: 构建静态站点
+        run: node scripts/build-site.mjs
+
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: 发布
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 部署
+        id: deployment
+        uses: actions/deploy-pages@v4

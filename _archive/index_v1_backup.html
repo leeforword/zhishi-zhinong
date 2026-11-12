@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>田智 · 华北平原农事决策助手</title>
+<style>
+  :root {
+    --bg: #f5f7f4;
+    --panel: #ffffff;
+    --green: #2e7d32;
+    --green-light: #e8f5e9;
+    --yellow: #f9a825;
+    --yellow-light: #fff8e1;
+    --red: #c62828;
+    --red-light: #ffebee;
+    --text: #1f2933;
+    --text-sub: #5f6b76;
+    --border: #e0e4e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  header {
+    background: linear-gradient(135deg, #2e7d32, #4caf50);
+    color: #fff;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .logo { display: flex; align-items: baseline; gap: 10px; }
+  .logo h1 { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+  .logo .sub { font-size: 13px; opacity: .85; }
+  .badge {
+    background: rgba(255,255,255,.2);
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 20px;
+    padding: 3px 12px;
+    font-size: 12px;
+  }
+
+  /* ---------- 主布局 ---------- */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 320px;
+    gap: 16px;
+    padding: 16px;
+    max-width: 1500px;
+    margin: 0 auto;
+    align-items: start;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .panel h2 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel h2 small { font-weight: 400; color: var(--text-sub); font-size: 12px; }
+
+  /* ---------- 地块列表 ---------- */
+  .plot {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .plot:hover { border-color: var(--green); background: var(--green-light); }
+  .plot.active { border-color: var(--green); background: var(--green-light); }
+  .plot .name { font-weight: 600; font-size: 14px; }
+  .plot .meta { font-size: 12px; color: var(--text-sub); }
+
+  /* ---------- 定位输入 ---------- */
+  .loc-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .loc-row input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .loc-row input:focus { outline: 2px solid var(--green); outline-offset: -1px; border-color: transparent; }
+  button {
+    background: var(--green);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background .15s;
+  }
+  button:hover { background: #256428; }
+  button:disabled { background: #b0bec5; cursor: not-allowed; }
+  button.ghost { background: #fff; color: var(--green); border: 1px solid var(--green); }
+
+  /* ---------- 天气时间轴 ---------- */
+  .timeline { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .day-card {
+    min-width: 92px;
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 8px;
+    text-align: center;
+    font-size: 12px;
+  }
+  .day-card .dow { font-weight: 700; font-size: 12px; color: var(--text-sub); }
+  .day-card .temp { font-size: 15px; font-weight: 700; margin: 4px 0; }
+  .day-card .rain { color: #1565c0; font-size: 11px; }
+  .day-card .tag {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag.ok   { background: var(--green-light);  color: var(--green); }
+  .tag.warn { background: var(--yellow-light); color: #e65100; }
+  .tag.bad  { background: var(--red-light);    color: var(--red); }
+
+  /* ---------- 决策卡片 ---------- */
+  .decision {
+    border-left: 4px solid var(--green);
+    background: #fafdfa;
+    border-radius: 0 8px 8px 0;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+  .decision.warn { border-left-color: var(--yellow); background: var(--yellow-light); }
+  .decision.bad  { border-left-color: var(--red);   background: var(--red-light); }
+  .decision .title { font-weight: 700; font-size: 13px; }
+  .decision .why { font-size: 12px; color: var(--text-sub); margin-top: 3px; }
+  .decision .src { font-size: 11px; color: #90a4ae; margin-top: 4px; font-style: italic; }
+
+  /* ---------- 长势 ---------- */
+  .growth-bar {
+    height: 8px; border-radius: 4px; background: #e0e4e0; margin: 8px 0 6px;
+    overflow: hidden; display: flex;
+  }
+  .growth-bar span { display: block; height: 100%; }
+
+  /* ---------- 问答 ---------- */
+  .chat-log {
+    height: 260px; overflow-y: auto; margin-bottom: 10px;
+    font-size: 13px; padding-right: 4px;
+  }
+  .msg { margin-bottom: 10px; padding: 8px 10px; border-radius: 8px; max-width: 92%; }
+  .msg.user { background: var(--green-light); margin-left: auto; }
+  .msg.bot  { background: #f0f2f0; }
+  .msg .role { font-size: 11px; color: var(--text-sub); margin-bottom: 2px; }
+  .chat-input { display: flex; gap: 8px; }
+  .chat-input input {
+    flex: 1; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; font-family: inherit;
+  }
+  .chat-input input:focus { outline: 2px solid var(--green); outline-offset: -1px; border-color: transparent; }
+
+  .loading { color: var(--text-sub); font-size: 12px; text-align: center; padding: 12px; }
+  .disclaimer {
+    text-align: center; font-size: 11px; color: var(--text-sub);
+    padding: 16px; border-top: 1px solid var(--border); margin-top: 8px;
+  }
+
+  /* ---------- 响应式：移动端单列 ---------- */
+  @media (max-width: 1024px) {
+    .layout { grid-template-columns: 1fr; }
+    .chat-log { height: 200px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <h1>田智</h1>
+    <span class="sub">华北平原 · 冬小麦 / 夏玉米 农事决策助手</span>
+  </div>
+  <span class="badge" id="statusBadge">等待加载</span>
+</header>
+
+<div class="layout">
+
+  <!-- 左列：地块 -->
+  <aside class="panel">
+    <h2>我的地块 <small id="plotCount"></small></h2>
+    <div class="loc-row">
+      <input id="locInput" placeholder="输入县/村名，如 保定" value="保定">
+      <button id="locBtn">定位</button>
+    </div>
+    <div id="plotList"></div>
+  </aside>
+
+  <!-- 中列：天气时间轴 + 决策 -->
+  <main class="panel">
+    <h2>未来 7 天农事窗口 <small id="cropLabel"></small></h2>
+    <div class="timeline" id="timeline">
+      <div class="loading">正在获取天气数据…</div>
+    </div>
+
+    <h2 style="margin-top:20px">今日决策建议</h2>
+    <div id="decisions"></div>
+
+    <h2 style="margin-top:20px">长势判读 <small>示意数据</small></h2>
+    <div id="growth"></div>
+  </main>
+
+  <!-- 右列：问答 -->
+  <aside class="panel">
+    <h2>问一句</h2>
+    <div class="chat-log" id="chatLog">
+      <div class="msg bot">
+        <div class="role">田智</div>
+        你好，我可以回答农事窗口、天气风险相关问题。试试问：
+        "下周能打药吗？" / "这几天要不要浇水？"
+      </div>
+    </div>
+    <div class="chat-input">
+      <input id="chatInput" placeholder="输入你的问题…">
+      <button id="chatBtn">发送</button>
+    </div>
+    <div class="disclaimer">
+      本工具建议仅供参考，实际操作请以当地农技部门指导意见为准。
+    </div>
+  </aside>
+
+</div>
+
+<script>
+/* =========================================================
+   配置
+   ========================================================= */
+const CONFIG = {
+  // Open-Meteo 无需 key；后续可在此配置时段、阈值
+  weatherAPI: 'https://api.open-meteo.com/v1/forecast',
+  defaultLoc: { name: '保定', lat: 38.87, lon: 115.46 }
+};
+
+/* =========================================================
+   状态
+   ========================================================= */
+const state = {
+  plots: [
+    { id: 'p1', name: '东洼地', area: 10, crop: 'wheat', lat: 38.87, lon: 115.46 },
+    { id: 'p2', name: '南坡地', area: 6,  crop: 'wheat', lat: 38.82, lon: 115.42 },
+    { id: 'p3', name: '北地块', area: 15, crop: 'maize', lat: 38.92, lon: 115.50 }
+  ],
+  activePlotId: 'p1',
+  weather: null
+};
+
+const CROP_NAME = { wheat: '冬小麦', maize: '夏玉米' };
+
+/* =========================================================
+   天气数据（Open-Meteo）
+   ========================================================= */
+async function fetchWeather(lat, lon) {
+  const url = new URL(CONFIG.weatherAPI);
+  url.searchParams.set('latitude', lat);
+  url.searchParams.set('longitude', lon);
+  url.searchParams.set('daily', [
+    'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum',
+    'precipitation_probability_max', 'wind_speed_10m_max', 'weather_code'
+  ].join(','));
+  url.searchParams.set('hourly', 'temperature_2m,precipitation');
+  url.searchParams.set('timezone', 'Asia/Shanghai');
+  url.searchParams.set('forecast_days', '7');
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error('天气接口请求失败：' + res.status);
+  return res.json();
+}
+
+/* =========================================================
+   规则引擎（阈值均标注"待核实"）
+   ========================================================= */
+function evaluateDay(day, prevDay, crop) {
+  const rules = [];
+  const rain  = day.precipitation_sum ?? 0;
+  const pRain = day.precipitation_probability_max ?? 0;
+  const wind  = day.wind_speed_10m_max ?? 0;
+  const tmax  = day.temperature_2m_max ?? 20;
+  const tmin  = day.temperature_2m_min ?? 5;
+
+  // --- 打药窗口 ---
+  let spray = 'ok', sprayWhy = '温度和风力适宜';
+  if (rain >= 1) { spray = 'bad'; sprayWhy = '当天有降雨，药液会被冲刷'; }
+  else if (pRain >= 60 && rain > 0.1) { spray = 'bad'; sprayWhy = '降雨概率高，打药易失效'; }
+  else if (wind >= 4) { spray = 'bad'; sprayWhy = '风速偏大，药液飘移风险高'; }
+  else if (wind >= 2.5) { spray = 'warn'; sprayWhy = '有一定风力，注意飘移'; }
+  else if (tmax > 32) { spray = 'bad'; sprayWhy = '气温过高，易产生药害'; }
+  else if (tmax < 5) { spray = 'warn'; sprayWhy = '气温偏低，药效下降'; }
+
+  // 连续降雨预警
+  if (rain >= 10) { spray = 'bad'; sprayWhy = '降雨量较大（' + rain.toFixed(1) + 'mm），不建议田间作业'; }
+
+  // --- 灌溉窗口 ---
+  let irr = 'ok', irrWhy = '降水条件正常';
+  if (rain >= 5) { irr = 'bad'; irrWhy = '有有效降水，无需灌溉'; }
+  else if (tmax >= 30) { irr = 'warn'; irrWhy = '高温少雨，注意墒情'; }
+
+  // --- 收获/晾晒 ---
+  let harvest = 'ok', harvestWhy = '天气适宜晾晒';
+  if (rain >= 1) { harvest = 'bad'; harvestWhy = '有降雨，不宜晾晒'; }
+  else if (pRain >= 50) { harvest = 'warn'; harvestWhy = '降雨概率较高，谨慎晾晒'; }
+
+  return { spray, sprayWhy, irr, irrWhy, harvest, harvestWhy, rain, wind, tmax, tmin, pRain };
+}
+
+function buildDecisions(weather, crop) {
+  const d = weather.daily;
+  const days = d.time.map((t, i) => ({
+    date: t,
+    precipitation_sum: d.precipitation_sum[i],
+    precipitation_probability_max: d.precipitation_probability_max?.[i],
+    wind_speed_10m_max: d.wind_speed_10m_max?.[i],
+    temperature_2m_max: d.temperature_2m_max[i],
+    temperature_2m_min: d.temperature_2m_min[i],
+    weather_code: d.weather_code?.[i]
+  }));
+
+  const evaluated = days.map((day, i) => evaluateDay(day, days[i - 1], crop));
+  return { days, evaluated };
+}
+
+/* =========================================================
+   渲染
+   ========================================================= */
+const DOW = ['周日','周一','周二','周三','周四','周五','周六'];
+
+function renderPlots() {
+  const box = document.getElementById('plotList');
+  box.innerHTML = '';
+  state.plots.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'plot' + (p.id === state.activePlotId ? ' active' : '');
+    div.innerHTML = `<div class="name">${p.name}</div>
+      <div class="meta">${p.area} 亩 · ${CROP_NAME[p.crop]}</div>`;
+    div.onclick = () => {
+      state.activePlotId = p.id;
+      renderPlots();
+      loadWeather();
+    };
+    box.appendChild(div);
+  });
+  document.getElementById('plotCount').textContent = state.plots.length + ' 块';
+}
+
+function tagClass(v) { return v === 'ok' ? 'ok' : v === 'warn' ? 'warn' : 'bad'; }
+function tagText(v) { return v === 'ok' ? '可作业' : v === 'warn' ? '谨慎' : '不宜'; }
+
+function renderTimeline(days, evaluated) {
+  const box = document.getElementById('timeline');
+  box.innerHTML = '';
+  days.forEach((d, i) => {
+    const dt = new Date(d.date);
+    const e = evaluated[i];
+    const div = document.createElement('div');
+    div.className = 'day-card';
+    div.innerHTML = `
+      <div class="dow">${DOW[dt.getDay()]}</div>
+      <div class="dow" style="font-size:11px;font-weight:400">${dt.getMonth()+1}/${dt.getDate()}</div>
+      <div class="temp">${Math.round(d.temperature_2m_max)}° / ${Math.round(d.temperature_2m_min)}°</div>
+      <div class="rain">${d.precipitation_sum > 0 ? '💧' + d.precipitation_sum.toFixed(1) + 'mm' : '无雨'}</div>
+      <span class="tag ${tagClass(e.spray)}">${tagText(e.spray)}</span>
+    `;
+    box.appendChild(div);
+  });
+}
+
+function renderDecisions(evaluated) {
+  const box = document.getElementById('decisions');
+  box.innerHTML = '';
+  const today = evaluated[0];
+
+  const items = [
+    { kind: today.spray,    title: '打药',   why: today.sprayWhy },
+    { kind: today.irr,      title: '灌溉',   why: today.irrWhy },
+    { kind: today.harvest,  title: '晾晒',   why: today.harvestWhy }
+  ];
+
+  // 找出未来 7 天内最适合打药的日期
+  let bestSpray = -1;
+  evaluated.forEach((e, i) => {
+    if (e.spray === 'ok' && (bestSpray === -1 || evaluated[bestSpray].spray !== 'ok')) bestSpray = i;
+  });
+
+  items.forEach(it => {
+    const div = document.createElement('div');
+    div.className = 'decision ' + tagClass(it.kind);
+    div.innerHTML = `<div class="title">${it.kind === 'ok' ? '✅' : it.kind === 'warn' ? '⚠️' : '❌'} 今日${it.title}：${tagText(it.kind)}</div>
+      <div class="why">${it.why}</div>
+      <div class="src">依据：Open-Meteo 逐日预报 · 阈值为公开农技常识，待核实</div>`;
+    box.appendChild(div);
+  });
+
+  if (bestSpray > 0) {
+    const d = new Date(evaluated[bestSpray] ? document.querySelectorAll('#timeline .day-card')[bestSpray]?.querySelectorAll('.dow')[1]?.textContent : '');
+    const div = document.createElement('div');
+    div.className = 'decision';
+    const dayLabel = document.querySelectorAll('#timeline .day-card')[bestSpray]?.querySelectorAll('.dow')[1]?.textContent || '';
+    div.innerHTML = `<div class="title">📅 未来 7 天最佳打药日：${dayLabel}（第 ${bestSpray+1} 天）</div>
+      <div class="why">当天无雨、风速适宜、气温在合理区间</div>
+      <div class="src">依据：规则引擎综合判定</div>`;
+    box.appendChild(div);
+  }
+}
+
+function renderGrowth() {
+  const box = document.getElementById('growth');
+  // MVP 阶段：示意数据，不接真实遥感
+  const ndvi = 0.52, ndviAvg = 0.61;
+  const pct = Math.round((ndvi / ndviAvg) * 100);
+  box.innerHTML = `
+    <div style="font-size:13px">本块地长势指数：<b>${pct}%</b>（相对周边同类地块）</div>
+    <div class="growth-bar">
+      <span style="width:${Math.min(pct,100)}%;background:${pct < 90 ? '#f9a825' : '#4caf50'}"></span>
+    </div>
+    <div style="font-size:12px;color:#5f6b76">
+      ${pct < 90 ? '长势偏差，建议关注水肥与病虫害。' : '长势正常。'}
+    </div>
+    <div class="src" style="font-size:11px;color:#90a4ae;margin-top:6px;font-style:italic">
+      示意数据 · 真实遥感接入为后续版本
+    </div>`;
+}
+
+/* =========================================================
+   加载流程
+   ========================================================= */
+async function loadWeather() {
+  const plot = state.plots.find(p => p.id === state.activePlotId);
+  const badge = document.getElementById('statusBadge');
+  badge.textContent = '加载中…';
+  document.getElementById('cropLabel').textContent = plot.name + ' · ' + CROP_NAME[plot.crop];
+
+  try {
+    const w = await fetchWeather(plot.lat, plot.lon);
+    state.weather = w;
+    const { days, evaluated } = buildDecisions(w, plot.crop);
+    renderTimeline(days, evaluated);
+    renderDecisions(evaluated);
+    renderGrowth();
+    badge.textContent = '天气数据已更新 · ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+  } catch (err) {
+    badge.textContent = '加载失败';
+    document.getElementById('timeline').innerHTML = '<div class="loading">天气数据加载失败：' + err.message + '</div>';
+  }
+}
+
+/* =========================================================
+   问答（MVP 阶段：规则驱动的本地应答，后续接 LLM）
+   ========================================================= */
+function answerQuestion(q) {
+  if (!state.weather) return '天气数据还没加载好，请稍候再问。';
+  const plot = state.plots.find(p => p.id === state.activePlotId);
+  const { days, evaluated } = buildDecisions(state.weather, plot.crop);
+
+  if (/打药|喷药|施药/.test(q)) {
+    const okDays = evaluated
+      .map((e, i) => e.spray === 'ok' ? i : -1)
+      .filter(i => i >= 0);
+    if (okDays.length === 0) {
+      return `未来 7 天内没有合适的打药窗口。主要原因是降雨或风力偏大，建议等天气转好再打，避免药效流失${''}。`;
+    }
+    const list = okDays.map(i => {
+      const dt = new Date(days[i].date);
+      return `${dt.getMonth()+1}/${dt.getDate()}（${DOW[dt.getDay()]}）`;
+    }).join('、');
+    const best = okDays[0];
+    return `未来 7 天里适合打药的有：${list}。\n\n推荐优先级最高的是 ${new Date(days[best].date).getMonth()+1}/${new Date(days[best].date).getDate()}，当天无雨、风速 ${evaluated[best].wind.toFixed(1)} m/s、最高温 ${Math.round(evaluated[best].tmax)}℃。`;
+  }
+
+  if (/浇|灌水|墒/.test(q)) {
+    const wetDays = evaluated.filter(e => e.rain >= 1).length;
+    const today = evaluated[0];
+    return `未来 7 天有 ${wetDays} 天可能出现降水。今天${today.irr === 'bad' ? '有有效降水，暂时不需要灌溉' : today.irr === 'warn' ? '高温少雨，建议检查墒情，必要时补水' : '降水条件正常，正常管理即可'}。`;
+  }
+
+  if (/天气|下雨|晴/.test(q)) {
+    const t = days[0];
+    return `今天（${t.date}）最高 ${Math.round(t.temperature_2m_max)}℃、最低 ${Math.round(t.temperature_2m_min)}℃，${t.precipitation_sum > 0 ? '预计降水 ' + t.precipitation_sum.toFixed(1) + 'mm' : '预计无降水'}。`;
+  }
+
+  return '这个问题目前还不在我的处理范围内。我可以回答：打药时机、灌溉建议、天气情况。其他方向（如病虫害识别、测土施肥）还在开发中。';
+}
+
+function appendMsg(role, text) {
+  const log = document.getElementById('chatLog');
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+  div.innerHTML = `<div class="role">${role === 'user' ? '我' : '田智'}</div>${text.replace(/\n/g, '<br>')}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const q = input.value.trim();
+  if (!q) return;
+  appendMsg('user', q);
+  input.value = '';
+  setTimeout(() => appendMsg('bot', answerQuestion(q)), 200);
+}
+
+/* =========================================================
+   事件绑定
+   ========================================================= */
+document.getElementById('chatBtn').onclick = sendChat;
+document.getElementById('chatInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendChat();
+});
+document.getElementById('locBtn').onclick = () => {
+  const v = document.getElementById('locInput').value.trim();
+  if (!v) return;
+  // MVP：简单映射几个常用地点
+  const map = {
+    '保定': [38.87, 115.46],
+    '石家庄': [38.04, 114.51],
+    '邯郸': [36.61, 114.49],
+    '邢台': [37.07, 114.50],
+    '衡水': [37.74, 115.67],
+    '沧州': [38.30, 116.84]
+  };
+  const hit = Object.keys(map).find(k => v.includes(k));
+  if (hit) {
+    const p = state.plots.find(p => p.id === state.activePlotId);
+    p.lat = map[hit][0]; p.lon = map[hit][1]; p.name = hit + '地块';
+    renderPlots();
+    loadWeather();
+  } else {
+    document.getElementById('statusBadge').textContent = '暂只支持：保定/石家庄/邯郸/邢台/衡水/沧州';
+  }
+};
+
+/* 初始化 */
+renderPlots();
+loadWeather();
+</script>
+</body>
+</html>
