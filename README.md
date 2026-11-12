@@ -97,6 +97,9 @@ Object.assign(window.TIANZHI_CONFIG, {
 ```bash
 node scripts/build-site.mjs    # web/ → site/（发布用的成品）
 node scripts/test-pwa.mjs      # 真浏览器验证：能装、能离线、图标齐全
+
+# 直接测线上（真实 HTTPS + 真实子路径，比本地测更严格）
+node scripts/test-pwa.mjs --url=https://leeforword.github.io/zhishi-zhinong/
 ```
 
 推送到 `main` 分支后，GitHub Actions 会自动构建并发布到 Pages。

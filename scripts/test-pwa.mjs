@@ -29,6 +29,14 @@ const DIR = path.resolve(ROOT, process.argv[2] || 'site');
 const PORT = 8977;
 const CDP_PORT = 9247;
 
+/* 传 --url=https://xxx.github.io/repo/ 就直接测线上，
+   不带就本地起一个服务器测 site/。线上版才能验到真东西：
+   HTTPS、CDN 的 Content-Type、以及 GitHub Pages 真实的子路径。 */
+const LIVE = (() => {
+  const a = process.argv.find((x) => x.startsWith('--url='));
+  return a ? a.slice('--url='.length).replace(/\/?$/, '/') : null;
+})();
+
 /* GitHub Pages 的站点挂在 /<仓库名>/ 这样的子路径下，而不是域名根目录。
    子路径是最容易暴露 scope / start_url 写错的地方（manifest 用绝对路径就会装不上），
    所以默认就按真实部署的子路径来测，也支持 --base=/ 回退到根目录。 */
@@ -43,7 +51,7 @@ const CHROME = [
 ].find((p) => fs.existsSync(p));
 
 if (!CHROME) { console.error('Chrome/Edge not found'); process.exit(1); }
-if (!fs.existsSync(path.join(DIR, 'index.html'))) {
+if (!LIVE && !fs.existsSync(path.join(DIR, 'index.html'))) {
   console.error('No index.html in ' + DIR + ' -- run: node scripts/build-site.mjs');
   process.exit(1);
 }
@@ -62,33 +70,40 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8'
 };
 
-const server = http.createServer((req, res) => {
-  let p = decodeURIComponent(req.url.split('?')[0]);
-  // 只在这个子路径下提供服务，模拟 GitHub Pages 的 /<repo>/ 结构
-  if (!p.startsWith(BASE)) {
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('404');
-    return;
-  }
-  p = '/' + p.slice(BASE.length);
-  if (p === '/') p = '/index.html';
-  const file = path.join(DIR, path.normalize(p).replace(/^(\.\.[/\\])+/, ''));
-  if (!file.startsWith(DIR) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('404');
-    return;
-  }
-  res.writeHead(200, {
-    'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
-    'Cache-Control': 'no-cache'
-  });
-  res.end(fs.readFileSync(file));
-});
+let server = null;
+let SITE;
 
-await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
-const ORIGIN = 'http://127.0.0.1:' + PORT;
-const SITE = ORIGIN + BASE;
-console.log('serving ' + DIR + '\n       at ' + SITE + '  (base ' + BASE + ')\n');
+if (LIVE) {
+  SITE = LIVE;
+  console.log('target ' + SITE + '  (live URL)\n');
+} else {
+  server = http.createServer((req, res) => {
+    let p = decodeURIComponent(req.url.split('?')[0]);
+    // 只在这个子路径下提供服务，模拟 GitHub Pages 的 /<repo>/ 结构
+    if (!p.startsWith(BASE)) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('404');
+      return;
+    }
+    p = '/' + p.slice(BASE.length);
+    if (p === '/') p = '/index.html';
+    const file = path.join(DIR, path.normalize(p).replace(/^(\.\.[/\\])+/, ''));
+    if (!file.startsWith(DIR) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('404');
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
+      'Cache-Control': 'no-cache'
+    });
+    res.end(fs.readFileSync(file));
+  });
+
+  await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
+  SITE = 'http://127.0.0.1:' + PORT + BASE;
+  console.log('serving ' + DIR + '\n       at ' + SITE + '  (base ' + BASE + ')\n');
+}
 
 /* ---------------- 启动 Chrome ---------------- */
 const userDataDir = path.join(process.env.TEMP || '.', 'cdp_pwa_' + Date.now());
@@ -149,7 +164,7 @@ function check(cond, msg, detail) {
 function cleanup(code) {
   try { ws && ws.close(); } catch (e) {}
   try { proc.kill(); } catch (e) {}
-  try { server.close(); } catch (e) {}
+  try { if (server) server.close(); } catch (e) {}
   setTimeout(() => process.exit(code), 250);
 }
 
