@@ -44,7 +44,7 @@ fs.mkdirSync(OUT, { recursive: true });
 /* ------------------------------------------------------------
    二、运行时文件清单
    ------------------------------------------------------------ */
-const JS_FILES = ['llm.js', 'weather.js', 'hebei-geo.js', 'logic.js', 'ensemble.js', 'app.js', 'pwa.js'];
+const JS_FILES = ['llm.js', 'weather.js', 'hebei-geo.js', 'place.js', 'logic.js', 'ensemble.js', 'app.js', 'pwa.js'];
 
 let copied = 0;
 function copy(rel, dest) {

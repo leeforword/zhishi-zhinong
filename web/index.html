@@ -1008,7 +1008,7 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
     </div>
 
     <div class="side-foot">
-      气象 Open-Meteo（主预报）+ 和风天气（分钟级）<br>
+      <span id="footWeather">气象 和风天气（主预报）+ Open-Meteo（集合）</span><br>
       地图 高德 JS API<br>
       建议仅供参考 · 以当地农技部门为准
     </div>
@@ -1139,7 +1139,7 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
             <div class="chart-scroll"><div id="windChart"><div class="skel" style="height:150px"></div></div></div>
             <div class="chart-foot">
               <span><i class="ln" style="background:#2563eb"></i>实测风速</span>
-              <span><i class="ln" style="background:#ef4444"></i>2.5 m/s 上限</span>
+              <span><i class="ln" style="background:#ef4444"></i><span id="windLimitTag">风速上限</span></span>
               <span><i style="background:rgba(34,197,94,.18)"></i>可作业时段</span>
             </div>
           </div>
@@ -1301,6 +1301,7 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
 <script src="llm.js"></script>
 <script src="weather.js"></script>
 <script src="hebei-geo.js"></script>
+<script src="place.js"></script>
 <script src="logic.js"></script>
 <script src="ensemble.js"></script>
 <script src="app.js"></script>

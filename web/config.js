@@ -60,6 +60,15 @@ window.TIANZHI_CONFIG = {
   /* 关掉可只留 Open-Meteo（演示降级路径用） */
   enableQWeather: true,
 
+  /* ---------- 主预报源 ----------
+     'qweather'   和风天气做主预报（默认）：168 小时逐时，同化国内站网，
+                  县域尺度的温度和风更贴本地，还带逐时降水概率 pop
+     'open-meteo' 改回 Open-Meteo 做主预报（9–11km 全球模式插值）
+
+     两种模式下，集合预报（置信度）和多模式分歧仍然取自 Open-Meteo，
+     因为和风的免费额度给不了这两样。 */
+  preferSource: 'qweather',
+
   /* ---------- 功能开关 ---------- */
   enableLLM: false,            // 公网版无 key，默认关闭；本地可在 config.local.js 打开
 

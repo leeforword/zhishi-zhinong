@@ -32,6 +32,7 @@ const SHELL = [
   './llm.js',
   './weather.js',
   './hebei-geo.js',
+  './place.js',
   './logic.js',
   './ensemble.js',
   './app.js',

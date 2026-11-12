@@ -18,12 +18,13 @@
    }
 
    为什么是"双源"而不是一家包干：
-     实测 2026-11，和风 v7 的「格点天气」接口已废弃，只剩下城市级预报；
-     而 Open-Meteo 能用任意经纬度插值出真实的 7 天逐时曲线。
+     主预报用和风（/v7/weather/168h，168 小时逐时，同化国内站网），
+     但和风的免费额度给不了集合预报和多模式，
+     而这两样正是本作品"置信度"和"分歧提示"的依据。
      所以分工是：
-       · Open-Meteo → 主预报（逐时 + 逐日，9–11km 网格）
-       · 和风天气   → 分钟级降水（未来 2 小时）+ 灾害预警
-     前者保证图表连续可信，后者补上"打完药会不会马上下雨"这个农学缺口。
+       · 和风天气   → 主预报（168 小时逐时 + 7 天逐日）+ 分钟级降水 + 灾害预警
+       · Open-Meteo → 集合预报（50 成员，算置信度）+ 多模式分歧 + 主源故障时兜底
+     前者让数字更贴本地，后者让"这个结论有多稳"可量化。
    ============================================================= */
 (function (root) {
   'use strict';
@@ -166,6 +167,107 @@
   }
 
   /* ============================================================
+     二·五、和风 168 小时逐时 —— 主预报（默认首选）
+     -------------------------------------------------------------
+     早期版本把和风只当"兜底 + 分钟级降水"，是因为当时判断和风
+     只能给城市级预报。2026-11 重新实测后纠正了这个判断：
+
+       /v7/weather/168h  → 真的返回 168 小时逐时，字段齐全
+         （temp / precip / windSpeed / humidity / pop 每小时都有）
+
+     所以现在让和风做主源，理由不是"国产优先"，而是它更适合这块地：
+       · 和风同化了国内地面观测站，县域尺度的温度/风和实况更贴
+       · 它的降水包含"逐小时降水概率 pop"，Open-Meteo 的逐时没有
+       · Open-Meteo 是 9–11 km 的全球模式插值，代表县域而非地块
+
+     仍然保留 Open-Meteo 的两个不可替代用途：
+       · 集合预报（50 个成员）→ 打药窗口的置信度靠它
+       · 多模式分歧（ECMWF/GFS/ICON/CMA）→ 用来暴露不确定性
+     这两项和风的免费额度给不了，缺了它们反而会"看起来更确定、其实更不可靠"。
+
+     ⚠️ 单位换算：和风 windSpeed 是 km/h，本项目内部统一用 m/s。
+     ============================================================ */
+  function fromQWeather168(lat, lon) {
+    var loc = locParam(lat, lon);
+    return Promise.all([
+      qwGet('/v7/weather/168h?location=' + loc),
+      qwGet('/v7/weather/7d?location=' + loc)
+    ]).then(function (res) {
+      var hours = res[0].hourly || [];
+      var days = res[1].daily || [];
+      if (hours.length < 24) throw new Error('和风逐时数据不足（' + hours.length + ' 小时）');
+      if (!days.length) throw new Error('和风逐日数据为空');
+
+      var daily = {
+        time: [], temperature_2m_max: [], temperature_2m_min: [],
+        precipitation_sum: [], precipitation_probability_max: [],
+        wind_speed_10m_max: [], weather_code: []
+      };
+      days.forEach(function (d) {
+        var date = String(d.fxDate || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+        daily.time.push(date);
+        daily.temperature_2m_max.push(r1(d.tempMax));
+        daily.temperature_2m_min.push(r1(d.tempMin));
+        daily.precipitation_sum.push(r1(d.precip));
+        daily.wind_speed_10m_max.push(r1(num(d.windSpeedDay) / 3.6));
+        var wmo = QW_ICON_TO_WMO[String(d.iconDay)];
+        daily.weather_code.push(wmo === undefined ? 3 : wmo);
+      });
+
+      /* ⚠️ 这一步很容易被忽略，但不做就会出 NaN：
+         和风的 168 小时是从「现在」开始往后数的，所以它会跨 8 个日历日
+         （比如 11-12 22:00 → 11-19 21:00）。
+         而上层是按"逐时数据里出现的日期"建天、再去逐日数组里取当天的
+         最高温、降水概率的 —— 第 8 天在逐日数组里没有对应项，
+         取出来就是 undefined，界面上会显示 NaN℃。
+         所以这里把逐时裁到"逐日数据覆盖的那 7 天"，两边严格对齐。 */
+      var keep = {};
+      daily.time.forEach(function (d) { keep[d] = 1; });
+
+      var hourly = {
+        time: [], temperature_2m: [], precipitation: [],
+        wind_speed_10m: [], relative_humidity_2m: []
+      };
+      var popByDate = {};
+
+      hours.forEach(function (h) {
+        // 和风格式 2026-11-12T21:00+08:00 → 统一裁成 2026-11-12T21:00
+        var t = String(h.fxTime || '').slice(0, 16);
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(t)) return;
+
+        var d = t.slice(0, 10);
+        if (!keep[d]) return;
+
+        hourly.time.push(t);
+        hourly.temperature_2m.push(r1(h.temp));
+        hourly.precipitation.push(r1(h.precip));
+        hourly.wind_speed_10m.push(r1(num(h.windSpeed) / 3.6));
+        hourly.relative_humidity_2m.push(Math.round(num(h.humidity)));
+
+        var pop = num(h.pop);
+        if (popByDate[d] === undefined || pop > popByDate[d]) popByDate[d] = pop;
+      });
+
+      // 逐日降水概率用当天的逐时最大值，比留 0 诚实
+      daily.time.forEach(function (date, i) {
+        daily.precipitation_probability_max[i] =
+          popByDate[date] === undefined ? 0 : Math.round(popByDate[date]);
+      });
+
+      if (hourly.time.length < 24) throw new Error('和风逐时数据不足以覆盖 7 天');
+
+      stats.base = 'qweather';
+      return {
+        hourly: hourly,
+        daily: daily,
+        resolution: '和风天气（国内站网同化）',
+        sourceLabel: '和风天气'
+      };
+    });
+  }
+
+  /* ============================================================
      三、和风兜底：Open-Meteo 不可用时，用城市预报顶上
      ============================================================ */
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -188,6 +290,7 @@
   };
 
   function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+  function r1(v) { return Math.round(num(v) * 10) / 10; }
 
   function fromQWeatherFallback(lat, lon) {
     var loc = locParam(lat, lon);
@@ -343,26 +446,39 @@
    * 取天气
    * @param {number} lat
    * @param {number} lon
-   * @param {object} opts { preferSource: 'auto'|'open-meteo'|'qweather' }
+   * @param {object} opts { preferSource: 'qweather'|'open-meteo'|'auto' }
    */
   function getWeather(lat, lon, opts) {
     opts = opts || {};
     stats.lastError = null;
     stats.extras = [];
+    stats.baseError = null;
 
-    var prefer = opts.preferSource || 'auto';
+    // 默认和风优先（config.js 里 preferSource 可改回 open-meteo）
+    var prefer = opts.preferSource || CFG.preferSource || 'qweather';
 
-    // 主预报
     var baseP;
-    if (prefer === 'qweather' && QW.enabled) {
-      baseP = fromQWeatherFallback(lat, lon).catch(function () { return fromOpenMeteo(lat, lon); });
-    } else {
+    if (prefer === 'open-meteo') {
       baseP = fromOpenMeteo(lat, lon).catch(function (err) {
         stats.lastError = 'Open-Meteo 不可用（' + err.message + '）';
         if (!QW.enabled) throw err;
-        // 主源挂了 → 用和风顶上
-        return fromQWeatherFallback(lat, lon);
+        return fromQWeather168(lat, lon).catch(function () {
+          return fromQWeatherFallback(lat, lon);
+        });
       });
+    } else {
+      // 和风优先：拿得到 168 小时逐时就用它
+      baseP = (QW.enabled
+        ? fromQWeather168(lat, lon).catch(function (err) {
+            stats.baseError = err.message;
+            return fromQWeatherFallback(lat, lon);   // 逐时不够时退到城市级估算
+          })
+        : Promise.reject(new Error('未配置和风天气')))
+        .catch(function (err) {
+          stats.lastError = '和风不可用（' + (err && err.message || '') + '）';
+          // 和风全挂 → 回到 Open-Meteo，保证页面还能出结论
+          return fromOpenMeteo(lat, lon);
+        });
     }
 
     // 主预报 + 增强数据并行（集合预报也一起取，取不到不影响主流程）
@@ -384,6 +500,11 @@
       if (extras.warnings) base.sources.push('qweather-warning');
       if (ens) base.sources.push('ensemble');
       if (multi) base.sources.push('multi-model');
+      if (!base.sourceLabel) {
+        base.sourceLabel = stats.base === 'qweather' ? '和风天气' :
+          (stats.base === 'open-meteo' ? 'Open-Meteo' : '未知源');
+      }
+      base.baseError = stats.baseError || null;
       return base;
     });
   }
@@ -396,6 +517,7 @@
     MULTI_MODELS: MULTI_MODELS,
     // 便于调试与测试
     _fromOpenMeteo: fromOpenMeteo,
+    _fromQWeather168: fromQWeather168,
     _fromQWeatherFallback: fromQWeatherFallback,
     _getMinutely: getMinutely,
     _getWarnings: getWarnings,

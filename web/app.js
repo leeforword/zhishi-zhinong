@@ -442,7 +442,9 @@
     var hours = T.hoursOf(raw.hourly, d.date);
     var dt = new Date(d.date + 'T00:00:00');
     $('windTitle').textContent = '逐小时风速 · ' + (dt.getMonth() + 1) + '月' + dt.getDate() + '日 ' + d.dow;
-    $('windSub').textContent = '虚线为 2.5 m/s 作业上限；' + d.spray.why;
+    $('windSub').textContent = '虚线为 ' + RULES.spray.wind_max + ' m/s 作业上限；' + d.spray.why;
+    // 图例里的上限数字跟着规则走，不要在 HTML 里写死（会跟实际判定对不上）
+    if ($('windLimitTag')) $('windLimitTag').textContent = RULES.spray.wind_max + ' m/s 上限';
     $('windChart').innerHTML = hours.length
       ? windChartSvg(hours, d.windMax)
       : '<div class="chart-note">该日无逐小时数据</div>';
@@ -491,8 +493,7 @@
           '<span class="plot-name">' + esc(p.name) + '</span>' +
           '<span class="plot-area">' + p.area + ' 亩</span>' +
         '</div>' +
-        '<div class="plot-meta">' + esc(p.place) +
-          (p.city && p.city !== p.place ? ' · ' + esc(p.city) : '') +
+        '<div class="plot-meta">' + esc(placeText(p)) +
           '<span class="plot-crop">' + CROP_NAME[p.crop] + '</span></div>' +
         '<span class="plot-acts">' +
           '<button class="ico-btn" data-act="edit" title="编辑">' +
@@ -1383,20 +1384,36 @@
   /* =========================================================
      加载
      ========================================================= */
+
+  /** 侧栏底部：如实写出这一次的数据到底来自谁 */
+  function updateFootSources(w) {
+    var el = $('footWeather');
+    if (!el) return;
+    var s = (w && w.sources) || [];
+    var main = s.indexOf('qweather') >= 0 ? '和风天气'
+      : (s.indexOf('open-meteo') >= 0 ? 'Open-Meteo' : '未知数据源');
+    var extra = [];
+    if (s.indexOf('ensemble') >= 0) extra.push('集合预报');
+    if (s.indexOf('multi-model') >= 0) extra.push('多模式');
+    if (s.indexOf('qweather-minutely') >= 0) extra.push('分钟级降水');
+    el.textContent = '气象 ' + main + '（主预报）' +
+      (extra.length ? ' + ' + extra.join(' / ') : '');
+  }
+
   function load() {
     var plot = activePlot();
     if (!plot) return;
     state.loading = true;
     state.result = null;
-
     $('tbTitle').textContent = plot.name + ' · ' + CROP_NAME[plot.crop];
-    $('tbSub').textContent = plot.place + (plot.city && plot.city !== plot.place ? ' · ' + plot.city : '') + ' · 华北平原';
+    $('tbSub').textContent = placeText(plot) + ' · 华北平原';
     setStatus('busy', '正在获取天气…');
     $('refreshBtn').classList.add('spin');
 
     fetchWeather(plot.lat, plot.lon).then(function (w) {
       if (!w.hourly || !w.daily) throw new Error('返回数据不完整');
       state.raw = w;
+      updateFootSources(w);
       state._ensKey = plot.lat.toFixed(3) + ',' + plot.lon.toFixed(3) + ',' + (w.hourly.time[0] || '');
       state._ensCache = null;
       var result = T.evaluateWeather(w.hourly, w.daily);
@@ -1405,8 +1422,7 @@
         state.chartDay = result.days[0].date;
       }
 
-      $('tbSub').textContent = plot.place +
-        (plot.city && plot.city !== plot.place ? ' · ' + plot.city : '') +
+      $('tbSub').textContent = placeText(plot) +
         ' · ' + plot.lat.toFixed(2) + '°N ' + plot.lon.toFixed(2) + '°E';
       renderHero(result);
       renderDays(result);
@@ -1567,10 +1583,100 @@
     return n + '（' + loc.city + '）';
   }
 
+  /* =========================================================
+     地名显示："市名 · 村名"
+     -------------------------------------------------------------
+     老数据里 place 存的是县级名（"保定市"），新数据存的是最细的
+     可用名称（村名，退而求其次乡镇名）。两种都要能正确显示，
+     所以判断"谁包含谁"而不是简单拼接。
+     ========================================================= */
+  function placeText(p) {
+    if (!p) return '';
+    var sub = (p.place || '').trim();
+    var city = (p.city || '').trim();
+
+    if (sub && city && sub !== city && sub.indexOf(city) !== 0) {
+      return city + ' · ' + sub;
+    }
+    return sub || city || '未命名';
+  }
+
   /** WGS-84 坐标反查地名（供启动迁移、无地图时使用） */
   function placeLabel(lon, lat) {
     var c = locateCounty(lon, lat);
     return c ? displayName(c) : null;
+  }
+
+  /* =========================================================
+     精确地名（村 / 乡镇）：在线反查
+     -------------------------------------------------------------
+     为什么分两步走：
+       点击的瞬间先用本地县界给出"县名"，界面立刻有反馈；
+       同时后台去问高德（能到村）和 BigDataCloud（能到乡镇），
+       谁更细就用谁的结果把"已选地点"升级一次。
+
+     为什么不直接等在线结果：
+       在线反查要 300–1500ms，让"已选地点"空着等它，
+       用户会以为没点成功，然后再点一次。体验上不能这么做。
+     ========================================================= */
+  var PLACE_SEQ = 0;
+
+  var PRECISION_TAG = {
+    village: '精确到村',
+    township: '精确到乡镇/街道',
+    county: '仅到县区',
+    city: '仅到市'
+  };
+
+  function resolveFinePlace(lon, lat) {
+    if (!window.TianZhiPlace) return Promise.resolve(null);
+    return window.TianZhiPlace.resolve(lon, lat, {
+      // 高德 SDK 加载好才用得上；没加载就只走 BigDataCloud
+      AMap: window.AMap || null,
+      toGcj: function (lo, la) {
+        try { return T.wgs84ToGcj(lo, la); } catch (e) { return [lo, la]; }
+      }
+    }).catch(function () { return null; });
+  }
+
+  /** 用更细的结果更新界面（只更新仍在同一坐标上的选择） */
+  function applyFinePlace(fine, lon, lat) {
+    if (!fine || !fine.label) return;
+    if (Math.abs(form.lon - lon) > 1e-6 || Math.abs(form.lat - lat) > 1e-6) return;
+
+    if (fine.sub) form.place = fine.sub;
+    if (fine.city) form.city = fine.city;
+    form.village = fine.village || '';
+    form.precision = fine.precision;
+
+    var tag = PRECISION_TAG[fine.precision];
+    var suffix = tag ? '（' + tag + '）' : '';
+
+    $('fHint').className = 'hint';
+    $('fHint').textContent = '已选地点：' + fine.label + suffix;
+    $('mapRead').innerHTML = '已选点：<span class="loc">' + fine.label + '</span>';
+
+    // 高德服务不可用（例如安全密钥不匹配）时，说明白为什么只到乡镇
+    if (!fine.village && fine.error && /SCODE|KEY/i.test(fine.error)) {
+      $('fHint').className = 'hint warn';
+      $('fHint').textContent = '已选地点：' + fine.label +
+        '（高德定位服务鉴权失败，暂时只能到乡镇）';
+      if (window.console) console.warn('[知时智农] 高德逆地理编码失败：' + fine.error);
+    }
+  }
+
+  /** 触发一次在线精确化，结果回来时只认最后一次点击 */
+  function kickFinePlace(lon, lat) {
+    var seq = ++PLACE_SEQ;
+    return resolveFinePlace(lon, lat).then(function (fine) {
+      if (seq !== PLACE_SEQ) return;      // 期间又点了别处
+      applyFinePlace(fine, lon, lat);
+    });
+  }
+
+  /** 地名里是否已经是"细粒度"（村/乡镇），用于决定要不要提示升级中 */
+  function isFineName(s) {
+    return /(村|庄|屯|营|寨|沟|铺|集|堡|街道|镇|乡)$/.test(s || '');
   }
 
   /* ---------- 加载高德 SDK ---------- */
@@ -1682,8 +1788,11 @@
       : '已选点（省外或海上）';
     $('fHint').className = 'hint';
     $('fHint').textContent = loc
-      ? '已选地点：' + describePlace(loc)
+      ? '已选地点：' + describePlace(loc) + '（正在识别到村…）'
       : '已选地点：' + lat.toFixed(2) + '°N, ' + lon.toFixed(2) + '°E';
+
+    // 后台升级到村名（高德能给到村，BigDataCloud 兜底到乡镇）
+    kickFinePlace(lon, lat);
 
     drawMarker(lat, lon);
     drawPlotMarkers();
@@ -2020,6 +2129,12 @@
     $('mapCoord').textContent = lat.toFixed(2) + '°N, ' + lon.toFixed(2) + '°E';
     $('mapRead').innerHTML = '已选点：<span class="loc">' + desc + '</span>';
     $('fResults').innerHTML = '';
+
+    // 后台把"县名"升级成"村名/乡镇名"，回来时自己更新界面
+    if (!isFineName(form.place)) {
+      $('fHint').textContent = '已选地点：' + desc + '（正在识别到村…）';
+    }
+    kickFinePlace(lon, lat);
   }
 
   function openModal(plot) {
@@ -2129,15 +2244,19 @@
     if (!area || area <= 0) { toast('面积要大于 0'); $('fArea').focus(); return; }
     if (!form.place) { toast('先选一个地点'); return; }
 
-    // 保存前用坐标再校正一次地名，杜绝"名字和坐标对不上"
+    // 保存前再校正一次：优先用在线解析出的细粒度名称（村 / 乡镇），
+    // 拿不到才退回本地县界给出的县名。
+    // 注意不能反过来——县界只到县，用它覆盖会把已经识别出的村名抹掉。
     var loc = locateCounty(form.lon, form.lat);
-    var finalPlace = loc ? displayName(loc) : form.place;
-    var finalCity = loc ? loc.city : '';
+    var bad = !form.place || form.place === '未知位置' || form.place === '地图选点' || form.place === '我的位置';
+    var finalPlace = bad ? (loc ? displayName(loc) : form.place) : form.place;
+    var finalCity = form.city || (loc ? loc.city : '');
 
     if (state.editing) {
       var p = state.plots.filter(function (x) { return x.id === state.editing.id; })[0];
       p.name = name; p.area = area; p.crop = crop;
       p.place = finalPlace; p.city = finalCity;
+      p.village = form.village || '';
       p.lat = form.lat; p.lon = form.lon;
       state.activeId = p.id;
       toast('已保存「' + name + '」');
@@ -2145,7 +2264,7 @@
       var np = {
         id: 'p' + Date.now(),
         name: name, area: area, crop: crop,
-        place: finalPlace, city: finalCity,
+        place: finalPlace, city: finalCity, village: form.village || '',
         lat: form.lat, lon: form.lon
       };
       state.plots.push(np);
