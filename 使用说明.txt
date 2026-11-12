@@ -8,12 +8,12 @@
 
 浏览器打开：
 
-    https://lixiangzhi0000.github.io/zhishi-zhinong/
+    https://leeforword.github.io/zhishi-zhinong/
 
 手机打开后可以「安装」到桌面，变成一个独立图标，全屏运行，
 下次不用再翻书签 —— 具体步骤见第六节。
 
-> 网址里的 lixiangzhi0000 换成部署仓库的 GitHub 用户名。
+> 网址里的 leeforword 换成部署仓库的 GitHub 用户名。
 > 如果还没部署，看 docs/部署与安装.md。
 
 ---

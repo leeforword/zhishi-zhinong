@@ -18,7 +18,7 @@
 部署完成后地址形如：
 
 ```
-https://lixiangzhi0000.github.io/zhishi-zhinong/
+https://leeforword.github.io/zhishi-zhinong/
 ```
 
 ### 装到手机桌面（像 App 一样用）
