@@ -16,17 +16,66 @@
   'use strict';
 
   var CFG = root.TIANZHI_CONFIG || {};
-  var KEY = CFG.deepseekKey || '';
-  var MODEL = CFG.deepseekModel || 'deepseek-chat';
-  var ENDPOINT = CFG.deepseekEndpoint || 'https://api.deepseek.com/chat/completions';
-  var TIMEOUT = CFG.timeoutMs || 9000;
 
-  var enabled = !!KEY && CFG.enableLLM !== false;
-  var stats = { calls: 0, ok: 0, fallback: 0, rejected: 0 };
+  /* ============================================================
+     运行时配置
+     -------------------------------------------------------------
+     三种模式，优先级由 settings.js（「我的」页可改）决定：
+
+       proxy  → 调自己的 Cloudflare Worker 中转，前端没有 key
+       direct → 前端直连，key 存在本机浏览器（仅本地开发用）
+       off    → 纯规则引擎，所有 AI 功能静默跳过
+
+     为什么默认是 proxy：仓库是公开的，前端一旦写死 key，
+     等于把按量计费的额度送给所有看得见源码的人。
+     ============================================================ */
+  var RT = {
+    mode: 'off',
+    endpoint: '',
+    proxyUrl: '',
+    key: '',
+    model: 'deepseek-chat',
+    timeout: CFG.timeoutMs || 9000
+  };
+
+  var stats = { calls: 0, ok: 0, fallback: 0, rejected: 0, lastError: null };
+  var enabled = false;
+
+  function readRuntime() {
+    var S = root.TianZhiSettings;
+    var ai = S ? S.get('ai') : {
+      mode: CFG.llmProxyUrl ? 'proxy' : (CFG.deepseekKey ? 'direct' : 'off'),
+      proxyUrl: CFG.llmProxyUrl || '',
+      key: CFG.deepseekKey || '',
+      endpoint: CFG.deepseekEndpoint || 'https://api.deepseek.com/chat/completions',
+      model: CFG.deepseekModel || 'deepseek-chat'
+    };
+
+    RT.mode = ai.mode || 'off';
+    RT.proxyUrl = ai.proxyUrl || '';
+    RT.key = ai.key || '';
+    RT.endpoint = ai.endpoint || 'https://api.deepseek.com/chat/completions';
+    RT.model = ai.model || 'deepseek-chat';
+    RT.timeout = CFG.timeoutMs || 9000;
+
+    enabled = (RT.mode === 'proxy' && !!RT.proxyUrl) || (RT.mode === 'direct' && !!RT.key);
+    return RT;
+  }
+
+  readRuntime();
 
   function isEnabled() { return enabled; }
-  function setEnabled(v) { enabled = !!v && !!KEY; }
-  function hasKey() { return !!KEY; }
+
+  /** 用户手动关掉 AI（问答卡片右上角的开关）：只关本次，不改设置 */
+  function setEnabled(v) {
+    enabled = !!v && ((RT.mode === 'proxy' && !!RT.proxyUrl) || (RT.mode === 'direct' && !!RT.key));
+  }
+
+  /** 设置改过之后重新读一遍 */
+  function reconfigure() { readRuntime(); return enabled; }
+
+  function hasKey() { return RT.mode === 'proxy' ? !!RT.proxyUrl : !!RT.key; }
+
   function getStats() { return stats; }
 
   /* ---------------- 底层请求 ---------------- */
@@ -36,32 +85,60 @@
     if (!navigator.onLine) return Promise.reject(new Error('离线'));
 
     var ctrl = new AbortController();
-    var timer = setTimeout(function () { ctrl.abort(); }, opts.timeout || TIMEOUT);
+    var timer = setTimeout(function () { ctrl.abort(); }, opts.timeout || RT.timeout);
     stats.calls++;
+    stats.lastError = null;
 
-    return fetch(ENDPOINT, {
-      method: 'POST',
-      signal: ctrl.signal,
-      headers: {
+    var url, headers, body;
+
+    if (RT.mode === 'proxy') {
+      /* 走中转：不带任何密钥。Worker 那边校验来源域名后自己加 key。
+         请求体只发 messages 和两个参数，Worker 会做白名单过滤。 */
+      url = RT.proxyUrl;
+      headers = { 'Content-Type': 'application/json' };
+      body = {
+        messages: messages,
+        temperature: opts.temperature === undefined ? 0.3 : opts.temperature,
+        maxTokens: opts.maxTokens || 320
+      };
+    } else {
+      /* 直连：仅限本地开发。公开部署绝不要用这个模式。 */
+      url = RT.endpoint;
+      headers = {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + KEY
-      },
-      body: JSON.stringify({
-        model: MODEL,
+        'Authorization': 'Bearer ' + RT.key
+      };
+      body = {
+        model: RT.model,
         messages: messages,
         temperature: opts.temperature === undefined ? 0.3 : opts.temperature,
         max_tokens: opts.maxTokens || 320,
         stream: false
-      })
+      };
+    }
+
+    return fetch(url, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: headers,
+      body: JSON.stringify(body)
     }).then(function (r) {
       clearTimeout(timer);
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     }).then(function (j) {
-      if (!j.choices || !j.choices[0]) throw new Error('返回结构异常');
-      return j.choices[0].message.content.trim();
+      // 中转回的是 {content}，直连回的是 OpenAI 结构，两种都认
+      if (typeof j.content === 'string') return j.content.trim();
+      if (j.choices && j.choices[0] && j.choices[0].message) {
+        return String(j.choices[0].message.content || '').trim();
+      }
+      if (j.error) throw new Error(String(j.error));
+      throw new Error('返回结构异常');
     }, function (e) {
       clearTimeout(timer);
+      throw e;
+    }).catch(function (e) {
+      stats.lastError = e.message;
       throw e;
     });
   }
@@ -191,8 +268,10 @@
   root.TianZhiLLM = {
     isEnabled: isEnabled,
     setEnabled: setEnabled,
+    reconfigure: reconfigure,
     hasKey: hasKey,
     getStats: getStats,
+    getMode: function () { return RT.mode; },
     classify: classify,
     refine: refine,
     refuse: refuse,

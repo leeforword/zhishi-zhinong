@@ -636,17 +636,21 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
 .modal{
   background:var(--surface);border-radius:var(--r-lg);border:1px solid var(--border);
   box-shadow:0 20px 40px rgba(16,24,40,.18);
-  width:100%;max-width:520px;max-height:92vh;overflow-y:auto;
+  width:100%;max-width:520px;max-height:92vh;
+  /* 地图默认展开后内容变长，改成「头尾固定、中间滚动」，
+     这样「保存」永远在屏幕里，不用滚到底才能提交 */
+  display:flex;flex-direction:column;overflow:hidden;
 }
 .modal-head{
   padding:14px 18px;display:flex;align-items:center;justify-content:space-between;
-  border-bottom:1px solid var(--border);
+  border-bottom:1px solid var(--border);flex:none;
 }
 .modal-head h3{font-size:14px;font-weight:600}
-.modal-body{padding:16px 18px 4px}
+.modal-body{padding:16px 18px 4px;flex:1;min-height:0;overflow-y:auto}
 .modal-foot{
   padding:12px 18px 16px;display:flex;gap:8px;justify-content:flex-end;
-  border-top:1px solid var(--border);margin-top:8px;
+  border-top:1px solid var(--border);flex:none;background:rgba(255,255,255,.96);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
 }
 .frow{margin-bottom:14px}
 .frow > label{display:block;font-size:12px;font-weight:500;color:var(--text-2);margin-bottom:5px}
@@ -967,6 +971,105 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
             padding-right:max(12px,env(safe-area-inset-right))}
   }
 }
+/* ============================================================
+   视图切换：内容 / 对话 / 我的
+   -------------------------------------------------------------
+   同一套 DOM，两种导航方式：
+     · 手机（≤640px）：底部固定三个 Tab
+     · 电脑：左侧栏顶部三个入口
+   不复制页面，只切换 .view 的显示，避免两套代码各自跑偏。
+   ============================================================ */
+.view{display:none}
+.view.on{display:block}
+
+/* 左侧栏导航（电脑） */
+.side-nav{display:flex;flex-direction:column;gap:2px;padding:6px 8px 10px;
+          border-bottom:1px solid var(--border);flex:none}
+.side-nav button{
+  display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;
+  border:0;background:transparent;border-radius:var(--r-sm);
+  font-family:inherit;font-size:12.5px;color:var(--text-2);cursor:pointer;text-align:left;
+}
+.side-nav button:hover{background:var(--surface-2)}
+.side-nav button.on{background:var(--brand-weak);color:var(--brand);font-weight:600}
+.side-nav button svg{width:15px;height:15px;flex:none}
+.side-nav .dot-tip{width:5px;height:5px;border-radius:50%;background:var(--success);margin-left:auto;flex:none}
+
+/* 底部 Tab（手机） */
+.tabbar{display:none}
+
+/* 对话页：整块占满，中间滚动，输入框贴底 */
+#viewChat.on{display:flex;flex-direction:column;height:calc(100vh - 52px)}
+#viewChat .chatwrap{display:flex;flex-direction:column;height:100%;min-height:0}
+#viewChat .chat-head{padding:10px 14px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none;
+  background:rgba(255,255,255,.6)}
+#viewChat .chat-title{font-size:13px;font-weight:600;color:var(--text)}
+#viewChat .chat-sub{font-size:11px;color:var(--text-3);margin-top:2px}
+#viewChat .ask-meta{flex:none}
+#viewChat .ai-tag{white-space:nowrap}
+#viewChat .qa-log{flex:1;min-height:0;overflow-y:auto;padding:14px;display:flex;
+  flex-direction:column;gap:10px;background:var(--surface-solid)}
+#viewChat .qa-foot{flex:none;border-top:1px solid var(--border);padding:10px 14px;
+  background:rgba(255,255,255,.92);padding-bottom:max(10px,env(safe-area-inset-bottom))}
+#viewChat .qa-foot .chips-row{margin:0 0 8px;overflow-x:auto;flex-wrap:nowrap;
+  -webkit-overflow-scrolling:touch;padding-bottom:2px}
+#viewChat .qa-foot .chip-btn{flex:none}
+#viewChat .qa-input{margin:0}
+
+/* 「我的」页 */
+/* 地块行右侧有常显的编辑/删除按钮，给面积数字留出位置，别互相压住 */
+.plot{padding-right:66px}
+.mine-sec{margin-bottom:12px}
+.mine-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.mine-row:last-child{border-bottom:0}
+.mine-row .k{font-size:12.5px;color:var(--text);flex:none;min-width:96px}
+.mine-row .v{font-size:12px;color:var(--text-2);flex:1;min-width:0}
+.mine-row .v b{color:var(--text);font-weight:600}
+.mine-row .field{flex:1;min-width:0}
+.mine-hint{font-size:11px;color:var(--text-3);line-height:1.6;margin:6px 0 0}
+.mine-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.tabs-sm{display:flex;gap:4px;background:var(--surface-2);padding:3px;border-radius:var(--r-md)}
+.tabs-sm button{flex:1;border:0;background:transparent;font-family:inherit;font-size:11.5px;
+  padding:5px 8px;border-radius:5px;color:var(--text-2);cursor:pointer}
+.tabs-sm button.on{background:#fff;color:var(--text);font-weight:600;box-shadow:var(--shadow)}
+.about-list{font-size:12px;color:var(--text-2);line-height:1.9}
+.about-list b{color:var(--text)}
+.news{font-size:11px;color:var(--text-3);line-height:1.7}
+
+/* 聊天时输入框贴着底部，安装提示条会正好压住它 → 这个视图下不弹提示条 */
+html.zz-chat #zzBar{display:none!important}
+
+/* 「我的」页在宽屏上别铺满 1440px，输入框拉太长很难读 */
+@media (min-width:900px){
+  #viewMine .content{max-width:860px;margin:0 auto;width:100%}
+  .mine-row .field{max-width:340px}
+}
+
+@media (max-width:640px){
+  .tabbar{
+    display:flex;position:fixed;left:0;right:0;bottom:0;z-index:130;
+    background:rgba(255,255,255,.95);
+    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    border-top:1px solid var(--border);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  .tabbar button{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    height:52px;border:0;background:transparent;font-family:inherit;
+    font-size:10.5px;color:var(--text-3);cursor:pointer;padding:0;
+  }
+  .tabbar button.on{color:var(--brand);font-weight:600}
+  .tabbar button svg{width:19px;height:19px}
+  .side-nav{display:none}          /* 手机用底部 Tab，左侧栏只放地块 */
+  /* 给底部 Tab 让出空间，否则最后一张卡片会被挡住 */
+  body{padding-bottom:calc(52px + env(safe-area-inset-bottom,0px))}
+  #viewChat.on{height:calc(100vh - 52px - 52px - env(safe-area-inset-bottom,0px))}
+  /* 手机上"问一句"这行副标题太长，会顶掉输入框的高度，直接省掉 */
+  #viewChat .chat-sub{display:none}
+  #viewChat .qa-log{padding:12px}
+  #viewChat .qa-foot{padding:8px 12px 8px}
+}
 </style>
 </head>
 <body>
@@ -998,7 +1101,31 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
       </div>
     </div>
 
-    <div class="side-sec" style="flex:1;overflow-y:auto">
+    <!-- 三个功能区（电脑端；手机端改用底部 Tab） -->
+    <nav class="side-nav" id="sideNav">
+      <button data-view="content" class="on">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/>
+          <rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>
+        </svg>
+        内容
+      </button>
+      <button data-view="chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-4-.9L3 21l1.9-4.6A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/>
+        </svg>
+        对话
+        <span class="dot-tip" id="chatDot" style="display:none"></span>
+      </button>
+      <button data-view="mine">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>
+        </svg>
+        我的
+      </button>
+    </nav>
+
+    <div class="side-sec" id="sidePlots" style="flex:1;overflow-y:auto">
       <div class="side-label">地块 <span class="cnt" id="plotCount">0 块</span></div>
       <div class="plots" id="plotList"></div>
       <button class="add-plot" id="addPlotBtn">
@@ -1043,6 +1170,8 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
       </div>
     </div>
 
+    <!-- ============ 视图一：内容（长滚动，不拆） ============ -->
+    <section class="view on" id="viewContent">
     <div class="content">
 
       <!-- ---------- 告警 ---------- -->
@@ -1189,22 +1318,30 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
         </div>
       </div>
 
-      <!-- ---------- 问答 ---------- -->
-      <div class="card">
-        <div class="card-head">
-          <span class="card-title">问一句</span>
+    </div>
+    </section>
+
+    <!-- ============ 视图二：对话（全屏聊天） ============ -->
+    <section class="view" id="viewChat">
+      <div class="chatwrap">
+        <div class="chat-head">
+          <div>
+            <div class="chat-title">问一句</div>
+            <div class="chat-sub" id="chatSub">回答由规则引擎算出，AI 只负责把话说顺</div>
+          </div>
           <span class="ask-meta">
             <span class="ai-tag" id="aiTag">AI 润色</span>
             <button class="ai-toggle" id="aiToggle" title="切换大模型润色">开</button>
           </span>
         </div>
-        <div class="card-body">
-          <div class="qa-log" id="qaLog"></div>
+        <div class="qa-log" id="qaLog"></div>
+        <div class="qa-foot">
           <div class="chips-row">
             <button class="chip-btn" data-q="哪天能打药？">哪天能打药</button>
             <button class="chip-btn" data-q="这几天要不要浇水？">要不要浇水</button>
             <button class="chip-btn" data-q="今天天气怎么样？">今日天气</button>
             <button class="chip-btn" data-q="可以晾晒吗？">可否晾晒</button>
+            <button class="chip-btn" data-q="我那几亩地长势怎么样？">长势怎么样</button>
           </div>
           <div class="qa-input">
             <input class="field" id="qaInput" placeholder="比如：这周哪天适合打药？" autocomplete="off">
@@ -1212,10 +1349,154 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
           </div>
         </div>
       </div>
+    </section>
 
-    </div>
+    <!-- ============ 视图三：我的 ============ -->
+    <section class="view" id="viewMine">
+      <div class="content">
+
+        <!-- 地块管理 -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">地块管理</span>
+            <span class="card-sub" id="minePlotCount"></span>
+          </div>
+          <div class="card-body">
+            <div class="plots" id="minePlotList"></div>
+            <button class="add-plot" id="mineAddPlot">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              新增地块
+            </button>
+            <div class="mine-hint">地图选点可精确到村/乡镇。点地块右侧的笔可编辑，× 可删除。</div>
+          </div>
+        </div>
+
+        <!-- 农事阈值 -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">农事阈值</span>
+            <span class="card-sub">按本地农技标准自行校准</span>
+          </div>
+          <div class="card-body">
+            <div class="mine-row">
+              <span class="k">风速上限</span>
+              <input class="field" id="setWind" type="number" min="0.5" max="20" step="0.1">
+              <span class="v" style="flex:none">m/s</span>
+            </div>
+            <div class="mine-row">
+              <span class="k">气温区间</span>
+              <input class="field" id="setTempMin" type="number" min="-20" max="40" step="1">
+              <span class="v" style="flex:none">~</span>
+              <input class="field" id="setTempMax" type="number" min="-10" max="50" step="1">
+              <span class="v" style="flex:none">℃</span>
+            </div>
+            <div class="mine-row">
+              <span class="k">作业时段</span>
+              <input class="field" id="setHourStart" type="number" min="0" max="23" step="1">
+              <span class="v" style="flex:none">~</span>
+              <input class="field" id="setHourEnd" type="number" min="1" max="24" step="1">
+              <span class="v" style="flex:none">时</span>
+            </div>
+            <div class="mine-row">
+              <span class="k">当日降水上限</span>
+              <input class="field" id="setRainDay" type="number" min="0" max="50" step="0.5">
+              <span class="v" style="flex:none">mm</span>
+            </div>
+            <div class="mine-hint">
+              默认值来自公开农技常识（风速 3.4 m/s ≈ 3 级风），<b>未经当地农技部门核定</b>。
+              如果你们县有明确标准，以当地为准，改这里即可，不用改代码。
+            </div>
+            <div class="mine-actions">
+              <button class="btn btn-primary" id="setSaveRules">保存并重算</button>
+              <button class="btn" id="setResetRules">恢复默认</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI 设置 -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">AI 对话</span>
+            <span class="card-sub" id="aiState"></span>
+          </div>
+          <div class="card-body">
+            <div class="mine-row">
+              <span class="k">模式</span>
+              <div class="tabs-sm" id="aiModeTabs" style="flex:1">
+                <button data-mode="proxy">中转（推荐）</button>
+                <button data-mode="direct">直连</button>
+                <button data-mode="off">关闭</button>
+              </div>
+            </div>
+            <div class="mine-row" id="aiRowProxy">
+              <span class="k">中转地址</span>
+              <input class="field" id="aiProxyUrl" placeholder="https://xxx.workers.dev">
+            </div>
+            <div class="mine-row" id="aiRowKey">
+              <span class="k">API Key</span>
+              <input class="field" id="aiKey" type="password" placeholder="sk-...">
+            </div>
+            <div class="mine-row" id="aiRowModel">
+              <span class="k">接口地址</span>
+              <input class="field" id="aiEndpoint" placeholder="https://api.deepseek.com/chat/completions">
+            </div>
+            <div class="mine-hint" id="aiHintBox"></div>
+            <div class="mine-actions">
+              <button class="btn btn-primary" id="aiSave">保存</button>
+              <button class="btn" id="aiTest">测试连接</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 关于 -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">关于</span><span class="card-sub">v4.0</span></div>
+          <div class="card-body">
+            <div class="about-list" id="aboutBox">
+              <div><b>知时智农</b> · 华北平原冬小麦 / 夏玉米农事决策助手</div>
+              <div>气象 <span id="aboutWeather">和风天气（主预报）+ Open-Meteo（集合）</span></div>
+              <div>地图 高德 JS API · 地名 高德逆地理编码 + BigDataCloud</div>
+              <div>行政区划 阿里 DataV GeoAtlas（离线内置）</div>
+            </div>
+            <div class="mine-hint" style="margin-top:10px">
+              <b>免责声明</b>：本工具输出的一切建议仅供参考。农事操作受土壤、品种、苗情、
+              历史管理等多重因素影响，实际决策请以当地农技部门指导意见和农药标签说明为准。
+            </div>
+            <div class="news" style="margin-top:10px">
+              隐私：不收集任何个人信息；地块与设置仅存于本机浏览器；定位坐标只用于请求天气，不上传服务器。
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
   </main>
 </div>
+
+<!-- 手机底部 Tab -->
+<nav class="tabbar" id="tabBar">
+  <button data-view="content" class="on">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/>
+      <rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>
+    </svg>
+    内容
+  </button>
+  <button data-view="chat">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-4-.9L3 21l1.9-4.6A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/>
+    </svg>
+    对话
+  </button>
+  <button data-view="mine">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>
+    </svg>
+    我的
+  </button>
+</nav>
+
 
 <!-- ================= 地块弹窗 ================= -->
 <div class="mask" id="plotMask">
@@ -1296,6 +1577,7 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
 <div class="toast" id="toast"></div>
 
 <script src="config.js"></script>
+<script src="settings.js"></script>
 <script src="llm.js"></script>
 <script src="weather.js"></script>
 <script src="hebei-geo.js"></script>

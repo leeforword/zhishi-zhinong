@@ -29,6 +29,7 @@ const SHELL = [
   './',
   './index.html',
   './config.js',
+  './settings.js',
   './llm.js',
   './weather.js',
   './hebei-geo.js',

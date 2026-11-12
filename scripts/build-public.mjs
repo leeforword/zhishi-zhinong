@@ -75,7 +75,7 @@ console.log('  1. DeepSeek key 已移除: ' + (cfg.includes("deepseekKey: ''") ?
 console.log('  2. 大模型默认关闭: ' + (cfg.includes('enableLLM: false') ? 'OK' : 'FAIL'));
 
 /* ---- 2. 复制其余文件 ---- */
-const files = ['index.html', 'llm.js', 'weather.js', 'hebei-geo.js', 'place.js',
+const files = ['index.html', 'settings.js', 'llm.js', 'weather.js', 'hebei-geo.js', 'place.js',
                'logic.js', 'ensemble.js', 'app.js', 'server.mjs', 'qr.mjs',
                /* PWA：装到手机桌面需要这三个 + icons/ */
                'pwa.js', 'sw.js', 'manifest.webmanifest'];

@@ -67,6 +67,64 @@
     }
   };
 
+  /* ===========================================================
+     阈值覆盖（来自「我的」页的用户设置）
+     -----------------------------------------------------------
+     为什么允许用户改：
+       这些阈值来自公开农技常识，没有经过当地农技部门核定。
+       与其写死一个数字然后标"待核实"，不如让懂行的人按本地
+       标准自己调——风速上限各地差别很大（平原/山区/邻近敏感作物）。
+
+     实现方式：直接修改上面这个 RULES 对象。
+       引擎里所有判定都读它，改完立刻生效；下次重算就会用新阈值。
+     只覆盖认识的字段，非法值一律忽略（不能让用户把页面玩坏）。
+     =========================================================== */
+  var OVERRIDABLE = {
+    wind_max: 'number', temp_min: 'number', temp_max: 'number',
+    rain_day_max: 'number', rain_prev_max: 'number',
+    hours_start: 'int', hours_end: 'int', min_window_hours: 'int'
+  };
+
+  function applyRuleOverrides(o) {
+    if (!o || typeof o !== 'object') return false;
+    var s = RULES.spray;
+    var changed = false;
+
+    Object.keys(OVERRIDABLE).forEach(function (k) {
+      if (!(k in o)) return;
+      var v = Number(o[k]);
+      if (!isFinite(v)) return;
+
+      if (k === 'hours_start') {
+        if (v < 0 || v > 23) return;
+        s.hours[0] = Math.round(v);
+        changed = true;
+        return;
+      }
+      if (k === 'hours_end') {
+        if (v < 1 || v > 24) return;
+        s.hours[1] = Math.round(v);
+        changed = true;
+        return;
+      }
+      if (k === 'min_window_hours') {
+        if (v < 1 || v > 12) return;
+        s.min_window_hours = Math.round(v);
+        changed = true;
+        return;
+      }
+      // 其余都是正数量：风速/气温/降水
+      if (v < 0 || v > 200) return;
+      s[k] = v;
+      changed = true;
+    });
+
+    // 时段起止写反了就纠正，否则窗口永远算不出来
+    if (s.hours[1] <= s.hours[0]) s.hours[1] = Math.min(24, s.hours[0] + 1);
+
+    return changed;
+  }
+
   var CROP_NAME = { wheat: '冬小麦', maize: '夏玉米' };
 
   var DOW = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -849,6 +907,7 @@
   /* =========================================================== */
   return {
     RULES: RULES,
+    applyRuleOverrides: applyRuleOverrides,
     CROP_NAME: CROP_NAME,
     DOW: DOW,
     CITIES: CITIES,

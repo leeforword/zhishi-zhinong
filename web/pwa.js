@@ -78,7 +78,8 @@
       /* ---- 顶栏安装按钮 ---- */
       '#zzInstallTop{display:none}',
       '#zzInstallTop.on{display:inline-flex}',
-      '@media (max-width:640px){#zzBar{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px))}}'
+      /* 手机上要给底部 Tab 栏让位，否则提示条正好压住导航 */
+      '@media (max-width:640px){#zzBar{left:8px;right:8px;bottom:calc(64px + env(safe-area-inset-bottom,0px))}}'
     ].join('\n');
 
     var el = document.createElement('style');

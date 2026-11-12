@@ -458,70 +458,78 @@
   /* =========================================================
      渲染：地块
      ========================================================= */
-  function renderPlots() {
-    var box = $('plotList');
-    box.innerHTML = '';
-    state.plots.forEach(function (p) {
-      var d = document.createElement('div');
+  /** 生成一行地块（左侧栏和「我的」页共用同一套渲染） */
+  function buildPlotNode(p) {
+    var d = document.createElement('div');
 
-      // 行内确认删除（不用浏览器原生 confirm）
-      if (state.pendingDelete === p.id) {
-        d.className = 'plot confirming';
-        d.innerHTML =
-          '<div class="plot-body">' +
-            '<div class="confirm-txt">删除「' + esc(p.name) + '」？</div>' +
-            '<div class="confirm-acts">' +
-              '<button class="mini-btn ghost" data-act="cancel">取消</button>' +
-              '<button class="mini-btn danger" data-act="confirm">删除</button>' +
-            '</div>' +
-          '</div>';
-        d.onclick = function (e) {
-          var btn = e.target.closest ? e.target.closest('button[data-act]') : null;
-          if (!btn) return;
-          e.stopPropagation();
-          if (btn.getAttribute('data-act') === 'confirm') doDelete(p);
-          else { state.pendingDelete = null; renderPlots(); }
-        };
-        box.appendChild(d);
-        return;
-      }
-
-      d.className = 'plot' + (p.id === state.activeId ? ' on' : '');
+    // 行内确认删除（不用浏览器原生 confirm）
+    if (state.pendingDelete === p.id) {
+      d.className = 'plot confirming';
       d.innerHTML =
-        '<div class="plot-main">' +
-          '<span class="plot-dot"></span>' +
-          '<span class="plot-name">' + esc(p.name) + '</span>' +
-          '<span class="plot-area">' + p.area + ' 亩</span>' +
-        '</div>' +
-        '<div class="plot-meta">' + esc(placeText(p)) +
-          '<span class="plot-crop">' + CROP_NAME[p.crop] + '</span></div>' +
-        '<span class="plot-acts">' +
-          '<button class="ico-btn" data-act="edit" title="编辑">' +
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16v4z"/></svg>' +
-          '</button>' +
-          '<button class="ico-btn del" data-act="del" title="删除">' +
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
-          '</button>' +
-        '</span>';
-
+        '<div class="plot-body">' +
+          '<div class="confirm-txt">删除「' + esc(p.name) + '」？</div>' +
+          '<div class="confirm-acts">' +
+            '<button class="mini-btn ghost" data-act="cancel">取消</button>' +
+            '<button class="mini-btn danger" data-act="confirm">删除</button>' +
+          '</div>' +
+        '</div>';
       d.onclick = function (e) {
         var btn = e.target.closest ? e.target.closest('button[data-act]') : null;
-        if (btn) {
-          e.stopPropagation();
-          if (btn.getAttribute('data-act') === 'edit') openModal(p);
-          else askDelete(p);
-          return;
-        }
-        if (state.loading || p.id === state.activeId) return;
-        state.activeId = p.id;
-        state.chartDay = null;
-        save();
-        renderPlots();
-        load();
+        if (!btn) return;
+        e.stopPropagation();
+        if (btn.getAttribute('data-act') === 'confirm') doDelete(p);
+        else { state.pendingDelete = null; renderPlots(); }
       };
-      box.appendChild(d);
+      return d;
+    }
+
+    d.className = 'plot' + (p.id === state.activeId ? ' on' : '');
+    d.innerHTML =
+      '<div class="plot-main">' +
+        '<span class="plot-dot"></span>' +
+        '<span class="plot-name">' + esc(p.name) + '</span>' +
+        '<span class="plot-area">' + p.area + ' 亩</span>' +
+      '</div>' +
+      '<div class="plot-meta">' + esc(placeText(p)) +
+        '<span class="plot-crop">' + CROP_NAME[p.crop] + '</span></div>' +
+      '<span class="plot-acts">' +
+        '<button class="ico-btn" data-act="edit" title="编辑">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16v4z"/></svg>' +
+        '</button>' +
+        '<button class="ico-btn del" data-act="del" title="删除">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+        '</button>' +
+      '</span>';
+
+    d.onclick = function (e) {
+      var btn = e.target.closest ? e.target.closest('button[data-act]') : null;
+      if (btn) {
+        e.stopPropagation();
+        if (btn.getAttribute('data-act') === 'edit') openModal(p);
+        else askDelete(p);
+        return;
+      }
+      if (state.loading || p.id === state.activeId) return;
+      state.activeId = p.id;
+      state.chartDay = null;
+      save();
+      renderPlots();
+      load();
+      // 手机端在「我的」里切换地块后，回到内容页才看得到结果
+      if (currentView !== 'content') setView('content');
+    };
+    return d;
+  }
+
+  function renderPlots() {
+    ['plotList', 'minePlotList'].forEach(function (id) {
+      var box = $(id);
+      if (!box) return;
+      box.innerHTML = '';
+      state.plots.forEach(function (p) { box.appendChild(buildPlotNode(p)); });
     });
-    $('plotCount').textContent = state.plots.length + ' 块';
+    if ($('plotCount')) $('plotCount').textContent = state.plots.length + ' 块';
+    if ($('minePlotCount')) $('minePlotCount').textContent = state.plots.length + ' 块';
   }
 
   function askDelete(p) {
@@ -2159,13 +2167,24 @@
       $('fHint').textContent = '已选地点：' + $('fHint').textContent.replace('已选地点：', '') + '（默认沿用当前地块，可修改）';
     }
 
-    // 地图默认收起，保证"保存"按钮在一屏内可见
-    $('mapPanel').style.display = 'none';
-    $('mapToggleTxt').textContent = '展开';
+    /* 地图默认展开
+       -------------------------------------------------------------
+       早期版本默认收起，为的是让"保存"按钮在一屏内可见。
+       但实测下来：这个工具的核心动作就是"在地图上点自己的地"，
+       默认藏起来等于让每个人多按一次，还容易以为没有地图功能。
+       收起的问题改由「保存按钮固定在弹窗底部」解决（CSS 已改 sticky），
+       两边的诉求就都在了。 */
+    $('mapPanel').style.display = 'block';
+    $('mapToggleTxt').textContent = '收起';
 
     bindMapStage();
     mapCenterOn(base.lon, base.lat, plot ? 9 : 8);
     $('plotMask').classList.add('on');
+    // 展开后需要重绘地图（此时容器才有真实尺寸）
+    setTimeout(function () {
+      renderMap({ lat: base.lat, lon: base.lon });
+      if (MAP.instance) MAP.instance.resize();
+    }, 80);
     setTimeout(function () { $('fName').focus(); }, 60);
   }
 
@@ -2468,6 +2487,206 @@
   };
 
   /* =========================================================
+     视图切换：内容 / 对话 / 我的
+     -------------------------------------------------------------
+     手机用底部 Tab，电脑用左侧栏。同一套 DOM，只切 .on。
+     ========================================================= */
+  var currentView = 'content';
+
+  function setView(name) {
+    if (['content', 'chat', 'mine'].indexOf(name) < 0) name = 'content';
+    currentView = name;
+
+    [['content', 'viewContent'], ['chat', 'viewChat'], ['mine', 'viewMine']]
+      .forEach(function (pair) {
+        var el = $(pair[1]);
+        if (el) el.classList.toggle('on', pair[0] === name);
+      });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-view]'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-view') === name);
+    });
+
+    // 聊天视图下输入框贴底，安装提示条会压住它（见 index.html 里的 CSS）
+    document.documentElement.classList.toggle('zz-chat', name === 'chat');
+
+    if (name === 'chat') {
+      var log = $('qaLog');
+      if (log) setTimeout(function () { log.scrollTop = log.scrollHeight; }, 30);
+    }
+    try { history.replaceState(null, '', '#' + name); } catch (e) { /* file:// 下可能不允许 */ }
+  }
+
+  function bindViews() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-view]'), function (b) {
+      b.onclick = function () { setView(b.getAttribute('data-view')); };
+    });
+    // 直接带 #chat / #mine 打开时进对应页（便于分享具体页面）
+    var h = (location.hash || '').replace('#', '');
+    if (h === 'chat' || h === 'mine') setView(h);
+  }
+
+  /* =========================================================
+     「我的」页：阈值 / AI / 地块
+     ========================================================= */
+  var S = window.TianZhiSettings;
+
+  /* ---------- 农事阈值 ---------- */
+  function fillRuleInputs() {
+    if (!S) return;
+    var r = S.get('rules');
+    if ($('setWind')) $('setWind').value = r.wind_max;
+    if ($('setTempMin')) $('setTempMin').value = Math.round(r.temp_min);
+    if ($('setTempMax')) $('setTempMax').value = Math.round(r.temp_max);
+    if ($('setHourStart')) $('setHourStart').value = r.hours_start;
+    if ($('setHourEnd')) $('setHourEnd').value = r.hours_end;
+    if ($('setRainDay')) $('setRainDay').value = r.rain_day_max;
+  }
+
+  function saveRules() {
+    if (!S) return;
+    var min = Number($('setTempMin').value);
+    var max = Number($('setTempMax').value);
+    if (isFinite(min) && isFinite(max) && max <= min) {
+      toast('气温上限要大于下限');
+      return;
+    }
+    var start = Number($('setHourStart').value);
+    var end = Number($('setHourEnd').value);
+    if (isFinite(start) && isFinite(end) && end <= start) {
+      toast('作业时段结束要晚于开始');
+      return;
+    }
+
+    S.save('rules', {
+      wind_max: Number($('setWind').value),
+      temp_min: min,
+      temp_max: max,
+      hours_start: start,
+      hours_end: end,
+      rain_day_max: Number($('setRainDay').value)
+    });
+    S.applyRules();
+    fillRuleInputs();          // 回填：逻辑层纠正过的值（比如时段写反）要能看出来
+    toast('阈值已保存，正在按新阈值重算');
+    load();
+  }
+
+  /* ---------- AI 设置 ---------- */
+
+  function activeAiMode() {
+    var on = $('aiModeTabs') ? $('aiModeTabs').querySelector('button.on') : null;
+    return on ? on.getAttribute('data-mode') : 'off';
+  }
+
+  function syncAiRows() {
+    var mode = activeAiMode();
+    if ($('aiRowProxy')) $('aiRowProxy').style.display = mode === 'proxy' ? '' : 'none';
+    if ($('aiRowKey')) $('aiRowKey').style.display = mode === 'direct' ? '' : 'none';
+    if ($('aiRowModel')) $('aiRowModel').style.display = mode === 'direct' ? '' : 'none';
+  }
+
+  function fillAiInputs() {
+    if (!S) return;
+    var ai = S.get('ai');
+    if ($('aiProxyUrl')) $('aiProxyUrl').value = ai.proxyUrl || '';
+    if ($('aiKey')) $('aiKey').value = ai.key || '';
+    if ($('aiEndpoint')) $('aiEndpoint').value = ai.endpoint || '';
+    if ($('aiModeTabs')) {
+      Array.prototype.forEach.call($('aiModeTabs').querySelectorAll('button'), function (b) {
+        b.classList.toggle('on', b.getAttribute('data-mode') === ai.mode);
+      });
+    }
+    syncAiRows();
+  }
+
+  function renderAiStatus() {
+    var st = S ? S.aiStatus() : { ok: false, text: '未配置' };
+    if ($('aiState')) $('aiState').textContent = st.text;
+    if ($('chatSub')) {
+      $('chatSub').textContent = st.ok
+        ? 'AI 只负责把结论说顺；所有数字来自规则引擎'
+        : '纯规则引擎模式：回答由实时气象数据算出，不经过大模型';
+    }
+    if ($('aiHintBox') && !$('aiHintBox').textContent) {
+      $('aiHintBox').innerHTML = '中转模式下前端没有 key，仓库公开也不怕被刷。' +
+        '部署方法见仓库里的 <b>worker/README.md</b>。';
+    }
+  }
+
+  function saveAi() {
+    if (!S) return;
+    var mode = activeAiMode();
+    S.save('ai', {
+      mode: mode,
+      proxyUrl: ($('aiProxyUrl').value || '').trim(),
+      key: ($('aiKey').value || '').trim(),
+      endpoint: ($('aiEndpoint').value || '').trim() || 'https://api.deepseek.com/chat/completions'
+    });
+    var L = window.TianZhiLLM;
+    if (L) {
+      L.reconfigure();
+      aiOn = L.isEnabled();
+      if (aiOn) L.setEnabled(true);
+    }
+    renderAiToggle();
+    renderAiStatus();
+    fillAiInputs();
+    toast('AI 设置已保存');
+  }
+
+  function bindMine() {
+    if ($('mineAddPlot')) $('mineAddPlot').onclick = function () { openModal(null); };
+    if ($('setSaveRules')) $('setSaveRules').onclick = saveRules;
+    if ($('setResetRules')) {
+      $('setResetRules').onclick = function () {
+        S.reset('rules');
+        S.applyRules();
+        fillRuleInputs();
+        toast('阈值已恢复默认');
+        load();
+      };
+    }
+    if ($('aiModeTabs')) {
+      Array.prototype.forEach.call($('aiModeTabs').querySelectorAll('button'), function (b) {
+        b.onclick = function () {
+          Array.prototype.forEach.call($('aiModeTabs').querySelectorAll('button'), function (x) {
+            x.classList.remove('on');
+          });
+          b.classList.add('on');
+          syncAiRows();
+        };
+      });
+    }
+    if ($('aiSave')) $('aiSave').onclick = saveAi;
+    if ($('aiTest')) {
+      $('aiTest').onclick = function () {
+        var btn = this;
+        saveAi();                       // 先保存，测的就是屏幕上这套配置
+        var L = window.TianZhiLLM;
+        if (!L || !L.isEnabled()) {
+          $('aiHintBox').textContent = '还没配好：' + (S ? S.aiStatus().text : '未配置');
+          return;
+        }
+        btn.disabled = true;
+        var old = btn.textContent;
+        btn.textContent = '测试中…';
+        L.classify('哪天能打药').then(function (k) {
+          $('aiHintBox').innerHTML = '连接正常，模型返回类别：<b>' + k + '</b>';
+        }).catch(function (e) {
+          $('aiHintBox').textContent = '连接失败：' + (e && e.message || e);
+        }).then(function () {
+          btn.disabled = false;
+          btn.textContent = old;
+        });
+      };
+    }
+    fillRuleInputs();
+    fillAiInputs();
+    renderAiStatus();
+  }
+
+  /* =========================================================
      启动
      ========================================================= */
   if (!loadStore()) {
@@ -2544,7 +2763,13 @@
   bindDrawer();       // 手机端侧栏抽屉
   buildPresets();     // 预设城市按钮已移除，这里只清理旧 DOM
   bindTaskSwitch();   // 未来七天：打药 / 灌溉 / 晾晒 切换
+  bindViews();        // 内容 / 对话 / 我的 三个视图
+  bindMine();         // 「我的」页：阈值 / AI 设置
   bindMapStage();     // 提前绑定并预加载高德 SDK
+
+  // 把用户改过的阈值先灌进规则引擎，再取第一次天气（否则首屏用的是默认阈值）
+  if (S) S.applyRules();
+
   renderAiToggle();
   appendMsg('bot', '你好。可以问我哪天适合打药、要不要浇水、这几天什么天气。\n数字都从实时气象数据算出来，不是我编的。');
   renderPlots();

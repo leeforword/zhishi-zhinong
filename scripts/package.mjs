@@ -57,6 +57,7 @@ const files = [
   ['start.bat', 'start.bat'],
   ['web/index.html', 'web/index.html'],
   ['web/config.js', 'web/config.js'],
+  ['web/settings.js', 'web/settings.js'],
   ['web/llm.js', 'web/llm.js'],
   ['web/weather.js', 'web/weather.js'],
   ['web/hebei-geo.js', 'web/hebei-geo.js'],

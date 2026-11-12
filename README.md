@@ -31,6 +31,20 @@ https://leeforword.github.io/zhishi-zhinong/
 
 装上之后：有自己的图标、全屏无地址栏、断网时界面仍能打开（会明确提示取不到天气数据）。
 
+### 界面分三个功能区
+
+| | 手机 | 电脑 |
+|---|---|---|
+| **内容** | 底部 Tab ① | 左侧栏 ① |
+| **对话** | 底部 Tab ②（全屏聊天，输入框贴底） | 左侧栏 ② |
+| **我的** | 底部 Tab ③ | 左侧栏 ③ |
+
+「内容」是长滚动的一整页（最佳窗口 → 今日判读 → 未来七天 → 五张图表），不拆分。
+「我的」包含四块：**地块管理 / 农事阈值 / AI 对话 / 关于**。
+
+> 农事阈值可在「我的」里直接改（风速上限、气温区间、作业时段、降水拦截），
+> 改完立刻按新阈值重算。这样当地农技部门有明确标准时，不用改代码。
+
 > ⚠️ 断网只保证**界面**能开。天气数据必须联网取，取不到时会明确告诉你
 > "现在没有网络"，**不会**拿上一次的旧数据冒充本次结果——这是农事工具该有的底线。
 
@@ -58,8 +72,23 @@ https://leeforword.github.io/zhishi-zhinong/
 **数字一致性校验**：输出里出现的每个数字都必须在原始答案中出现过，否则整段丢弃、
 回退模板。
 
-所以关掉大模型（`enableLLM: false`）之后，结论和数字**完全不变**，只是措辞更朴素。
-本仓库的公开版本就是这样跑的——它反过来证明了这套东西不依赖模型编数字。
+所以关掉大模型之后，结论和数字**完全不变**，只是措辞更朴素。
+
+### AI 对话怎么开（可选，走中转）
+
+网站是纯静态的，源码全网可见，所以**不能把 API key 写进前端**。正确做法是加一层
+Cloudflare Worker 中转：
+
+```
+浏览器 ──POST──▶ Worker（key 在服务端）──▶ DeepSeek
+   ↑ 没有 key              ↑ 有 key
+```
+
+部署步骤见 **[worker/README.md](worker/README.md)**（全程免费，约 10 分钟）。
+部署完把 Worker 地址填进 **我的 → AI 对话 → 中转地址**，或者写进 `web/config.js`
+的 `llmProxyUrl`。
+
+不配也能用：问答会退回「纯规则引擎模式」，界面会明确显示当前是哪一种。
 
 ---
 
@@ -124,10 +153,12 @@ zhishi-zhinong/
 ├── web/                         ← 开发目录
 │   ├── index.html               界面（样式 + 渲染 + 图表，手写 SVG）
 │   ├── logic.js                 规则引擎 + 问答 + 坐标转换
-│   ├── weather.js               气象数据层（Open-Meteo + 和风）
+│   ├── weather.js               气象数据层（和风主源 + Open-Meteo 集合/多模式）
+│   ├── place.js                 地名解析（坐标 → 市/乡镇/村，多源并行）
 │   ├── ensemble.js              集合预报 / 多模式比较
-│   ├── llm.js                   大模型增强层（意图 / 润色 / 数字校验）
-│   ├── app.js                   交互与渲染
+│   ├── settings.js              本地设置（AI 配置、农事阈值）
+│   ├── llm.js                   大模型增强层（意图 / 润色 / 数字校验 / 中转）
+│   ├── app.js                   交互、视图切换、渲染
 │   ├── pwa.js                   安装引导 + 版本更新 + 断网提示
 │   ├── sw.js                    Service Worker（应用外壳缓存）
 │   ├── manifest.webmanifest     桌面图标与安装信息
@@ -136,6 +167,9 @@ zhishi-zhinong/
 │   ├── hebei-geo.js             河北 167 个县级单元边界（离线内置）
 │   ├── icons/                   图标：192 / 512 / maskable / apple-touch
 │   └── server.mjs               本地静态服务器（零依赖）
+├── worker/                      ← AI 中转（Cloudflare Worker，可选）
+│   ├── ai-proxy.js              中转源码：key 只存在服务端
+│   └── README.md                10 分钟部署步骤
 ├── scripts/
 │   ├── build-site.mjs           web/ → site/，带自检
 │   ├── make-icons.mjs           零依赖生成 PNG 图标（手写 PNG 编码器）
@@ -198,7 +232,8 @@ zhishi-zhinong/
 |---|---|---|
 | 高德地图 `amapKey` | ✅ 保留 | 有域名白名单机制，**请务必在控制台绑定你的托管域名**，绑定后别的站用不了 |
 | 和风天气 `qweatherKey` | ✅ 保留 | 免费额度，被刷爆只是当天数据不全，控制台可随时换 |
-| DeepSeek `deepseekKey` | ❌ **不入库** | 按量计费，泄露等于直接扣钱。放在被 gitignore 的 `config.local.js` 里 |
+| DeepSeek `deepseekKey` | ❌ **不入库** | 按量计费，泄露等于直接扣钱。**放在 Cloudflare Worker 的环境变量里**（见 [worker/README.md](worker/README.md)），前端只知道中转地址 |
+| Cloudflare Worker 地址 | ✅ 入库 | 地址本身不含密钥，公开无风险 |
 
 ---
 
