@@ -1452,6 +1452,55 @@ html.zz-chat #zzBar{display:none!important}
   .tab-pill,.ai-fab,.qa-foot{transition:none!important}
 }
 
+
+/* ============================================================
+   地块弹窗：iOS 底部抽屉（手机）/ 放大卡片（桌面）
+   ============================================================ */
+.mask{background:rgba(17,24,39,.32);animation:maskIn .26s ease both;
+  -webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%)}
+@keyframes maskIn{from{opacity:0}to{opacity:1}}
+.modal{position:relative;border-radius:22px;border:1px solid rgba(255,255,255,.7);
+  box-shadow:0 26px 70px rgba(16,24,40,.24);
+  animation:modalIn .36s cubic-bezier(.22,1,.36,1) both}
+@keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.975)}to{opacity:1;transform:none}}
+
+@media (max-width:640px){
+  .mask{align-items:flex-end;padding:0}
+  .modal{
+    width:100%;max-width:100%;max-height:92dvh;
+    border-radius:28px 28px 0 0;border-bottom:0;
+    background:rgba(255,255,255,.9);
+    -webkit-backdrop-filter:blur(30px) saturate(190%);
+    backdrop-filter:blur(30px) saturate(190%);
+    box-shadow:0 -20px 56px rgba(18,28,22,.3),inset 0 1px 0 rgba(255,255,255,.9);
+    animation:sheetUp .48s cubic-bezier(.22,1,.36,1) both;
+  }
+  .modal::before{
+    content:"";position:absolute;left:50%;top:8px;transform:translateX(-50%);
+    width:38px;height:5px;border-radius:99px;background:rgba(17,24,39,.16);
+  }
+  @keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
+  .modal-head{padding:22px 18px 12px;border-bottom:1px solid rgba(17,24,39,.06);
+    background:transparent;position:sticky;top:0;z-index:3}
+  .modal-head h3{font-size:17px;font-weight:600}
+  .modal-body{padding:14px 18px 6px}
+  .modal-foot{
+    background:rgba(255,255,255,.72);
+    -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+    border-top:1px solid rgba(17,24,39,.06);
+    padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px));
+  }
+  .modal-foot .btn{
+    height:48px;border-radius:16px;font-size:15px;font-weight:600;
+    background:rgba(255,255,255,.92);color:var(--text);
+    border:1px solid rgba(17,24,39,.08);
+  }
+  .modal-foot .btn-primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .modal-foot .btn:active{transform:scale(.97)}
+  .modal .frow > label{font-size:12.5px}
+  .modal .field{height:44px;border-radius:12px;font-size:15px}
+}
+
 </style>
 </head>
 <body>

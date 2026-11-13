@@ -2397,6 +2397,20 @@
     kickFinePlace(lon, lat);
   }
 
+  /* 锁滚动时把滚动条宽度补回去，否则页面会横向抖一下 */
+  function lockBody(on) {
+    var b = document.body;
+    if (on) {
+      var sw = window.innerWidth - document.documentElement.clientWidth;
+      b.dataset.padRight = b.style.paddingRight || '';
+      if (sw > 0) b.style.paddingRight = sw + 'px';
+      b.style.overflow = 'hidden';
+    } else {
+      b.style.overflow = '';
+      b.style.paddingRight = b.dataset.padRight || '';
+    }
+  }
+
   function openModal(plot) {
     state.editing = plot || null;
     $('modalTitle').textContent = plot ? '编辑地块' : '新增地块';
@@ -2431,6 +2445,7 @@
 
     bindMapStage();
     mapCenterOn(base.lon, base.lat, plot ? 9 : 8);
+    lockBody(true);
     $('plotMask').classList.add('on');
     // 展开后需要重绘地图（此时容器才有真实尺寸）
     setTimeout(function () {
@@ -2442,6 +2457,7 @@
 
   function closeModal() {
     $('plotMask').classList.remove('on');
+    lockBody(false);
     state.editing = null;
   }
 
@@ -2758,8 +2774,13 @@
     pill.style.transform = 'translateX(' + (idx * 100) + '%)';
   }
 
+  var scrollMemo = { content: 0, chat: 0, mine: 0 };
+
   function setView(name) {
     if (['content', 'chat', 'mine'].indexOf(name) < 0) name = 'content';
+    var prevView = currentView;
+    // 必须在切换 display 之前记：切完再读 scrollY，浏览器的滚动位置已经被夹到 0 了
+    var fromY = window.scrollY || 0;
     currentView = name;
 
     [['content', 'viewContent'], ['chat', 'viewChat'], ['mine', 'viewMine']]
@@ -2778,6 +2799,13 @@
     if (name === 'chat') {
       var log = $('qaLog');
       if (log) setTimeout(function () { log.scrollTop = log.scrollHeight; }, 30);
+    }
+    // 每个视图各记各的滚动位置：切回来还在原地，不会突然跳顶
+    if (prevView !== name) {
+      scrollMemo[prevView] = fromY;
+      // 等一帧再滚：刚切过来的视图还没完成布局，直接 scrollTo 会被截断到很小的值
+      var target = name === 'chat' ? 0 : (scrollMemo[name] || 0);
+      setTimeout(function () { window.scrollTo(0, target); }, 40);
     }
     moveTabPill(name);
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* file:// 下可能不允许 */ }
