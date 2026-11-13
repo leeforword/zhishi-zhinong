@@ -551,10 +551,10 @@ button{font-family:inherit}
 .day.today{border-color:#C7DCE8;background:var(--brand-weak)}
 .day.best{border-color:#bbf7d0;background:var(--success-weak)}
 .day.sel{box-shadow:0 0 0 2px var(--brand)}
-.day-dow{font-size:11px;color:var(--text-2);font-weight:500;display:flex;align-items:center;gap:4px}
+.day-dow{font-size:11px;color:var(--text-2);font-weight:500;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .day-date{font-size:15px;font-weight:600;margin-top:1px;font-variant-numeric:tabular-nums}
 .day-icon{height:18px;margin-top:4px;display:flex;align-items:center;color:var(--text-2)}
-.day-weather{font-size:10.5px;color:var(--text-3);margin-top:1px}
+.day-weather{font-size:10px;color:var(--text-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .day-temp{font-size:11.5px;color:var(--text-2);margin-top:3px;font-variant-numeric:tabular-nums}
 .day-temp b{color:var(--text);font-weight:600}
 .day-rain{font-size:10.5px;color:var(--brand);margin-top:1px;min-height:14px}
@@ -1113,7 +1113,7 @@ html.zz-chat #zzBar{display:none!important}
 .verdict p{font-size:13px;color:var(--text-2);max-width:36ch;line-height:1.62;margin:0}
 /* 四宫格 KPI */
 .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.sky .kpi{background:rgba(255,255,255,.76);border:1px solid rgba(226,230,221,.9);
+.sky .kpi{background:rgba(255,255,255,.92);border:1px solid rgba(226,230,221,.9);
   border-radius:14px;padding:11px 12px 12px;backdrop-filter:blur(10px);
   -webkit-backdrop-filter:blur(10px);box-shadow:var(--shadow);transition:all .12s}
 .sky .kpi:hover{background:#fff;border-color:var(--border-strong)}
@@ -1182,10 +1182,78 @@ html.zz-chat #zzBar{display:none!important}
 .topbar{background:rgba(243,245,241,.86);border-bottom-color:var(--border)}
 .tabbar{background:rgba(255,255,255,.88);border-top-color:var(--border)}
 .icon-btn{background:var(--surface-solid);border-color:var(--border);border-radius:10px}
-.btn{background:var(--brand);border-radius:10px}
+.btn{background:var(--brand);border-color:var(--brand);color:#fff;border-radius:10px}
+.btn:hover{background:#2F5643;border-color:#2F5643}
 .btn:hover{background:#2F5643}
 
-/* ---- 手机端：地块卡、天象头收窄 ---- */
+/* ---- 七日 / 对话：贴合原型 ---- */
+.days{gap:6px}
+.day{border-radius:10px;background:var(--surface-2);padding:9px 6px}
+.day.today{border-color:var(--brand);background:var(--brand-weak)}
+.day.best{border-color:#B7DCC5;background:var(--success-weak)}
+.day-sel{border-color:var(--brand)}
+.qa-log{gap:14px}
+.msg{font-size:13px}
+.msg.bot{border-radius:4px 14px 14px 14px;padding:11px 13px;box-shadow:var(--shadow)}
+.msg.me{border-radius:14px 4px 14px 14px;padding:11px 13px;box-shadow:none}
+.msg .who{font-size:10.5px;letter-spacing:.02em}
+.qa-input{gap:8px}
+.field{border-radius:10px}
+.alert{border-radius:14px}
+/* ---- 我的：列表 + 滑轴（对齐原型） ---- */
+.home-top{display:flex;align-items:center;gap:9px;margin:0 0 10px}
+.btn-sm{height:32px;padding:0 12px;font-size:12px;border-radius:9px}
+.mine-list{background:var(--surface-solid);border:1px solid var(--border);border-radius:18px;
+  overflow:hidden;box-shadow:var(--shadow)}
+.mrow{display:flex;align-items:center;gap:11px;width:100%;padding:12px 16px;
+  border:0;border-bottom:1px solid var(--border);text-align:left;background:none;color:inherit}
+.mrow:last-child{border-bottom:none}
+.mrow .mic{width:28px;height:28px;border-radius:9px;background:var(--brand-weak);
+  display:grid;place-items:center;flex:none;color:var(--brand)}
+.mrow .mtx{min-width:0}
+.mrow .mtx b{display:block;font-size:13.5px;font-weight:500;color:var(--text)}
+.mrow .mtx span{font-size:11px;color:var(--text-3)}
+.mrow .mval{margin-left:auto;font-size:12px;color:var(--text-2);white-space:nowrap}
+.card.pad{padding:16px}
+.th-row{padding:2px 0 4px}
+.th-top{display:flex;align-items:baseline;gap:8px;font-size:12.5px;flex-wrap:wrap}
+.th-top b{font-weight:500;color:var(--text)}
+.th-top .hint{font-size:11px;color:var(--text-3)}
+.th-top .num{margin-left:auto;font-weight:600;color:var(--brand);font-variant-numeric:tabular-nums}
+.slider{-webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:99px;
+  background:var(--border-strong);margin:14px 0 4px;outline:none}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:99px;
+  background:#fff;border:2px solid var(--brand);box-shadow:var(--shadow);cursor:pointer}
+.slider::-moz-range-thumb{width:20px;height:20px;border-radius:99px;background:#fff;
+  border:2px solid var(--brand);cursor:pointer}
+.seg{display:flex;gap:3px;padding:3px;background:#EDF0EA;border:1px solid var(--border);border-radius:10px}
+.seg button{flex:1;padding:7px 4px;border-radius:7px;font-size:12px;color:var(--text-2);
+  background:none;border:0;transition:all .12s}
+.seg button.on{background:#fff;color:var(--text);font-weight:500;box-shadow:var(--shadow)}
+.m-field{margin-bottom:16px}
+.m-field label{display:block;font-size:12px;color:var(--text-2);margin-bottom:6px;font-weight:500}
+.m-inp{display:flex;align-items:center;gap:8px;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:10px;padding:0 12px;height:42px}
+.m-inp:focus-within{border-color:var(--brand);background:#fff}
+.m-inp input{flex:1;border:0;background:none;outline:none;font-size:14px;min-width:0;color:var(--text)}
+.m-inp .unit{font-size:11.5px;color:var(--text-3);flex:none}
+.note{background:var(--surface-2);border:1px dashed var(--border-strong);border-radius:10px;
+  padding:10px 12px;font-size:11.5px;color:var(--text-2);line-height:1.65}
+.note b{color:var(--text);font-weight:600}
+.notice:empty{display:none}
+.notice{display:flex;gap:8px;padding:10px 12px;border-radius:10px;background:var(--warn-weak);
+  color:#87600E;font-size:11.5px;line-height:1.6;margin-bottom:16px}
+.disc{background:var(--surface-2);border:1px solid var(--border);border-radius:18px;
+  padding:16px;font-size:11.5px;color:var(--text-2);line-height:1.75}
+.disc b{display:block;font-size:12.5px;color:var(--text);margin-bottom:6px;font-weight:600}
+.disc p+p{margin-top:6px}
+.btn-row{display:flex;gap:12px}
+.btn-row .btn{flex:1}
+.btn.gh{background:var(--surface-solid);color:var(--text);border:1px solid var(--border-strong)}
+.btn.gh:hover{background:var(--surface-2)}
+.btn.block{width:100%}
+
+
 @media (max-width:640px){
   /* 窄屏改成上下排：两列会把标题挤成"窗口"孤字 */
   .sky-body{grid-template-columns:1fr;gap:12px;padding:16px 14px 0;align-items:start}
@@ -1344,6 +1412,15 @@ html.zz-chat #zzBar{display:none!important}
     <!-- ============ 视图一：内容（长滚动，不拆） ============ -->
     <section class="view on" id="viewContent">
     <div class="content">
+
+      <!-- 首页左上角：新增地块 -->
+      <div class="home-top">
+        <button class="btn gh btn-sm" id="homeAddPlot">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          新增地块
+        </button>
+        <span class="hint" id="homePlotHint" style="font-size:11.5px;color:var(--text-3)"></span>
+      </div>
 
       <!-- ---------- 告警 ---------- -->
       <div class="alerts" id="alerts"></div>
@@ -1516,118 +1593,85 @@ html.zz-chat #zzBar{display:none!important}
     <section class="view" id="viewMine">
       <div class="content">
 
-        <!-- 地块管理 -->
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">地块管理</span>
-            <span class="card-sub" id="minePlotCount"></span>
+        <div class="sec-h"><h2>地块管理</h2><span class="hint" id="minePlotCount"></span></div>
+        <div class="card pad">
+          <div class="plots" id="minePlotList"></div>
+          <button class="add-plot" id="mineAddPlot">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新增地块
+          </button>
+          <div class="note" style="margin-top:12px">地图选点可精确到村 / 乡镇。点地块右侧的笔可编辑，× 可删除。</div>
+        </div>
+
+        <div class="sec-h"><h2>农事阈值</h2><span class="hint">按本地农技标准自行校准</span></div>
+        <div class="card pad">
+          <div class="th-row">
+            <div class="th-top"><b>风速上限</b><span class="hint">超过即判定不宜喷施</span><span class="num" id="thWindV">3.4 m/s</span></div>
+            <input class="slider" type="range" id="setWind" min="0.5" max="8" step="0.1">
           </div>
-          <div class="card-body">
-            <div class="plots" id="minePlotList"></div>
-            <button class="add-plot" id="mineAddPlot">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              新增地块
-            </button>
-            <div class="mine-hint">地图选点可精确到村/乡镇。点地块右侧的笔可编辑，× 可删除。</div>
+          <div class="th-row" style="margin-top:14px">
+            <div class="th-top"><b>气温区间</b><span class="hint">低于下限药效差，高于上限易药害</span><span class="num" id="thTempV">5 — 32 ℃</span></div>
+            <input class="slider" type="range" id="setTempMin" min="-10" max="20" step="1">
+            <input class="slider" type="range" id="setTempMax" min="15" max="40" step="1" style="margin-top:-6px">
+          </div>
+          <div class="th-row" style="margin-top:14px">
+            <div class="th-top"><b>作业时段</b><span class="hint">避开逆温与露水时段</span><span class="num" id="thHourV">6 — 18 时</span></div>
+            <input class="slider" type="range" id="setHourStart" min="0" max="14" step="1">
+            <input class="slider" type="range" id="setHourEnd" min="8" max="24" step="1" style="margin-top:-6px">
+          </div>
+          <div class="th-row" style="margin-top:14px">
+            <div class="th-top"><b>当日降水上限</b><span class="hint">预计雨量超过即关闭窗口</span><span class="num" id="thRainV">0.5 mm</span></div>
+            <input class="slider" type="range" id="setRainDay" min="0" max="10" step="0.1">
+          </div>
+          <div class="note" style="margin-top:16px">
+            默认值来自公开农技常识（风速 <b>3.4 m/s ≈ 3 级风</b>），未经当地农技部门核定。
+            如果你们县有明确标准，以当地为准，改这里即可，不用改代码。
+          </div>
+          <div class="btn-row" style="margin-top:14px">
+            <button class="btn" id="setSaveRules">保存并重算</button>
+            <button class="btn gh" id="setResetRules">恢复默认</button>
           </div>
         </div>
 
-        <!-- 农事阈值 -->
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">农事阈值</span>
-            <span class="card-sub">按本地农技标准自行校准</span>
+        <div class="sec-h"><h2>AI 对话</h2><span class="hint" id="aiState"></span></div>
+        <div class="card pad">
+          <div class="m-field">
+            <label>模式</label>
+            <div class="seg" id="aiModeTabs">
+              <button data-mode="proxy">中转（推荐）</button>
+              <button data-mode="direct">直连</button>
+              <button data-mode="off">关闭</button>
+            </div>
           </div>
-          <div class="card-body">
-            <div class="mine-row">
-              <span class="k">风速上限</span>
-              <input class="field" id="setWind" type="number" min="0.5" max="20" step="0.1">
-              <span class="v" style="flex:none">m/s</span>
-            </div>
-            <div class="mine-row">
-              <span class="k">气温区间</span>
-              <input class="field" id="setTempMin" type="number" min="-20" max="40" step="1">
-              <span class="v" style="flex:none">~</span>
-              <input class="field" id="setTempMax" type="number" min="-10" max="50" step="1">
-              <span class="v" style="flex:none">℃</span>
-            </div>
-            <div class="mine-row">
-              <span class="k">作业时段</span>
-              <input class="field" id="setHourStart" type="number" min="0" max="23" step="1">
-              <span class="v" style="flex:none">~</span>
-              <input class="field" id="setHourEnd" type="number" min="1" max="24" step="1">
-              <span class="v" style="flex:none">时</span>
-            </div>
-            <div class="mine-row">
-              <span class="k">当日降水上限</span>
-              <input class="field" id="setRainDay" type="number" min="0" max="50" step="0.5">
-              <span class="v" style="flex:none">mm</span>
-            </div>
-            <div class="mine-hint">
-              默认值来自公开农技常识（风速 3.4 m/s ≈ 3 级风），<b>未经当地农技部门核定</b>。
-              如果你们县有明确标准，以当地为准，改这里即可，不用改代码。
-            </div>
-            <div class="mine-actions">
-              <button class="btn btn-primary" id="setSaveRules">保存并重算</button>
-              <button class="btn" id="setResetRules">恢复默认</button>
-            </div>
+          <div class="m-field" id="aiRowProxy">
+            <label>中转地址</label>
+            <div class="m-inp"><input id="aiProxyUrl" placeholder="https://your-worker.xxx.workers.dev" autocomplete="off"><span class="unit">HTTPS</span></div>
+          </div>
+          <div class="m-field" id="aiRowKey">
+            <label>API Key</label>
+            <div class="m-inp"><input id="aiKey" type="password" placeholder="sk-…（仅存本机浏览器）" autocomplete="off"></div>
+          </div>
+          <div class="m-field" id="aiRowModel">
+            <label>接口地址</label>
+            <div class="m-inp"><input id="aiEndpoint" placeholder="https://api.deepseek.com/chat/completions" autocomplete="off"></div>
+          </div>
+          <div class="notice" id="aiHintBox"></div>
+          <div class="btn-row">
+            <button class="btn" id="aiSave">保存</button>
+            <button class="btn gh" id="aiTest">测试连接</button>
           </div>
         </div>
 
-        <!-- AI 设置 -->
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">AI 对话</span>
-            <span class="card-sub" id="aiState"></span>
-          </div>
-          <div class="card-body">
-            <div class="mine-row">
-              <span class="k">模式</span>
-              <div class="tabs-sm" id="aiModeTabs" style="flex:1">
-                <button data-mode="proxy">中转（推荐）</button>
-                <button data-mode="direct">直连</button>
-                <button data-mode="off">关闭</button>
-              </div>
-            </div>
-            <div class="mine-row" id="aiRowProxy">
-              <span class="k">中转地址</span>
-              <input class="field" id="aiProxyUrl" placeholder="https://xxx.workers.dev">
-            </div>
-            <div class="mine-row" id="aiRowKey">
-              <span class="k">API Key</span>
-              <input class="field" id="aiKey" type="password" placeholder="sk-...">
-            </div>
-            <div class="mine-row" id="aiRowModel">
-              <span class="k">接口地址</span>
-              <input class="field" id="aiEndpoint" placeholder="https://api.deepseek.com/chat/completions">
-            </div>
-            <div class="mine-hint" id="aiHintBox"></div>
-            <div class="mine-actions">
-              <button class="btn btn-primary" id="aiSave">保存</button>
-              <button class="btn" id="aiTest">测试连接</button>
-            </div>
-          </div>
+        <div class="sec-h"><h2>关于</h2><span class="hint">v4.2</span></div>
+        <div class="disc">
+          <b>知时智农 · 华北平原冬小麦 / 夏玉米农事决策助手</b>
+          <p>气象 <span id="aboutWeather">和风天气（主预报）+ Open-Meteo（集合预报，用于置信度）</span></p>
+          <p>地图 高德 JS API · 地名 高德逆地理编码 + BigDataCloud</p>
+          <p>行政区划 阿里 DataV GeoAtlas（离线内置）</p>
+          <p style="margin-top:10px;color:#8C3025"><b style="color:#8C3025;display:inline">免责声明：</b>本工具输出的一切建议仅供参考。农事操作受土壤、品种、苗情、历史管理等多重因素影响，实际决策请以当地农技部门指导意见和农药标签说明为准。</p>
+          <p style="color:#215C39"><b style="color:#215C39;display:inline">隐私：</b>不收集任何个人信息；地块与设置仅存于本机浏览器；定位坐标只用于请求天气，不上传服务器。</p>
         </div>
-
-        <!-- 关于 -->
-        <div class="card">
-          <div class="card-head"><span class="card-title">关于</span><span class="card-sub">v4.0</span></div>
-          <div class="card-body">
-            <div class="about-list" id="aboutBox">
-              <div><b>知时智农</b> · 华北平原冬小麦 / 夏玉米农事决策助手</div>
-              <div>气象 <span id="aboutWeather">和风天气（主预报）+ Open-Meteo（集合）</span></div>
-              <div>地图 高德 JS API · 地名 高德逆地理编码 + BigDataCloud</div>
-              <div>行政区划 阿里 DataV GeoAtlas（离线内置）</div>
-            </div>
-            <div class="mine-hint" style="margin-top:10px">
-              <b>免责声明</b>：本工具输出的一切建议仅供参考。农事操作受土壤、品种、苗情、
-              历史管理等多重因素影响，实际决策请以当地农技部门指导意见和农药标签说明为准。
-            </div>
-            <div class="news" style="margin-top:10px">
-              隐私：不收集任何个人信息；地块与设置仅存于本机浏览器；定位坐标只用于请求天气，不上传服务器。
-            </div>
-          </div>
-        </div>
+        <div id="aboutBox" style="display:none"></div>
 
       </div>
     </section>

@@ -2633,6 +2633,7 @@
      事件
      ========================================================= */
   $('addPlotBtn').onclick = function () { openModal(null); };
+  if ($('homeAddPlot')) $('homeAddPlot').onclick = function () { openModal(null); };
   $('modalClose').onclick = closeModal;
   $('modalCancel').onclick = closeModal;
   $('modalSave').onclick = formSave;
@@ -2732,6 +2733,38 @@
     if ($('setHourStart')) $('setHourStart').value = r.hours_start;
     if ($('setHourEnd')) $('setHourEnd').value = r.hours_end;
     if ($('setRainDay')) $('setRainDay').value = r.rain_day_max;
+    syncRuleLabels();
+  }
+
+  /** 滑轴旁边的实时数值 */
+  function syncRuleLabels() {
+    if ($('thWindV') && $('setWind')) $('thWindV').textContent = Number($('setWind').value).toFixed(1) + ' m/s';
+    if ($('thTempV') && $('setTempMin') && $('setTempMax')) {
+      $('thTempV').textContent = $('setTempMin').value + ' — ' + $('setTempMax').value + ' ℃';
+    }
+    if ($('thHourV') && $('setHourStart') && $('setHourEnd')) {
+      $('thHourV').textContent = $('setHourStart').value + ' — ' + $('setHourEnd').value + ' 时';
+    }
+    if ($('thRainV') && $('setRainDay')) $('thRainV').textContent = Number($('setRainDay').value).toFixed(1) + ' mm';
+  }
+
+  /** 滑轴：拖动即时回显；上下限互相顶住，不让出现反区间 */
+  function bindRuleSliders() {
+    var pairs = [['setTempMin', 'setTempMax'], ['setHourStart', 'setHourEnd']];
+    ['setWind', 'setTempMin', 'setTempMax', 'setHourStart', 'setHourEnd', 'setRainDay'].forEach(function (id) {
+      var el = $(id);
+      if (!el) return;
+      el.addEventListener('input', function () {
+        pairs.forEach(function (p) {
+          var a = $(p[0]), b = $(p[1]);
+          if (!a || !b) return;
+          if (id === p[0] && Number(a.value) > Number(b.value) - 1) b.value = String(Number(a.value) + 1);
+          if (id === p[1] && Number(b.value) < Number(a.value) + 1) a.value = String(Number(b.value) - 1);
+        });
+        syncRuleLabels();
+      });
+    });
+    syncRuleLabels();
   }
 
   function saveRules() {
@@ -2829,6 +2862,7 @@
   function bindMine() {
     if ($('mineAddPlot')) $('mineAddPlot').onclick = function () { openModal(null); };
     if ($('setSaveRules')) $('setSaveRules').onclick = saveRules;
+    bindRuleSliders();
     if ($('setResetRules')) {
       $('setResetRules').onclick = function () {
         S.reset('rules');
