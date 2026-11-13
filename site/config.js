@@ -65,7 +65,7 @@ window.TIANZHI_CONFIG = {
      申请：console.amap.com → 应用管理 → 我的应用 → 添加 Key
            服务平台选「Web服务」，不要设 IP 白名单（浏览器端调用）
      填进来之后，逆地理会优先走它，不再依赖 JS 的安全密钥。 */
-  amapWebKey: '',
+  amapWebKey: '1eb2e997c877ab0bc39c7d91f9c3bdb7',  // zhishi-rest · Web服务 · 逆地理编码
 
   /* ---------- 和风天气 ----------
      ⚠️ 新版和风必须使用「账号专属 API Host」（控制台 → 项目详情页顶部）。
