@@ -28,31 +28,38 @@
    不追求装饰，追求"每个元素都有理由"。
    ============================================================ */
 :root{
-  --bg:#f7f8fa;
-  --surface:rgba(255,255,255,.88);
+  --bg:#F3F5F1;
+  --surface:rgba(255,255,255,.9);
   --surface-solid:#ffffff;
-  --surface-2:rgba(249,250,251,.9);
-  --border:rgba(17,24,39,.09);
-  --border-strong:rgba(17,24,39,.16);
-  --text:#111827;
-  --text-2:#6b7280;
-  --text-3:#9ca3af;
-  --brand:#2563eb;
-  --brand-weak:rgba(239,246,255,.9);
-  --success:#16a34a;
-  --success-weak:rgba(240,253,244,.9);
-  --warn:#d97706;
-  --warn-weak:rgba(255,251,235,.9);
-  --danger:#dc2626;
-  --danger-weak:rgba(254,242,242,.9);
+  --surface-2:#F8FAF7;
+  --border:#E2E6DD;
+  --border-strong:#D2D8CC;
+  --text:#1A1F1B;
+  --text-2:#5B645A;
+  --text-3:#8D958A;
+  --brand:#3D6B55;
+  --brand-weak:#E7EFE9;
+  --success:#3B8A5A;
+  --success-weak:#E4F1E8;
+  --warn:#C0811A;
+  --warn-weak:#FBF0D9;
+  --danger:#BE4A3C;
+  --danger-weak:#F9E7E4;
   --r-sm:6px;
-  --r-md:8px;
-  --r-lg:12px;
-  --shadow:0 1px 2px rgba(16,24,40,.05);
-  --shadow-md:0 1px 3px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.04);
-  --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --r-md:10px;
+  --r-lg:14px;
+  --r-xl:18px;
+  --shadow:0 1px 2px rgba(26,31,27,.05);
+  --shadow-md:0 6px 24px rgba(26,31,27,.09),0 2px 6px rgba(26,31,27,.04);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  /* 天象头（默认晴） */
+  --sky-a:#F4E3C8;--sky-b:#E8EDE2;--sky-glow:rgba(242,182,102,.55);--sky-ac:#E0A55C;
 }
+.sky-rain{--sky-a:#D7E4EE;--sky-b:#E7EDE8;--sky-glow:rgba(120,158,190,.45);--sky-ac:#7BA3C4}
+.sky-wind{--sky-a:#DFE7E1;--sky-b:#EDF0E9;--sky-glow:rgba(140,170,155,.4);--sky-ac:#8FA994}
+.sky-snow{--sky-a:#E4EBF1;--sky-b:#F0F3F1;--sky-glow:rgba(170,196,214,.5);--sky-ac:#A8C4D6}
+.sky-cloud{--sky-a:#E6E9E4;--sky-b:#EFF1EC;--sky-glow:rgba(180,186,175,.4);--sky-ac:#A8B0A2}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{
@@ -160,13 +167,12 @@ button{font-family:inherit}
 /* 抽屉里的关闭按钮：只在手机抽屉出现（桌面侧栏一直可见，不需要） */
 .drawer-close{display:none}
 .brand-mark{
-  width:28px;height:28px;border-radius:var(--r-sm);flex:none;
-  background:linear-gradient(135deg,#2563eb,#1d4ed8);
-  display:grid;place-items:center;color:#fff;
-  box-shadow:0 1px 2px rgba(37,99,235,.35);
+  width:30px;height:30px;border-radius:9px;flex:none;
+  background:var(--brand-weak);
+  display:grid;place-items:center;color:var(--brand);
 }
-.brand-name{font-size:14px;font-weight:600;letter-spacing:.2px}
-.brand-sub{font-size:11px;color:var(--text-3);margin-top:-1px}
+.brand-name{font-size:15px;font-weight:600;letter-spacing:.01em}
+.brand-sub{font-size:9.5px;letter-spacing:.14em;color:var(--text-3);text-transform:uppercase;margin-top:1px}
 
 .side-sec{padding:14px 10px 6px}
 .side-label{
@@ -194,7 +200,7 @@ button{font-family:inherit}
   font-size:13px;font-weight:500;color:var(--text);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;
 }
-.plot.on .plot-name{color:#1d4ed8;font-weight:600}
+.plot.on .plot-name{color:#2F5643;font-weight:600}
 .plot-area{font-size:11px;color:var(--text-3);flex:none;font-variant-numeric:tabular-nums}
 .plot-meta{
   font-size:11px;color:var(--text-3);margin-top:1px;padding-left:13px;
@@ -276,7 +282,7 @@ button{font-family:inherit}
 .btn:active{transform:translateY(.5px)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
-.btn-primary:hover{background:#1d4ed8;border-color:#1d4ed8}
+.btn-primary:hover{background:#2F5643;border-color:#2F5643}
 .btn-sm{padding:3px 9px;font-size:11.5px}
 .btn-ghost{background:transparent;border-color:transparent;color:var(--text-2)}
 .btn-ghost:hover{background:var(--surface-2);color:var(--text)}
@@ -318,8 +324,8 @@ button{font-family:inherit}
 .alert.warn{border-color:#fde68a;background:var(--warn-weak)}
 .alert.warn .a-title{color:#b45309}
 .alert.warn .a-icon{color:var(--warn)}
-.alert.info{border-color:#bfdbfe;background:var(--brand-weak)}
-.alert.info .a-title{color:#1d4ed8}
+.alert.info{border-color:#C7DCE8;background:var(--brand-weak)}
+.alert.info .a-title{color:#2F5643}
 .alert.info .a-icon{color:var(--brand)}
 .alert.success{border-color:#bbf7d0;background:var(--success-weak)}
 .alert.success .a-title{color:#15803d}
@@ -451,7 +457,7 @@ button{font-family:inherit}
 .conf-caveat.ok{color:var(--text-3)}
 
 /* 逐小时支持率条 */
-.conf-strip{display:flex;gap:3px;margin-top:8px;height:20px;align-items:flex-end}
+.conf-strip{display:flex;gap:3px;margin-top:8px;height:14px;align-items:flex-end;max-width:520px}
 .conf-strip i{flex:1;border-radius:2px;min-height:5px;height:100%;display:block;transition:.2s}
 .conf-strip i:hover{transform:scaleY(1.15)}
 
@@ -542,7 +548,7 @@ button{font-family:inherit}
   cursor:pointer;transition:.12s;background:var(--surface);position:relative;
 }
 .day:hover{border-color:var(--border-strong);box-shadow:var(--shadow)}
-.day.today{border-color:#bfdbfe;background:var(--brand-weak)}
+.day.today{border-color:#C7DCE8;background:var(--brand-weak)}
 .day.best{border-color:#bbf7d0;background:var(--success-weak)}
 .day.sel{box-shadow:0 0 0 2px var(--brand)}
 .day-dow{font-size:11px;color:var(--text-2);font-weight:500;display:flex;align-items:center;gap:4px}
@@ -619,7 +625,7 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
 }
 .ask-meta{display:flex;align-items:center;gap:6px}
 .ai-tag{font-size:10.5px;color:var(--text-3);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:1px 7px}
-.ai-tag.on{color:#1d4ed8;background:var(--brand-weak);border-color:#bfdbfe}
+.ai-tag.on{color:#2F5643;background:var(--brand-weak);border-color:#C7DCE8}
 .ai-toggle{
   font-size:10.5px;font-weight:600;width:32px;height:18px;border-radius:999px;
   border:1px solid var(--border);background:var(--surface-2);color:var(--text-3);
@@ -1077,6 +1083,135 @@ html.zz-chat #zzBar{display:none!important}
   .mine-row .field{max-width:340px}
 }
 
+/* ============================================================
+   v2 设计语言（对齐《知时智农-浅色UI原型 v2》）
+   ============================================================ */
+/* ---- 区块标题 ---- */
+.sec-h{display:flex;align-items:baseline;gap:9px;margin:22px 2px 10px}
+.sec-h h2{font-size:16.5px;font-weight:600;letter-spacing:-.01em;margin:0;color:var(--text)}
+.sec-h .hint{font-size:11.5px;color:var(--text-3)}
+.sec-h .act{margin-left:auto}
+
+/* ---- 天象头 ---- */
+.sky{position:relative;margin:12px 0 0;border-radius:22px;overflow:hidden;
+  border:1px solid var(--border);padding-bottom:74px;
+  background:linear-gradient(168deg,var(--sky-a),var(--sky-b) 62%,var(--surface-solid));
+  box-shadow:var(--shadow);isolation:isolate}
+.sky-art{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+.sky-body{position:relative;padding:22px 18px 0;display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(300px,380px);gap:16px;align-items:end}
+.date-b{font-size:11px;color:var(--text-2);letter-spacing:.05em;display:flex;
+  align-items:center;gap:7px;margin-bottom:9px;flex-wrap:wrap}
+.jq{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;
+  background:rgba(255,255,255,.72);border:1px solid var(--border);
+  font-size:10.5px;color:#2B5040;font-weight:500}
+.verdict h1{font-size:clamp(22px,3.2vw,30px);font-weight:600;line-height:1.2;
+  letter-spacing:-.02em;margin:0 0 8px;color:var(--text)}
+.verdict h1 em{font-style:normal;color:var(--brand);position:relative;white-space:nowrap}
+.verdict h1 em::after{content:"";position:absolute;left:0;right:0;bottom:2px;height:6px;
+  background:var(--sky-glow);border-radius:99px;z-index:-1;opacity:.85}
+.verdict p{font-size:13px;color:var(--text-2);max-width:36ch;line-height:1.62;margin:0}
+/* 四宫格 KPI */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sky .kpi{background:rgba(255,255,255,.76);border:1px solid rgba(226,230,221,.9);
+  border-radius:14px;padding:11px 12px 12px;backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);box-shadow:var(--shadow);transition:all .12s}
+.sky .kpi:hover{background:#fff;border-color:var(--border-strong)}
+.sky .kpi .k{font-size:11.5px;color:var(--text-2);margin-bottom:5px;display:flex;
+  align-items:center;gap:5px;white-space:nowrap}
+.sky .kpi .v{font-size:23px;font-weight:600;letter-spacing:-.025em;line-height:1.1;color:var(--text);white-space:nowrap}
+.sky .kpi .u{display:inline;font-size:11.5px;font-weight:400;color:var(--text-3);margin-left:2px;white-space:nowrap}
+.sky .kpi .sub{font-size:10.5px;color:var(--text-3);margin-top:3px}
+.sky .kpi.warn .v{color:#87600E} .sky .kpi.bad .v{color:#8C3025} .sky .kpi.good .v{color:#215C39}
+
+/* ---- 适配度卡 ---- */
+.gauge-card{position:relative;z-index:2;margin:10px 0 0;padding:16px;
+  background:var(--surface-solid);border:1px solid var(--border);border-radius:18px;
+  box-shadow:var(--shadow-md);display:grid;grid-template-columns:132px minmax(0,1fr);
+  gap:16px;align-items:center}
+.gauge{position:relative;width:132px;height:132px;flex:none}
+.gauge svg{transform:rotate(-90deg);display:block}
+.gauge-t{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.gauge-n{font-size:34px;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--text)}
+.gauge-l{font-size:10.5px;color:var(--text-3);margin-top:4px;letter-spacing:.04em}
+.gauge-h{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.gauge-h b{font-size:14px;font-weight:600;color:var(--text)}
+.gauge-h span{font-size:11.5px;color:var(--text-3);margin-left:auto}
+.gbars{display:grid;gap:8px}
+.gbar{display:grid;grid-template-columns:72px minmax(0,1fr) 62px;gap:9px;align-items:center;font-size:11.5px}
+.gbar .bl{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gbar .bv{text-align:right;font-weight:600;font-size:11.5px;color:var(--text);font-variant-numeric:tabular-nums}
+.gtrack{height:5px;border-radius:99px;background:#EDF0EA;overflow:hidden}
+.gfill{display:block;height:100%;border-radius:99px;background:var(--brand);transition:width .34s cubic-bezier(.2,.8,.2,1)}
+
+/* ---- 详情卡（置信度/倒计时/推演） ---- */
+.detail-card{margin:10px 0 0;background:var(--surface-solid);border:1px solid var(--border);
+  border-radius:18px;box-shadow:var(--shadow);padding:14px}
+
+/* ---- 通用卡片换成大圆角 ---- */
+.card{border-radius:18px;border-color:var(--border);background:var(--surface-solid);box-shadow:var(--shadow)}
+.card-head{padding:13px 15px}
+.card-body{padding:14px 15px}
+.card-title{font-size:13.5px;font-weight:600;color:var(--text)}
+.card-sub{font-size:11px;color:var(--text-3)}
+
+/* ---- 判读卡（今日判读） ---- */
+.verdict-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.verdict-grid .kpi-item{display:flex;gap:10px;align-items:flex-start;background:var(--surface-solid);
+  border:1px solid var(--border);border-radius:14px;padding:13px 14px;box-shadow:var(--shadow)}
+.verdict-grid .kpi-main{min-width:0;flex:1}
+.verdict-grid .kpi-t{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;margin-bottom:6px}
+.verdict-grid .kpi-t .badge{margin-left:auto}
+.verdict-grid .kpi-d{font-size:11.5px;color:var(--text-2);line-height:1.55}
+
+/* ---- 地块卡（仅手机；桌面用左侧栏） ---- */
+.plot-sec,.plot-grid{display:none}
+
+/* ---- 图表容器 ---- */
+.cbox{background:var(--surface-solid);border:1px solid var(--border);border-radius:18px;
+  box-shadow:var(--shadow);padding:14px}
+.cbox-h{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.cbox-h b{font-size:13.5px;font-weight:600;color:var(--text)}
+.cbox-h span{font-size:11px;color:var(--text-3)}
+.cbox-h .lg{margin-left:auto;display:flex;gap:11px;flex-wrap:wrap}
+.cbox-h .lg i{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--text-2);font-style:normal}
+.cbox-h .lg i s{width:9px;height:2.5px;border-radius:99px;background:currentColor;text-decoration:none}
+.cbox-h .lg i s.dash{background:none;border-top:2px dashed currentColor;height:0}
+
+/* ---- 顶栏 / 底栏换肤 ---- */
+.topbar{background:rgba(243,245,241,.86);border-bottom-color:var(--border)}
+.tabbar{background:rgba(255,255,255,.88);border-top-color:var(--border)}
+.icon-btn{background:var(--surface-solid);border-color:var(--border);border-radius:10px}
+.btn{background:var(--brand);border-radius:10px}
+.btn:hover{background:#2F5643}
+
+/* ---- 手机端：地块卡、天象头收窄 ---- */
+@media (max-width:640px){
+  /* 窄屏改成上下排：两列会把标题挤成"窗口"孤字 */
+  .sky-body{grid-template-columns:1fr;gap:12px;padding:16px 14px 0;align-items:start}
+  .sky .kpi-grid{grid-template-columns:1fr 1fr;gap:7px}
+  .sky{padding-bottom:60px}
+  .verdict h1{font-size:21px}
+  .verdict p{font-size:12px}
+  .sky .kpi{padding:9px 10px 10px;border-radius:10px}
+  .sky .kpi .k{font-size:10.5px}
+  .sky .kpi .v{font-size:17px;letter-spacing:-.035em}
+  .sky .kpi .u{display:inline;font-size:10.5px}
+  .sky .kpi .sub{font-size:10px;line-height:1.45}
+  .gauge-card{grid-template-columns:1fr;gap:12px;padding:14px;margin:10px 0 0}
+  .sky{padding-bottom:56px}
+  .gauge{width:112px;height:112px}
+  .gauge-n{font-size:28px}
+  .detail-card{margin:10px 0 0;padding:12px}
+  .sec-h{margin:18px 2px 8px}
+  .sec-h h2{font-size:15px}
+  .cbox{padding:12px}
+  .verdict-grid{grid-template-columns:1fr;gap:8px}
+  .plot-sec{display:flex}
+  .plot-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .plot-grid .plot{margin:0}
+}
+
 @media (max-width:640px){
   .tabbar{
     display:flex;position:fixed;left:0;right:0;bottom:0;z-index:130;
@@ -1213,51 +1348,52 @@ html.zz-chat #zzBar{display:none!important}
       <!-- ---------- 告警 ---------- -->
       <div class="alerts" id="alerts"></div>
 
-      <!-- ---------- 概览 ---------- -->
-      <div class="grid-3">
-
-        <!-- 最佳窗口 + 倒计时 + 已打药 -->
-        <div class="card window-card">
-          <div class="card-head">
-            <span class="card-title">最佳打药窗口</span>
-            <span class="card-sub" id="windowSub"></span>
+      <!-- ---------- 天象头：结论 + 四宫格 + 适配度 ---------- -->
+      <section class="sky" id="sky">
+        <svg class="sky-art" id="skyArt" viewBox="0 0 800 420" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+        <div class="sky-body">
+          <div class="verdict" id="heroIn">
+            <div class="date-b"><span id="todayDate">—</span></div>
+            <h1>正在获取天气…</h1>
+            <p>数据来自和风天气主预报，集合预报用于置信度。</p>
           </div>
-          <div class="card-body" id="hero">
-            <div id="heroIn">
-              <div class="skel" style="height:96px"></div>
+          <div class="kpi-grid" id="skyKpi"></div>
+        </div>
+      </section>
+
+        <div class="gauge-card" id="gaugeCard" style="display:none">
+          <div class="gauge">
+            <svg width="132" height="132" viewBox="0 0 132 132">
+              <circle cx="66" cy="66" r="55" stroke="#EDF0EA" stroke-width="9" fill="none"/>
+              <circle id="gaugeArc" cx="66" cy="66" r="55" stroke="var(--brand)" stroke-width="9" fill="none"
+                      stroke-linecap="round" stroke-dasharray="345.6" stroke-dashoffset="345.6"/>
+            </svg>
+            <div class="gauge-t">
+              <div><div class="gauge-n" id="gaugeN">0</div><div class="gauge-l">适配度 / 100</div></div>
             </div>
           </div>
-        </div>
-
-        <!-- 今日判读 -->
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">今日判读</span>
-            <span class="card-sub" id="heroMeta"></span>
-          </div>
-          <div class="card-body">
-            <div class="kpi-list" id="cards">
-              <div class="skel" style="height:96px"></div>
-            </div>
+          <div>
+            <div class="gauge-h"><b>窗口适配度</b><span id="windowSub"></span></div>
+            <div class="gbars" id="gaugeBars"></div>
           </div>
         </div>
 
-        <!-- 关键数字 -->
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">关键数字</span>
-            <span class="card-sub" id="weekRainNote"></span>
-          </div>
-          <div class="card-body">
-            <div id="donutChart"><div class="skel" style="height:132px"></div></div>
-          </div>
-        </div>
+      <!-- 详细依据：置信度 / 倒计时 / 推迟代价 / 反事实 -->
+      <div class="detail-card" id="heroDetail"></div>
+
+      <!-- ---------- 今日判读 ---------- -->
+      <div class="sec-h"><h2>今日判读</h2><span class="hint" id="heroMeta"></span></div>
+      <div class="verdict-grid" id="cards">
+        <div class="skel" style="height:96px"></div>
       </div>
 
+      <!-- ---------- 地块（手机端在这里切换；桌面用左侧栏） ---------- -->
+      <div class="sec-h plot-sec"><h2>地块</h2><span class="hint" id="plotHint">点击切换下方数据</span></div>
+      <div class="plot-grid" id="plotGrid"></div>
+
       <!-- ---------- 七日 ---------- -->
-      <div class="card">
-        <div class="card-head">
-          <span class="card-title">未来七天</span>
+      <div class="sec-h"><h2>未来七天</h2><span class="hint" id="weekRainNote">逐日聚合</span>
+        <div class="act">
           <div class="task-switch" id="taskSwitch">
             <button class="task-btn on" data-task="spray">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1279,79 +1415,68 @@ html.zz-chat #zzBar{display:none!important}
             </button>
           </div>
         </div>
-        <div class="card-body">
-          <div class="days" id="days">
-            <div class="day"><div class="skel" style="height:92px"></div></div>
-            <div class="day"><div class="skel" style="height:92px"></div></div>
-            <div class="day"><div class="skel" style="height:92px"></div></div>
-            <div class="day"><div class="skel" style="height:92px"></div></div>
-            <div class="day"><div class="skel" style="height:92px"></div></div>
-            <div class="day"><div class="skel" style="height:92px"></div></div>
-            <div class="day"><div class="skel" style="height:92px"></div></div>
-          </div>
-          <div class="days-note" id="daysNote" style="display:none"></div>
+      </div>
+      <div class="cbox">
+        <div class="days" id="days">
+          <div class="day"><div class="skel" style="height:92px"></div></div>
+          <div class="day"><div class="skel" style="height:92px"></div></div>
+          <div class="day"><div class="skel" style="height:92px"></div></div>
+          <div class="day"><div class="skel" style="height:92px"></div></div>
+          <div class="day"><div class="skel" style="height:92px"></div></div>
+          <div class="day"><div class="skel" style="height:92px"></div></div>
+          <div class="day"><div class="skel" style="height:92px"></div></div>
         </div>
+        <div class="days-note" id="daysNote" style="display:none"></div>
       </div>
 
       <!-- ---------- 图表 ---------- -->
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title" id="windTitle">逐小时风速</span>
-            <span class="card-sub" id="windSub"></span>
-          </div>
-          <div class="card-body chart-box">
-            <div class="chart-scroll"><div id="windChart"><div class="skel" style="height:150px"></div></div></div>
-            <div class="chart-foot">
-              <span><i class="ln" style="background:#2563eb"></i>实测风速</span>
-              <span><i class="ln" style="background:#ef4444"></i><span id="windLimitTag">风速上限</span></span>
-              <span><i style="background:rgba(34,197,94,.18)"></i>可作业时段</span>
-            </div>
+      <div class="sec-h"><h2>逐小时风速</h2><span class="hint" id="windSub"></span></div>
+      <div class="cbox">
+        <div class="cbox-h"><b id="windTitle">风速走势</b><span>m/s</span>
+          <div class="lg">
+            <i style="color:#3D6B55"><s></s>实测风速</i>
+            <i style="color:#BE4A3C"><s class="dash"></s><span id="windLimitTag">风速上限</span></i>
+            <i style="color:#3B8A5A"><s></s>可作业</i>
           </div>
         </div>
+        <div class="chart-scroll"><div id="windChart"><div class="skel" style="height:150px"></div></div></div>
+      </div>
 
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">作业窗口分布</span>
-            <span class="card-sub">7 天 × 24 小时</span>
-          </div>
-          <div class="card-body chart-box">
-            <div class="chart-scroll"><div id="heatChart"><div class="skel" style="height:150px"></div></div></div>
-            <div class="chart-foot">
-              <span><i style="background:#bbf7d0"></i>可作业</span>
-              <span><i style="background:#fed7aa"></i>风大</span>
-              <span><i style="background:#bfdbfe"></i>低温</span>
-              <span><i style="background:#fde68a"></i>高温</span>
-              <span><i style="background:#c7d2fe"></i>雨阻</span>
-            </div>
+      <div class="sec-h"><h2>作业窗口分布</h2><span class="hint">7 天 × 24 小时 · 点格子看详情</span></div>
+      <div class="cbox">
+        <div class="cbox-h"><b>7 × 24 小时热力图</b><span>颜色越深越不适合作业</span>
+          <div class="lg">
+            <i style="color:#215C39"><s></s>可作业</i>
+            <i style="color:#87600E"><s></s>风大</i>
+            <i style="color:#255677"><s></s>低温/高温</i>
+            <i style="color:#8C3025"><s></s>雨阻</i>
           </div>
         </div>
+        <div class="chart-scroll"><div id="heatChart"><div class="skel" style="height:150px"></div></div></div>
+      </div>
 
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">温度与降水</span>
-            <span class="card-sub">柱为逐日雨量</span>
-          </div>
-          <div class="card-body chart-box">
-            <div class="chart-scroll"><div id="tempChart"><div class="skel" style="height:150px"></div></div></div>
-            <div class="chart-foot">
-              <span><i class="ln" style="background:#ef4444"></i>最高温</span>
-              <span><i class="ln" style="background:#3b82f6"></i>最低温</span>
-              <span><i style="background:#93c5fd"></i>雨量</span>
-            </div>
+      <div class="sec-h"><h2>温度与降水</h2><span class="hint">柱为逐日雨量</span></div>
+      <div class="cbox">
+        <div class="cbox-h"><b>气温区间与雨量</b><span>℃ / mm</span>
+          <div class="lg">
+            <i style="color:#8C3025"><s></s>最高温</i>
+            <i style="color:#255677"><s></s>最低温</i>
+            <i style="color:#7BA3C4"><s></s>雨量</i>
           </div>
         </div>
+        <div class="chart-scroll"><div id="tempChart"><div class="skel" style="height:150px"></div></div></div>
+      </div>
 
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">长势走势</span>
-            <span class="card-sub">示意数据</span>
-          </div>
-          <div class="card-body chart-box">
-            <div class="chart-scroll"><div id="growthChart"><div class="skel" style="height:150px"></div></div></div>
-            <div class="chart-note">真实遥感尚未接入，此曲线仅示意形态，不代表实际苗情。</div>
+      <div class="sec-h"><h2>长势走势</h2><span class="hint">示意数据</span></div>
+      <div class="cbox">
+        <div class="cbox-h"><b>NDVI 归一化植被指数</b><span>0—1</span>
+          <div class="lg">
+            <i style="color:#3D6B55"><s></s>本季</i>
+            <i style="color:#8D958A"><s class="dash"></s>近三年均值</i>
           </div>
         </div>
+        <div class="chart-scroll"><div id="growthChart"><div class="skel" style="height:150px"></div></div></div>
+        <div class="chart-note" style="margin-top:10px">真实遥感尚未接入，此曲线仅示意形态，不代表实际苗情。</div>
       </div>
 
     </div>

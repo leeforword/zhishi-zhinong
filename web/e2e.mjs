@@ -189,7 +189,9 @@ async function waitData(timeoutMs) {
     const heatRects = await ev("document.querySelectorAll('#heatChart rect').length");
     check(heatRects >= 168, 'heatmap 7x24 cells: ' + heatRects);
     check(await ev("!!document.querySelector('#tempChart svg')"), 'temp chart svg');
-    check(await ev("!!document.querySelector('#donutChart svg')"), 'donut chart svg');
+    // v2 首页把环形图换成了适配度环，断言跟着换
+    const gaugeArc = await ev("(() => { const a = document.getElementById('gaugeArc'); return a ? Number(a.getAttribute('stroke-dashoffset')) : -1; })()");
+    check(gaugeArc >= 0 && gaugeArc <= 346, 'gauge arc drawn: ' + gaugeArc);
     check(await ev("!!document.querySelector('#growthChart svg')"), 'growth chart svg');
 
     await shotFit('02-charts.png');

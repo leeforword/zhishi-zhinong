@@ -120,7 +120,7 @@
   function iconOf(code, size) {
     var k = iconKey(code);
     var color = (k === 'clear' || k === 'partly') ? '#f59e0b'
-              : (k === 'rain' || k === 'storm') ? '#3b82f6'
+              : (k === 'rain' || k === 'storm') ? '#3B7CA3'
               : (k === 'snow') ? '#60a5fa'
               : (k === 'fog') ? '#9ca3af' : '#9ca3af';
     var s = size || 22;
@@ -265,7 +265,7 @@
           color = '#c7d2fe';                       // 降雨拦截
         } else if (cell && inWork) {
           var v = T.hourVerdict(cell);
-          color = v === 'ok' ? '#bbf7d0' : v === 'wind' ? '#fed7aa' : v === 'cold' ? '#bfdbfe' : '#fde68a';
+          color = v === 'ok' ? '#bbf7d0' : v === 'wind' ? '#fed7aa' : v === 'cold' ? '#C7DCE8' : '#fde68a';
         }
         p.push('<rect x="' + (L + h * cw).toFixed(1) + '" y="' + (TP + di * chh).toFixed(1) +
           '" width="' + (cw - 2).toFixed(1) + '" height="' + (chh - 2.2).toFixed(1) +
@@ -331,11 +331,11 @@
       return out;
     }
     p.push(poly(tmax, '#a83e28'));
-    p.push(poly(tmin, '#3b82f6'));
+    p.push(poly(tmin, '#3B7CA3'));
 
     days.forEach(function (d, i) {
       p.push('<text x="' + x(i).toFixed(1) + '" y="' + (y(d.tmax) - 7).toFixed(1) + '" font-size="9.5" text-anchor="middle" fill="#ef4444">' + d.tmax + '</text>');
-      p.push('<text x="' + x(i).toFixed(1) + '" y="' + (y(d.tmin) + 14).toFixed(1) + '" font-size="9.5" text-anchor="middle" fill="#3b82f6">' + d.tmin + '</text>');
+      p.push('<text x="' + x(i).toFixed(1) + '" y="' + (y(d.tmin) + 14).toFixed(1) + '" font-size="9.5" text-anchor="middle" fill="#3B7CA3">' + d.tmin + '</text>');
     });
 
     // 降水柱（独立区域）
@@ -459,7 +459,7 @@
 
     $('heatChart').innerHTML = heatChartSvg(raw, result);
     $('tempChart').innerHTML = tempChartSvg(result);
-    $('donutChart').innerHTML = donutSvg(result);
+    if ($('donutChart')) $('donutChart').innerHTML = donutSvg(result);
     $('growthChart').innerHTML = growthSvg(plot);
   }
 
@@ -530,7 +530,7 @@
   }
 
   function renderPlots() {
-    ['plotList', 'minePlotList'].forEach(function (id) {
+    ['plotList', 'minePlotList', 'plotGrid'].forEach(function (id) {
       var box = $(id);
       if (!box) return;
       box.innerHTML = '';
@@ -538,6 +538,7 @@
     });
     if ($('plotCount')) $('plotCount').textContent = state.plots.length + ' 块';
     if ($('minePlotCount')) $('minePlotCount').textContent = state.plots.length + ' 块';
+    if ($('plotHint')) $('plotHint').textContent = state.plots.length + ' 块 · 点击切换下方数据';
   }
 
   function askDelete(p) {
@@ -641,37 +642,115 @@
     return { level: level, peak: peak, limit: limit, prob: prob, ratio: ratio };
   }
 
+  /* 相对日：今天 / 明天 / 后天 / 周X */
+  function relDay(dateStr) {
+    var d = new Date(dateStr + 'T00:00:00');
+    var t = new Date(); t.setHours(0, 0, 0, 0);
+    var diff = Math.round((d - t) / 86400000);
+    if (diff === 0) return '今天';
+    if (diff === 1) return '明天';
+    if (diff === 2) return '后天';
+    return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
+  }
+
+  /* 窗口适配度：风速余量 50% + 降水概率 20% + 温度适宜 15% + 时长 15%。
+     是加权综合分，不是概率，界面上也不说成概率。 */
+  function windowScore(best, w) {
+    var limit = RULES.spray.wind_max;
+    var peak = (w.maxWind != null ? w.maxWind : w.avgWind) || 0;
+    var windFit = Math.max(0, Math.min(1, 1 - peak / limit));
+    var rainFit = Math.max(0, Math.min(1, 1 - (best.dayProb || 0) / 100));
+    var t = w.avgTemp;
+    var tempFit = t < RULES.spray.temp_min ? 0.2
+      : t > RULES.spray.temp_max ? 0.2
+      : t < 10 ? 0.7 : t > 28 ? 0.7 : 1;
+    var durFit = Math.min(1, w.hours / 6);
+    var score = Math.round(100 * (0.5 * windFit + 0.2 * rainFit + 0.15 * tempFit + 0.15 * durFit));
+    return { score: Math.max(0, Math.min(100, score)), windFit: windFit, rainFit: rainFit, durFit: durFit, peak: peak, limit: limit };
+  }
+
   function renderHero(result) {
     var box = $('heroIn');
+    var kpiBox = $('skyKpi');
+    var detail = $('heroDetail');
     var best = T.bestWindow(result);
     var now = new Date();
     var dow = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()];
-    if ($('todayDate')) $('todayDate').textContent = cnMonth(now.getMonth() + 1) + cnDay(now.getDate()) + '日 ' + dow;
+    var todayTx = cnMonth(now.getMonth() + 1) + cnDay(now.getDate()) + '日 ' + dow;
+    if ($('todayDate')) $('todayDate').textContent = todayTx;
 
     clearInterval(countdownTimer);
-
     var ens = ensembleEval();
 
     if (!best) {
-      if ($('windowSub')) $('windowSub').textContent = '未来七日';
-      box.innerHTML =
-        '<div class="window-label">未来七天</div>' +
-        '<div class="window-date" style="color:#b91c1c">暂无合适窗口</div>' +
-        '<div class="window-meta" style="margin-top:6px">' + esc(result.days[0].spray.why) + '</div>' +
-        renderLimits(result) +
-        renderSprayRow(null);
+      if ($('windowSub')) $('windowSub').textContent = '未来七天';
+      if (box) {
+        box.innerHTML =
+          '<div class="date-b">' + todayTx + '</div>' +
+          '<h1>未来七天<br>没有合适的作业窗口</h1>' +
+          '<p>' + esc(result.days[0].spray.why) + '</p>';
+      }
+      if (kpiBox) kpiBox.innerHTML = '';
+      if ($('gaugeCard')) $('gaugeCard').style.display = 'none';
+      if (detail) detail.innerHTML = renderLimits(result) + renderSprayRow(null);
       return;
     }
 
     var w = best.spray.windows.slice().sort(function (a, b) { return b.hours - a.hours; })[0];
     var dt = new Date(best.date + 'T00:00:00');
-    if ($('windowSub')) $('windowSub').textContent = best.dow;
+    if ($('windowSub')) $('windowSub').textContent = cnMonth(dt.getMonth() + 1) + cnDay(dt.getDate()) + '日 · ' + best.dow;
 
-    // 集合预报给出的置信度
     var ev = ens && ens.evals[best.date];
     var ensBest = ev && ev.best;
+    var mg = marginEval(best, w);
+    var sc = windowScore(best, w);
 
-    // 置信度优先用集合结果；没有集合数据就明说
+    /* ---- 天象头：一句话结论 ---- */
+    if (box) {
+      box.innerHTML =
+        '<div class="date-b">' + todayTx + ' · ' +
+          (pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ' 更新') +
+          '<span class="jq">' + (dt.getMonth() + 1) + '/' + dt.getDate() + ' · ' + best.dow + '</span>' +
+        '</div>' +
+        '<h1>' + relDay(best.date) + ' <em>' + pad2(w.start) + '—' + pad2(w.end) + ' 时</em><br>' +
+          '是最近可作业窗口</h1>' +
+        '<p>风速 ' + w.avgWind + ' m/s（上限 ' + sc.limit + '）、气温 ' + w.avgTemp + '℃、' +
+          '当日降水概率 ' + (best.dayProb || 0) + '%，连续 ' + w.hours + ' 小时。' +
+          (best.date === result.days[0].date ? '今天就能干。' : '再往后要等下一轮窗口。') + '</p>';
+    }
+
+    /* ---- 四宫格 ---- */
+    if (kpiBox) {
+      var confTx = ensBest ? '置信度 ' + Math.round(ensBest.weakest.prob * 100) + '%'
+        : (ens ? '该日支持率不足' : '余量 ' + mg.level.label);
+      var windCls = w.avgWind > sc.limit * 0.9 ? 'warn' : 'good';
+      kpiBox.innerHTML =
+        kpiCell('窗口风速', w.avgWind, 'm/s', '上限 ' + sc.limit + ' m/s', windCls) +
+        kpiCell('气温', Math.round(w.avgTemp), '℃', best.tmin + '~' + best.tmax + ' ℃', '') +
+        kpiCell('降水概率', best.dayProb || 0, '%', '当日 ' + best.dayRain + ' mm', (best.dayProb || 0) >= 50 ? 'warn' : '') +
+        kpiCell('连续时长', w.hours, '小时', confTx, 'good');
+    }
+
+    /* ---- 适配度环 ---- */
+    if ($('gaugeCard')) {
+      $('gaugeCard').style.display = '';
+      if ($('gaugeN')) $('gaugeN').textContent = sc.score;
+      var arc = $('gaugeArc');
+      if (arc) {
+        var C = 2 * Math.PI * 55;
+        arc.setAttribute('stroke-dasharray', C.toFixed(1));
+        arc.setAttribute('stroke-dashoffset', (C * (1 - sc.score / 100)).toFixed(1));
+      }
+      var gb = $('gaugeBars');
+      if (gb) {
+        gb.innerHTML =
+          gbar('风速余量', Math.round(sc.windFit * 100), (sc.limit - sc.peak).toFixed(1) + ' m/s') +
+          gbar('降水概率', Math.round(best.dayProb || 0), (best.dayProb || 0) + '%') +
+          gbar('窗口时长', Math.round(sc.durFit * 100), w.hours + ' 小时');
+      }
+    }
+
+    /* ---- 详细依据 ---- */
     var confHtml = '';
     if (ensBest) {
       var memberWord = ens.kind === 'ensemble' ? '集合成员' : '模型';
@@ -689,10 +768,6 @@
       confHtml = '<div class="conf-row"><span class="conf-none">该日没有支持率过半的窗口</span></div>' +
         '<div class="conf-caveat' + (ens.caveat ? '' : ' ok') + '">' + esc(ens.caveat || ens.label) + '</div>';
     } else {
-      /* 没有集合预报（多数是 Open-Meteo 在当前网络不可达）时，
-         不要只留一句"暂无法评估"就完事——主预报本身还能说明余量。
-         但口径必须写清楚：这是余量，不是成员支持率。 */
-      var mg = marginEval(best, w);
       confHtml =
         '<div class="conf-row">' +
           '<span class="conf-badge" style="background:' + mg.level.color + '1a;color:' + mg.level.color +
@@ -704,28 +779,109 @@
         '<div class="conf-caveat">未取到集合预报，按<b>主预报余量</b>估算，非成员支持率</div>';
     }
 
-    box.innerHTML =
-      '<div class="window-top">' +
-        '<div>' +
-          '<div class="window-label">推荐作业日</div>' +
-          '<div class="window-date">' + cnMonth(dt.getMonth() + 1) + cnDay(dt.getDate()) + '日 · ' + best.dow + '</div>' +
-          '<div class="window-time">' + pad2(w.start) + ':00 – ' + pad2(w.end) + ':00</div>' +
-          '<div class="window-meta">连续 <b>' + w.hours + ' 小时</b> · 风速 <b>' + w.avgWind + ' m/s</b> · 气温 <b>' + w.avgTemp + '℃</b></div>' +
+    if (detail) {
+      detail.innerHTML =
+        confHtml +
+        '<div class="countdown" id="countdownRow">' +
+          '<span class="cd-l" id="cdLabel">—</span>' +
+          '<span class="cd-time" id="cdTime">—</span>' +
         '</div>' +
-        '<span class="badge ok"><span class="bd"></span>可作业</span>' +
-      '</div>' +
-      confHtml +
-      '<div class="countdown" id="countdownRow">' +
-        '<span class="cd-l" id="cdLabel">—</span>' +
-        '<span class="cd-time" id="cdTime">—</span>' +
-      '</div>' +
-      renderDelayCost(ens, best.date) +
-      renderCloseCondition(ensBest) +
-      renderSprayRow(best, w) +
-      renderWhatIf(best, result);
+        renderDelayCost(ens, best.date) +
+        renderCloseCondition(ensBest) +
+        renderSprayRow(best, w) +
+        renderWhatIf(best, result);
+    }
 
     startCountdown(best, w);
     bindWhatIf(best, result);
+    paintSky(best.code);
+  }
+
+  function kpiCell(k, v, u, sub, cls) {
+    return '<div class="kpi ' + (cls || '') + '">' +
+      '<div class="k">' + k + '</div>' +
+      '<div class="v">' + v + '<span class="u">' + u + '</span></div>' +
+      '<div class="sub">' + sub + '</div></div>';
+  }
+
+  function gbar(label, pct, val) {
+    return '<div class="gbar"><span class="bl">' + label + '</span>' +
+      '<span class="gtrack"><i class="gfill" style="width:' + pct + '%"></i></span>' +
+      '<span class="bv">' + val + '</span></div>';
+  }
+
+  /* ---- 天象插画：纯 SVG，晴/云/雨/风/雪 各一套 ---- */
+  var skyPainted = '';
+  function paintSky(code) {
+    var el = $('skyArt');
+    if (!el) return;
+    var kind = 'sun';
+    if (code === null || code === undefined) kind = 'sun';
+    else if (code >= 71 && code <= 77) kind = 'snow';
+    else if (code >= 51 && code <= 67) kind = 'rain';
+    else if (code >= 80) kind = 'rain';
+    else if (code === 45 || code === 48 || (code >= 1 && code <= 3)) kind = 'cloud';
+    if (skyPainted === kind) return;
+    skyPainted = kind;
+    var root = document.documentElement;
+    root.classList.remove('sky-rain', 'sky-wind', 'sky-snow', 'sky-cloud');
+    if (kind !== 'sun') root.classList.add('sky-' + kind);
+
+    var cs = getComputedStyle(root);
+    var ac = cs.getPropertyValue('--sky-ac').trim() || '#E0A55C';
+    var br = cs.getPropertyValue('--brand').trim() || '#3D6B55';
+    var glow = cs.getPropertyValue('--sky-glow').trim() || 'rgba(242,182,102,.55)';
+
+    var g = '<defs>' +
+      '<radialGradient id="skGlow"><stop offset="0" stop-color="' + glow + '"/><stop offset="1" stop-color="' + glow + '" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="skHillA" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0" stop-color="' + ac + '" stop-opacity=".38"/><stop offset="1" stop-color="' + ac + '" stop-opacity=".06"/></linearGradient>' +
+      '<linearGradient id="skHillB" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0" stop-color="' + br + '" stop-opacity=".24"/><stop offset="1" stop-color="' + br + '" stop-opacity=".04"/></linearGradient>' +
+      '</defs>';
+
+    if (kind === 'sun') {
+      /* 冬日低角度太阳：放在左下地平线上，右上角被四宫格挡住看不见 */
+      g += '<circle cx="196" cy="300" r="112" fill="url(#skGlow)"/>' +
+        '<circle cx="196" cy="300" r="16" fill="' + ac + '" opacity=".8"/>';
+      for (var i = 0; i < 5; i++) {
+        g += '<path d="M' + (110 + i * 34) + ' 262 L' + (60 + i * 46) + ' 214" stroke="' + ac +
+          '" stroke-width="1" opacity="' + (0.12 - i * 0.012).toFixed(3) + '"/>';
+      }
+    } else if (kind === 'cloud') {
+      g += '<ellipse cx="600" cy="96" rx="150" ry="66" fill="url(#skGlow)" opacity=".7"/>';
+      g += skyCloud(440, 92, 1.5, ac) + skyCloud(612, 70, 1.9, ac) + skyCloud(560, 150, 1.2, ac);
+    } else if (kind === 'rain') {
+      g += '<ellipse cx="420" cy="86" rx="190" ry="74" fill="url(#skGlow)" opacity=".8"/>';
+      g += skyCloud(320, 84, 1.7, ac) + skyCloud(480, 66, 2.0, ac);
+      for (var r = 0; r < 34; r++) {
+        g += '<path d="M' + (70 + (r * 41) % 690) + ' ' + (152 + (r * 47) % 140) + ' l-6 18" stroke="' + ac +
+          '" stroke-width="1.1" opacity="' + (0.18 + (r % 5) * 0.06).toFixed(2) + '" stroke-linecap="round"/>';
+      }
+    } else if (kind === 'snow') {
+      g += '<ellipse cx="440" cy="80" rx="200" ry="70" fill="url(#skGlow)" opacity=".85"/>';
+      g += skyCloud(350, 80, 1.6, ac);
+      for (var s = 0; s < 26; s++) {
+        var sx = 60 + (s * 47) % 700, sy = 150 + (s * 61) % 130, z = 3 + (s % 3);
+        g += '<g opacity="' + (0.35 + (s % 4) * 0.12).toFixed(2) + '" stroke="' + ac + '" stroke-width="1.2" stroke-linecap="round">' +
+          '<path d="M' + sx + ' ' + (sy - z) + ' v' + (z * 2) + 'M' + (sx - z) + ' ' + sy + ' h' + (z * 2) + '"/></g>';
+      }
+    }
+
+    /* 远山 + 麦田 */
+    g += '<path d="M0 330 L100 296 L200 326 L310 286 L420 320 L540 282 L660 316 L760 292 L800 306 L800 420 L0 420Z" fill="url(#skHillB)"/>' +
+      '<path d="M0 362 L130 334 L250 358 L370 324 L500 354 L620 320 L740 348 L800 334 L800 420 L0 420Z" fill="url(#skHillA)"/>';
+    for (var row = 0; row < 3; row++) {
+      var y0 = 372 + row * 14;
+      g += '<path d="M' + (360 + row * 12) + ' ' + y0 + ' L800 ' + (y0 - 4) + ' L800 ' + (y0 + 3) + ' L' + (360 + row * 12) + ' ' + (y0 + 5) + 'Z" fill="' + br + '" opacity="' + (0.08 + row * 0.04) + '"/>';
+    }
+    el.innerHTML = g;
+  }
+
+  function skyCloud(x, y, s, c) {
+    return '<g transform="translate(' + x + ',' + y + ') scale(' + s + ')" opacity=".5" fill="' + c + '">' +
+      '<ellipse cx="0" cy="0" rx="42" ry="24"/><ellipse cx="-26" cy="8" rx="26" ry="16"/>' +
+      '<ellipse cx="28" cy="9" rx="30" ry="17"/><ellipse cx="6" cy="-14" rx="24" ry="16"/></g>';
   }
 
   /* ---- 推迟代价：窗口往后挪，风险怎么变 ---- */
@@ -981,7 +1137,7 @@
       });
     });
     var rows = [
-      { k: 'cold', label: '气温过低', color: '#3b82f6' },
+      { k: 'cold', label: '气温过低', color: '#3B7CA3' },
       { k: 'wind', label: '风速过大', color: '#f59e0b' },
       { k: 'hot', label: '气温过高', color: '#ef4444' },
       { k: 'rain', label: '降雨', color: '#6366f1' }
