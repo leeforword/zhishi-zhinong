@@ -848,12 +848,10 @@
         '</div>' +
         renderDelayCost(ens, best.date) +
         renderCloseCondition(ensBest) +
-        renderSprayRow(best, w) +
-        renderWhatIf(best, result);
+        renderSprayRow(best, w);
     }
 
     startCountdown(best, w);
-    bindWhatIf(best, result);
     paintSky(best.code);
   }
 
@@ -2908,10 +2906,18 @@
     var tb = target.getBoundingClientRect();
     if (!tb.width || !nb.width) return;   // 桌面端底栏隐藏时量不到
 
-    // 胶囊 left:6px，而按钮左边缘 = 边框 + padding(6px)，所以再减 7
-    var dx = tb.left - nb.left - 7;
+    /* 绝对定位的包含块是 padding box，原点在 border 内侧。
+       所以偏移必须减掉 nav 的边框宽度，再加上按钮自己的位置——
+       之前用 CSS 的 top:6px/bottom:6px 估，按钮 52px 高、内容区 62px 高，
+       估出来的胶囊比按钮低 6px、矮 2px，看着就是"没压住"。 */
+    var cs = window.getComputedStyle(nav);
+    var bw = parseFloat(cs.borderLeftWidth) || 0;
+    var bh = parseFloat(cs.borderTopWidth) || 0;
+
     pill.style.width = tb.width + 'px';
-    pill.style.transform = 'translateX(' + dx + 'px)';
+    pill.style.height = tb.height + 'px';
+    pill.style.top = (tb.top - nb.top - bh) + 'px';
+    pill.style.transform = 'translateX(' + (tb.left - nb.left - bw) + 'px)';
     void idx;
   }
 
@@ -3271,7 +3277,6 @@
   renderSolarTerm();  // 节气条
   setTimeout(function () { moveTabPill(currentView || 'content'); }, 120);
   window.addEventListener('resize', function () { moveTabPill(currentView || 'content'); });
-  bindAdvToggle();    // 手机端"换个假设"折叠开关
   buildPresets();     // 预设城市按钮已移除，这里只清理旧 DOM
   bindTaskSwitch();   // 未来七天：打药 / 灌溉 / 晾晒 切换
   bindViews();        // 内容 / 对话 / 我的 三个视图

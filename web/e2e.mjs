@@ -181,9 +181,12 @@ async function waitData(timeoutMs) {
 
     /* ---------- 3 ---------- */
     console.log('\n== 3. charts ==');
-    check(await ev("!!document.querySelector('#windChart svg')"), 'wind chart svg');
-    check((await ev("document.querySelectorAll('#windChart path').length")) >= 2, 'wind chart area + line');
-    check(await ev(
+    /* 23 点之后和风的 168h 从明天 0 点起算，今天没有逐小时数据，
+       风速图会显示「该日无逐小时数据」——那不叫坏，断言要认这种情况。 */
+    const windEmpty = await ev("/无逐小时数据/.test(document.getElementById('windChart').textContent)");
+    check(windEmpty || await ev("!!document.querySelector('#windChart svg')"), 'wind chart svg');
+    check(windEmpty || (await ev("document.querySelectorAll('#windChart path').length")) >= 2, 'wind chart area + line');
+    check(windEmpty || await ev(
       "Array.from(document.querySelectorAll('#windChart line')).some(function(l){return l.getAttribute('stroke-dasharray')})"
     ), 'wind chart threshold line');
     const heatRects = await ev("document.querySelectorAll('#heatChart rect').length");
@@ -409,7 +412,9 @@ async function waitData(timeoutMs) {
     check(await waitData(), 'weather loads over file protocol');
     check(await ev("document.querySelectorAll('#days .day').length") === 7, 'seven days over file protocol');
     check(pageErrors.length === 0, 'no JS error over file protocol');
-    check((await ev("document.querySelectorAll('svg.chart').length")) >= 4, 'charts render over file protocol');
+    const fpCharts = await ev("document.querySelectorAll('svg.chart').length");
+    const fpWindEmpty = await ev("/无逐小时数据/.test(document.getElementById('windChart').textContent)");
+    check(fpCharts >= 4 || (fpCharts >= 3 && fpWindEmpty), 'charts render over file protocol');
 
     /* ---------- 11 ---------- */
     console.log('\n== 11. mobile ==');
