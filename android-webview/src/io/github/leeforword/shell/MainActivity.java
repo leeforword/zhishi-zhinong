@@ -55,6 +55,8 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         }
+        web.setHorizontalScrollBarEnabled(false);   // 页面本身锁了宽度，这里再兜一层，避免被拖动
+        web.setVerticalScrollBarEnabled(false);
         web.setBackgroundColor(Color.parseColor("#F3F5F1"));
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
 

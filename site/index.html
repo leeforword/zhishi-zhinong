@@ -1354,6 +1354,10 @@ html.zz-chat #zzBar{display:none!important}
    ============================================================ */
 @media (max-width:640px){
   html,body{height:auto}
+  /* 禁止横向拖动：宽度按 100% 锁死，任何溢出都不产生横向滚动条 */
+  html,body{overflow-x:hidden;max-width:100%}
+  body{overscroll-behavior-x:none}
+  .view,.content{max-width:100%}
   body{font-size:15px;-webkit-font-smoothing:antialiased}
 
   .tabbar{
@@ -1614,15 +1618,6 @@ html.zz-chat #zzBar{display:none!important}
     <section class="view on" id="viewContent">
     <div class="content">
 
-      <!-- 首页左上角：新增地块 -->
-      <div class="home-top">
-        <button class="btn gh btn-sm" id="homeAddPlot">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-          新增地块
-        </button>
-        <span class="hint" id="homePlotHint" style="font-size:11.5px;color:var(--text-3)"></span>
-      </div>
-
       <!-- ---------- 告警 ---------- -->
       <div class="alerts" id="alerts"></div>
 
@@ -1857,15 +1852,6 @@ html.zz-chat #zzBar{display:none!important}
 
         <div class="sec-h"><h2>应用</h2><span class="hint">装到桌面，像 App 一样打开</span></div>
         <div class="mine-list">
-          <button class="mrow" id="installRow" type="button">
-            <span class="mic">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/>
-              </svg>
-            </span>
-            <span class="mtx"><b>安装到桌面</b><span id="installHint">有自己的图标，不用每次找网址</span></span>
-            <span class="mval" id="installState">去安装 ›</span>
-          </button>
           <a class="mrow apk-row" id="apkRow" href="download/zhishi-zhinong.apk" download="知时智农.apk">
             <span class="mic">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -1924,12 +1910,6 @@ html.zz-chat #zzBar{display:none!important}
 </div>
 
 <!-- 手机底部 Tab -->
-      <!-- 悬浮 AI 入口（手机端，毛玻璃胶囊） -->
-      <button class="ai-fab" id="aiFab" type="button">
-        <span class="ai-fab-ico">✦</span>
-        <span class="ai-fab-tx">问 AI：哪天能打药</span>
-        <span class="ai-fab-go">›</span>
-      </button>
 <nav class="tabbar" id="tabBar">
   <span class="tab-pill" id="tabPill" aria-hidden="true"></span>
   <button data-view="content" class="on">
@@ -2010,8 +1990,8 @@ html.zz-chat #zzBar{display:none!important}
               <div id="amapBox" style="position:absolute;inset:0"></div>
               <div class="map-mode" id="mapMode">地图加载中…</div>
               <div class="map-layers">
-                <button class="layer-btn on" id="layerRoad">路网</button>
-                <button class="layer-btn" id="layerSat">卫星</button>
+                <button class="layer-btn" id="layerRoad">路网</button>
+                <button class="layer-btn on" id="layerSat">卫星</button>
               </div>
             </div>
             <div class="map-read">

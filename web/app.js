@@ -2004,6 +2004,7 @@
 
       // 供自动化测试访问（也是调试入口）
       window.__tzMap = MAP.instance;
+      setMapLayer('sat');   // 默认卫星图：选地块时看得清地块形状
 
       // 叠加河北省/市边界（本地 GeoJSON，离线可用）
       setTimeout(function () { addBoundaries(); }, 100);
@@ -2710,7 +2711,6 @@
      事件
      ========================================================= */
   $('addPlotBtn').onclick = function () { openModal(null); };
-  if ($('homeAddPlot')) $('homeAddPlot').onclick = function () { openModal(null); };
   $('modalClose').onclick = closeModal;
   $('modalCancel').onclick = closeModal;
   $('modalSave').onclick = formSave;
@@ -2762,16 +2762,32 @@
      ========================================================= */
   var currentView = 'content';
 
-  /* 底部 Tab 的滑动胶囊：跟着当前视图走，用 transform 保证 60fps */
+  /* 底部 Tab 的滑动胶囊
+     不能用百分比算：胶囊是绝对定位在 padding box 上，按钮在 content box 里，
+     两者基准不同，按 (100%-12)/3 算宽度会一格格偏，第三个 tab 最明显。
+     改成直接量按钮的真实位置，误差为 0；动画仍走 transform，保持 60fps。 */
   function moveTabPill(name) {
+    var nav = $('tabBar');
     var pill = $('tabPill');
-    if (!pill) return;
-    var tabs = document.querySelectorAll('#tabBar [data-view]');
-    var idx = 0;
+    if (!nav || !pill) return;
+    var tabs = nav.querySelectorAll('[data-view]');
+    if (!tabs.length) return;
+
+    var target = null, idx = 0;
     Array.prototype.forEach.call(tabs, function (b, i) {
-      if (b.getAttribute('data-view') === name) idx = i;
+      if (b.getAttribute('data-view') === name) { target = b; idx = i; }
     });
-    pill.style.transform = 'translateX(' + (idx * 100) + '%)';
+    if (!target) target = tabs[0];
+
+    var nb = nav.getBoundingClientRect();
+    var tb = target.getBoundingClientRect();
+    if (!tb.width || !nb.width) return;   // 桌面端底栏隐藏时量不到
+
+    // 胶囊 left:6px，而按钮左边缘 = 边框 + padding(6px)，所以再减 7
+    var dx = tb.left - nb.left - 7;
+    pill.style.width = tb.width + 'px';
+    pill.style.transform = 'translateX(' + dx + 'px)';
+    void idx;
   }
 
   var scrollMemo = { content: 0, chat: 0, mine: 0 };
@@ -3125,9 +3141,10 @@
   }
 
   save();
-  if ($('aiFab')) $('aiFab').onclick = function () { setView('chat'); };
   bindDrawer();       // 手机端侧栏抽屉
   renderSolarTerm();  // 节气条
+  setTimeout(function () { moveTabPill(currentView || 'content'); }, 120);
+  window.addEventListener('resize', function () { moveTabPill(currentView || 'content'); });
   bindAdvToggle();    // 手机端"换个假设"折叠开关
   buildPresets();     // 预设城市按钮已移除，这里只清理旧 DOM
   bindTaskSwitch();   // 未来七天：打药 / 灌溉 / 晾晒 切换
