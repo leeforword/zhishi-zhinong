@@ -96,6 +96,17 @@ for (const f of fs.readdirSync(path.join(WEB, 'icons'))) {
   copy(path.join('icons', f));
 }
 
+/* ---- 6.5 数字资产校验文件（PWABuilder 生成的 assetlinks.json 放这里） ---- */
+const WELL = path.join(WEB, '.well-known');
+if (fs.existsSync(WELL)) {
+  fs.mkdirSync(path.join(OUT, '.well-known'), { recursive: true });
+  const wellFiles = fs.readdirSync(WELL).filter((f) => f.endsWith('.json'));
+  for (const f of wellFiles) {
+    fs.copyFileSync(path.join(WELL, f), path.join(OUT, '.well-known', f));
+  }
+  if (wellFiles.length) log('  OK   .well-known/' + wellFiles.join(', '));
+}
+
 /* ---- 7. 安装引导里用到的两张截图 ---- */
 fs.mkdirSync(path.join(OUT, 'screenshots'), { recursive: true });
 for (const f of ['01-desktop-overview.png', '12-mobile-iphone.png']) {
