@@ -9,8 +9,9 @@
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
-  "background_color": "#f7f8fa",
-  "theme_color": "#ffffff",
+  "orientation": "portrait",
+  "background_color": "#F3F5F1",
+  "theme_color": "#3D6B55",
   "categories": ["productivity", "weather", "utilities"],
   "prefer_related_applications": false,
   "icons": [
