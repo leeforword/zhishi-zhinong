@@ -218,7 +218,12 @@
     if (!deferredPrompt) return;
     var p = deferredPrompt;
     deferredPrompt = null;     // 只能调用一次，用完即弃
-    p.prompt();
+    // 新版 Chrome 的 prompt() 返回 Promise，headless / 已弹过会 reject，
+    // 不接住就是一条未捕获异常
+    try {
+      var pr = p.prompt();
+      if (pr && pr.catch) pr.catch(function () {});
+    } catch (e) { /* 老浏览器没有返回值 */ }
     p.userChoice.then(function (res) {
       hideTopButton();
       hideBar();
@@ -365,6 +370,61 @@
   /* =========================================================
      八、启动
      ========================================================= */
+  /* =========================================================
+     「我的 → 安装到桌面」：安卓 / iOS / 微信各走各的引导
+     ========================================================= */
+  function refreshInstallRow() {
+    var st = document.getElementById('installState');
+    var hint = document.getElementById('installHint');
+    if (!st) return;
+    if (isStandalone) {
+      st.textContent = '已安装';
+      if (hint) hint.textContent = '正在从桌面图标运行';
+      return;
+    }
+    if (isWeChat) {
+      st.textContent = '看步骤 ›';
+      if (hint) hint.textContent = '微信里装不了，要在浏览器打开';
+      return;
+    }
+    if (isIOS) {
+      st.textContent = '看步骤 ›';
+      if (hint) hint.textContent = 'Safari → 分享 → 添加到主屏幕';
+      return;
+    }
+    if (deferredPrompt) {
+      st.textContent = '安装 ›';
+      if (hint) hint.textContent = '装好后有自己的图标，断网也能看';
+      return;
+    }
+    st.textContent = '看步骤 ›';
+    if (hint) hint.textContent = '从浏览器菜单里添加到主屏幕';
+  }
+
+  function onInstallRow() {
+    if (isStandalone) {
+      showBar({ title: '已经装好了', desc: '你现在就是从桌面图标打开的，不用再装。',
+        dismiss: hideBar, actions: [{ label: '知道了', primary: true, onClick: hideBar }] });
+      return;
+    }
+    if (deferredPrompt) { doInstall(); return; }
+    if (isWeChat) { showWeChatGuide(); return; }
+    if (isIOS) { showIOSGuide(); return; }
+    showBar({
+      title: '从浏览器菜单安装',
+      desc: 'Chrome / Edge：右上角 <b>⋮</b> → <b>添加到主屏幕</b>（或「安装应用」）<br>' +
+            'Safari：底部 <b>分享</b> → <b>添加到主屏幕</b>',
+      dismiss: hideBar,
+      actions: [{ label: '明白了', primary: true, onClick: hideBar }]
+    });
+  }
+
+  function bindInstallRow() {
+    var row = document.getElementById('installRow');
+    if (row) row.onclick = onInstallRow;
+    refreshInstallRow();
+  }
+
   function boot() {
     if (document.documentElement) {
       document.documentElement.classList.add(isStandalone ? 'zz-standalone' : 'zz-browser');
@@ -372,12 +432,14 @@
 
     registerSW();
     injectStyle();
+    bindInstallRow();
 
     if (isStandalone) return;   // 已经装好了，不用再提示安装
 
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault();       // 拦掉浏览器自带的迷你条，改用我们自己的
       deferredPrompt = e;
+      refreshInstallRow();
       // 桌面端只亮顶栏图标，不弹底部条（会挡住图表）
       if (isInstallTarget) offerInstall();
       else showTopButton();
@@ -387,6 +449,7 @@
       deferredPrompt = null;
       hideTopButton();
       hideBar();
+      refreshInstallRow();
     });
 
     // iOS / 微信没有 beforeinstallprompt，延迟一点直接给指引
