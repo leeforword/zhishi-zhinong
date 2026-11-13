@@ -669,6 +669,62 @@
     return { score: Math.max(0, Math.min(100, score)), windFit: windFit, rainFit: rainFit, durFit: durFit, peak: peak, limit: limit };
   }
 
+  /* =========================================================
+     节气：21 世纪通用算式（精确到日），用于首页节气条
+     ========================================================= */
+  var TERM_C = [
+    ['小寒', 5.4055], ['大寒', 20.12], ['立春', 3.87], ['雨水', 18.73],
+    ['惊蛰', 5.63], ['春分', 20.646], ['清明', 4.81], ['谷雨', 20.1],
+    ['立夏', 5.52], ['小满', 21.04], ['芒种', 5.678], ['夏至', 21.37],
+    ['小暑', 7.108], ['大暑', 22.83], ['立秋', 7.5], ['处暑', 23.13],
+    ['白露', 7.646], ['秋分', 23.042], ['寒露', 8.318], ['霜降', 23.438],
+    ['立冬', 7.438], ['小雪', 22.36], ['大雪', 7.18], ['冬至', 21.94]
+  ];
+
+  function termDay(year, i) {
+    var y = year % 100;
+    var d = Math.floor(y * 0.2422 + TERM_C[i][1]) - Math.floor(y / 4);
+    var m = Math.floor(i / 2) + 1;
+    return new Date(year, m - 1, d);
+  }
+
+  function termEvents(now) {
+    var y = now.getFullYear(), out = [];
+    for (var yr = y - 1; yr <= y + 1; yr++) {
+      for (var i = 0; i < 24; i++) out.push({ name: TERM_C[i][0], date: termDay(yr, i) });
+    }
+    out.sort(function (a, b) { return a.date - b.date; });
+    return out;
+  }
+
+  function renderSolarTerm() {
+    var now = new Date();
+    now.setHours(0, 0, 0, 0);
+    var evs = termEvents(now), cur = -1, next = -1;
+    for (var i = 0; i < evs.length; i++) {
+      if (evs[i].date <= now) cur = i;
+      else { next = i; break; }
+    }
+    if (cur < 0 || next < 0) return;
+    var c = evs[cur], n = evs[next];
+    var days = Math.floor((now - c.date) / 86400000);
+    var hou = Math.min(3, Math.floor(days / 5) + 1);
+    var toNext = Math.round((n.date - now) / 86400000);
+
+    if ($('jqNow')) $('jqNow').textContent = c.name;
+    if ($('jqSub')) $('jqSub').textContent = ['初候', '二候', '三候'][hou - 1] + ' · 第 ' + (days + 1) + ' 天';
+    if ($('jqNext')) $('jqNext').textContent = '距' + n.name + ' ' + toNext + ' 天';
+
+    var from = Math.max(0, cur - 2), to = Math.min(evs.length - 1, cur + 3), html = '';
+    for (var k = from; k <= to; k++) {
+      var e = evs[k];
+      var cls = k === cur ? ' on' : (k < cur ? ' past' : '');
+      html += '<div class="jq-tick' + cls + '"><i></i><span>' + e.name + '</span><em>' +
+        (e.date.getMonth() + 1) + '/' + e.date.getDate() + '</em></div>';
+    }
+    if ($('jqRail')) $('jqRail').innerHTML = html;
+  }
+
   function renderHero(result) {
     var box = $('heroIn');
     var kpiBox = $('skyKpi');
@@ -3024,6 +3080,7 @@
 
   save();
   bindDrawer();       // 手机端侧栏抽屉
+  renderSolarTerm();  // 节气条
   bindAdvToggle();    // 手机端"换个假设"折叠开关
   buildPresets();     // 预设城市按钮已移除，这里只清理旧 DOM
   bindTaskSwitch();   // 未来七天：打药 / 灌溉 / 晾晒 切换
