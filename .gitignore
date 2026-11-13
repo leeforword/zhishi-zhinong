@@ -32,3 +32,7 @@ npm-debug.log*
 
 # 临时调试脚本
 .tmp-e2e/
+
+# 安卓壳构建产物与便携 JDK
+.build/
+android-webview/build/
