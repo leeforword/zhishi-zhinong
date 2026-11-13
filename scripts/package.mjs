@@ -21,6 +21,24 @@ const ROOT = path.resolve(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
 const NAME = '知时智农';
 
+/* 逐文件递归复制。
+   不用 fs.cpSync：在 Windows + Node 22 上，目标目录含中文时会静默失败
+   （不抛错、也不建目录），结果就是 zip 里少了 icons/，装到手机桌面图标是空的。 */
+function copyDir(src, dst) {
+  fs.mkdirSync(dst, { recursive: true });
+  for (const ent of fs.readdirSync(src, { withFileTypes: true })) {
+    const from = path.join(src, ent.name);
+    const to = path.join(dst, ent.name);
+    if (ent.isDirectory()) copyDir(from, to);
+    else {
+      fs.copyFileSync(from, to);
+      if (fs.statSync(to).size !== fs.statSync(from).size) {
+        throw new Error('复制后大小不一致: ' + to);
+      }
+    }
+  }
+}
+
 /* ---- 第 0 步：先构建派生版本（必须在打包前）---- */
 console.log('=== 0. 构建派生版本 ===\n');
 
@@ -88,7 +106,7 @@ for (const [src, dst] of files) {
 /* 图标（装到手机桌面要用） */
 const iconSrc = path.join(ROOT, 'web', 'icons');
 if (fs.existsSync(iconSrc)) {
-  fs.cpSync(iconSrc, path.join(stage, 'web', 'icons'), { recursive: true });
+  copyDir(iconSrc, path.join(stage, 'web', 'icons'));
 }
 
 /* ---- 第 3 步：单文件版放到包里最显眼的位置 ---- */
@@ -112,7 +130,7 @@ if (fs.existsSync(pubSrc)) {
     if (!fs.statSync(from).isFile()) {
       // icons/ 这类目录要整目录带过去，否则手机上装出来的图标是空的
       if (f === 'icons' || f === 'screenshots') {
-        fs.cpSync(from, path.join(pubDst, f), { recursive: true });
+        copyDir(from, path.join(pubDst, f));
       }
       continue;
     }

@@ -1,5 +1,5 @@
 /* =============================================================
-   田智 · 天气数据适配层
+   知时智农 · 天气数据适配层
    -------------------------------------------------------------
    目标：把多个天气数据源统一成一个结构，上层（logic.js / app.js）
    完全不关心数据来自谁。
@@ -39,6 +39,20 @@
 
   var stats = { base: 'none', lastError: null, extras: [] };
 
+  /* ---------------- Open-Meteo 可选中转 ----------------
+     国内多数网络（含校园网）到 api.open-meteo.com 是 TCP 超时，
+     直连取不到集合预报/多模式，界面就只能显示"暂无法评估置信度"。
+     部署 worker/ai-proxy.js 后，把地址填进 config.openMeteoProxy，
+     这里的请求就会改走 /om/<host>/<path>，由 Worker 代取。
+     留空 = 直连，行为和以前完全一样。 */
+  var OM_PROXY = String((CFG.openMeteoProxy || '')).replace(/\/+$/, '');
+
+  function omUrl(host, pathAndQuery) {
+    return OM_PROXY
+      ? OM_PROXY + '/om/' + host + pathAndQuery
+      : 'https://' + host + pathAndQuery;
+  }
+
   function hasQWeather() { return QW.enabled; }
   function getSource() { return stats.base; }
   function getStats() { return stats; }
@@ -70,7 +84,7 @@
     u.searchParams.set('timezone', 'Asia/Shanghai');
     u.searchParams.set('forecast_days', '7');
 
-    return fetchJSON(u.toString(), 15000).then(function (j) {
+    return fetchJSON(omUrl('api.open-meteo.com', '/v1/forecast?' + u.searchParams.toString()), 15000).then(function (j) {
       if (!j.hourly || !j.daily) throw new Error('Open-Meteo 返回不完整');
       stats.base = 'open-meteo';
       return {
@@ -393,15 +407,13 @@
        虽然不是真集合，但能反映"不同模式看法是否一致"，
        且在同一个稳定域名上，1 次请求即可。
      ============================================================ */
-  var ENSEMBLE_URL = 'https://ensemble-api.open-meteo.com/v1/ensemble';
-
   function getEnsemble(lat, lon, model) {
     var m = model || 'ecmwf_ifs025';
-    var url = ENSEMBLE_URL +
+    var url = omUrl('ensemble-api.open-meteo.com', '/v1/ensemble' +
       '?latitude=' + lat.toFixed(4) + '&longitude=' + lon.toFixed(4) +
       '&hourly=precipitation,temperature_2m,wind_speed_10m' +
       '&models=' + m +
-      '&forecast_days=7&timezone=Asia%2FShanghai';
+      '&forecast_days=7&timezone=Asia%2FShanghai');
 
     // 5 秒超时：这个域名经常连不上，不能让它拖住整个页面
     return fetchJSON(url, 5000).then(function (j) {
@@ -426,11 +438,11 @@
   var MULTI_MODELS = ['best_match', 'ecmwf_ifs025', 'gfs_seamless', 'icon_seamless'];
 
   function getMultiModel(lat, lon) {
-    var url = 'https://api.open-meteo.com/v1/forecast' +
+    var url = omUrl('api.open-meteo.com', '/v1/forecast' +
       '?latitude=' + lat.toFixed(4) + '&longitude=' + lon.toFixed(4) +
       '&hourly=precipitation,temperature_2m,wind_speed_10m' +
       '&models=' + MULTI_MODELS.join(',') +
-      '&forecast_days=7&timezone=Asia%2FShanghai';
+      '&forecast_days=7&timezone=Asia%2FShanghai');
 
     return fetchJSON(url, 12000).then(function (j) {
       if (!j || !j.hourly) return null;

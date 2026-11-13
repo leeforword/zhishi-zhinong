@@ -39,6 +39,17 @@
   var isWeChat = /MicroMessenger/i.test(ua);
   var isAndroid = /Android/i.test(ua);
 
+  /* 是不是"装到桌面"这件事真正有意义的设备。
+     Chrome 在桌面上也会抛 beforeinstallprompt，如果一视同仁地弹底部条，
+     它就正好糊在图表上——桌面用户本来也不需要"添加到桌面"。
+     注意不能只看 maxTouchPoints：带触摸屏的笔记本也会 >0（实测 10），
+     但人家用的是鼠标。可靠信号是"主指针是不是粗的"+ 窄屏。
+     所以：手机/平板弹条，桌面只在顶栏留一个小按钮，愿意装的人自己点。 */
+  var isInstallTarget =
+    isIOS || isAndroid ||
+    (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+    window.innerWidth < 720;
+
   var DISMISS_KEY = 'zz.pwa.installDismissed';
 
   var deferredPrompt = null;   // 安卓 Chrome 的安装事件，只能存一次
@@ -371,7 +382,9 @@
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault();       // 拦掉浏览器自带的迷你条，改用我们自己的
       deferredPrompt = e;
-      offerInstall();
+      // 桌面端只亮顶栏图标，不弹底部条（会挡住图表）
+      if (isInstallTarget) offerInstall();
+      else showTopButton();
     });
 
     window.addEventListener('appinstalled', function () {

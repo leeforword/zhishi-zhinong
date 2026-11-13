@@ -61,8 +61,10 @@ window.TIANZHI_CONFIG = {
         填错会返回 Invalid Host。
 
      双源分工，各取所长：
-       · Open-Meteo   → 7 天逐时/逐日主预报（网格 9–11km，任意经纬度可用）
-       · 和风天气     → 分钟级降水（未来 2 小时，每 5 分钟）+ 灾害预警
+       · 和风天气     → 主预报：7 天 168 小时逐时 + 7 天逐日，
+                        附带分钟级降水（未来 2 小时）与灾害预警
+       · Open-Meteo   → 集合预报（置信度）与多模式分歧；
+                        和风不可用时整体兜底
 
      任一数据源不可用都不影响页面，只是对应功能自动隐藏。 */
   qweatherKey: '50b832fd5ab94314b13640cab4cb9d05',
@@ -79,6 +81,19 @@ window.TIANZHI_CONFIG = {
      两种模式下，集合预报（置信度）和多模式分歧仍然取自 Open-Meteo，
      因为和风的免费额度给不了这两样。 */
   preferSource: 'qweather',
+
+  /* ---------- Open-Meteo 中转（可选，解决国内直连超时） ----------
+     集合预报（置信度）和多模式分歧只有 Open-Meteo 有，但
+     api.open-meteo.com / ensemble-api.open-meteo.com 在国内多数网络
+     （校园网尤其明显）是 TCP 超时——直连拿不到，界面会退化成
+     「主预报余量评估」，看起来就是没有置信度。
+
+     解决办法：部署 worker/ai-proxy.js（免费，约 10 分钟），
+     然后把地址填在这里，例如：
+       openMeteoProxy: 'https://zhishi-ai.你的账号.workers.dev',
+
+     留空 = 直连。和风天气的主预报不受这个开关影响。 */
+  openMeteoProxy: '',
 
   /* ---------- 功能开关 ---------- */
   enableLLM: false,            // 公网版无 key，默认关闭；本地可在 config.local.js 打开

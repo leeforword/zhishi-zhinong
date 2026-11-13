@@ -183,9 +183,16 @@
 
     var p = [];
     // 可作业时段底色
-    p.push('<rect x="' + x(RULES.spray.hours[0]).toFixed(1) + '" y="' + TP + '" width="' +
-      (x(RULES.spray.hours[1]) - x(RULES.spray.hours[0])).toFixed(1) + '" height="' + ih +
-      '" fill="rgba(95,115,82,.13)" rx="4"/>');
+    // 今天的逐时数据从"当前小时"才开始（和风 168h 是往后数的），
+    // 底色若照 6–18 时整段铺开，左边会出现一大片没有折线的绿块，
+    // 看着像数据丢了。所以底色跟着实际有数据的区间收口。
+    var bandFrom = Math.max(RULES.spray.hours[0], hours[0].hour);
+    var bandTo = Math.min(RULES.spray.hours[1], hours[hours.length - 1].hour + 1);
+    if (bandTo > bandFrom) {
+      p.push('<rect x="' + x(bandFrom).toFixed(1) + '" y="' + TP + '" width="' +
+        (x(bandTo) - x(bandFrom)).toFixed(1) + '" height="' + ih +
+        '" fill="rgba(95,115,82,.13)" rx="4"/>');
+    }
     // 横向网格
     for (var g = 0; g <= ymax; g += 2) {
       p.push('<line x1="' + L + '" y1="' + y(g).toFixed(1) + '" x2="' + (W - R) + '" y2="' + y(g).toFixed(1) +
@@ -207,7 +214,8 @@
     var ty = y(RULES.spray.wind_max).toFixed(1);
     p.push('<line x1="' + L + '" y1="' + ty + '" x2="' + (W - R) + '" y2="' + ty +
       '" stroke="#a83e28" stroke-width="1.4" stroke-dasharray="5 4"/>');
-    p.push('<text x="' + (W - R) + '" y="' + (+ty - 5).toFixed(1) + '" font-size="9.5" text-anchor="end" fill="#a83e28">上限 2.5</text>');
+    // 阈值标注贴在右端线上方：左端会和 Y 轴刻度（4 / 2 / 0）撞在一起
+    p.push('<text x="' + (W - R - 2) + '" y="' + (+ty - 6).toFixed(1) + '" font-size="9.5" text-anchor="end" fill="#a83e28">上限 ' + RULES.spray.wind_max + '</text>');
 
     // 点
     hours.forEach(function (h) {
@@ -618,6 +626,21 @@
     return '<div class="conf-strip">' + cells + '</div>';
   }
 
+  /** 余量评估：取不到集合预报时的替代口径
+      只用主预报就能算：窗口内风速峰值离上限还有多少空间 + 当天降雨概率。
+      必须标明这不是集合成员支持率——两者不是一回事，不能混着说。 */
+  function marginEval(day, win) {
+    var limit = T.RULES.spray.wind_max;
+    var peak = (win.maxWind != null ? win.maxWind : win.avgWind) || 0;
+    var ratio = limit > 0 ? peak / limit : 1;
+    var prob = day.dayProb || 0;
+    var level;
+    if (ratio <= 0.75 && prob <= 20) level = { label: '充足', color: '#16a34a' };
+    else if (ratio <= 0.9 && prob <= 40) level = { label: '偏紧', color: '#d97706' };
+    else level = { label: '紧张', color: '#dc2626' };
+    return { level: level, peak: peak, limit: limit, prob: prob, ratio: ratio };
+  }
+
   function renderHero(result) {
     var box = $('heroIn');
     var best = T.bestWindow(result);
@@ -666,7 +689,19 @@
       confHtml = '<div class="conf-row"><span class="conf-none">该日没有支持率过半的窗口</span></div>' +
         '<div class="conf-caveat' + (ens.caveat ? '' : ' ok') + '">' + esc(ens.caveat || ens.label) + '</div>';
     } else {
-      confHtml = '<div class="conf-row"><span class="conf-none">未取到集合预报或多模型数据，暂无法评估置信度</span></div>';
+      /* 没有集合预报（多数是 Open-Meteo 在当前网络不可达）时，
+         不要只留一句"暂无法评估"就完事——主预报本身还能说明余量。
+         但口径必须写清楚：这是余量，不是成员支持率。 */
+      var mg = marginEval(best, w);
+      confHtml =
+        '<div class="conf-row">' +
+          '<span class="conf-badge" style="background:' + mg.level.color + '1a;color:' + mg.level.color +
+            ';border-color:' + mg.level.color + '40">' +
+            '<i style="background:' + mg.level.color + '"></i>余量 ' + mg.level.label + '</span>' +
+          '<span class="conf-src">窗口风速峰值 ' + mg.peak + ' m/s，上限 ' + mg.limit +
+            ' m/s；当日降雨概率 ' + mg.prob + '%</span>' +
+        '</div>' +
+        '<div class="conf-caveat">未取到集合预报，按<b>主预报余量</b>估算，非成员支持率</div>';
     }
 
     box.innerHTML =
@@ -1861,7 +1896,7 @@
     try {
       addLocalBoundaries();
     } catch (e) {
-      console.warn('[田智] 本地边界绘制失败：', e.message);
+      console.warn('[知时智农] 本地边界绘制失败：', e.message);
     }
   }
 
@@ -2048,7 +2083,7 @@
       // 容器尺寸变化后通知地图重绘
       setTimeout(function () { if (MAP.instance) MAP.instance.resize(); }, 60);
     }).catch(function (err) {
-      console.warn('[田智] 高德地图不可用，已降级：', err.message);
+      console.warn('[知时智农] 高德地图不可用，已降级：', err.message);
       MAP.failed = true;
       updateMapMode();
       renderFallbackMap(sel);
@@ -2080,7 +2115,7 @@
     // 这样用户点"展开地图"时基本已经就绪（避免首屏多等 1-2 秒）
     loadAMap().catch(function (err) {
       MAP.failed = true;
-      console.warn('[田智] 高德 SDK 预加载失败：', err.message);
+      console.warn('[知时智农] 高德 SDK 预加载失败：', err.message);
     });
   }
 
@@ -2306,7 +2341,7 @@
     d.className = 'msg ' + role;
     var who = document.createElement('div');
     who.className = 'who';
-    who.textContent = (role === 'me') ? '我' : '田智';
+    who.textContent = (role === 'me') ? '我' : '知时智农';
     var body = document.createElement('div');
     body.className = 'body';
     body.textContent = text;
@@ -2320,7 +2355,7 @@
     var log = $('qaLog');
     var d = document.createElement('div');
     d.className = 'msg bot typing-wrap';
-    d.innerHTML = '<div class="who">田智</div><div class="typing"><i></i><i></i><i></i></div>';
+    d.innerHTML = '<div class="who">知时智农</div><div class="typing"><i></i><i></i><i></i></div>';
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
     return d;
@@ -2430,7 +2465,7 @@
       if (err && /数字不一致/.test(err.message || '')) {
         appendMsg('bot', template);
         if (err.extra && err.extra.length) {
-          console.warn('[田智] 大模型改写出现新数字，已拦截:', err.extra);
+          console.warn('[知时智农] 大模型改写出现新数字，已拦截:', err.extra);
         }
       } else {
         appendMsg('bot', template);

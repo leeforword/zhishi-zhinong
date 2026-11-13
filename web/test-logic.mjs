@@ -1,11 +1,54 @@
 /**
  * test-logic.mjs — 逻辑层测试
  * 加载 logic.js（浏览器/Node 双用），用真实天气数据跑遍所有问答分支
- * 用法：node test-logic.mjs
+ * 用法：node test-logic.mjs [--source=qweather|open-meteo]
+ *
+ * 为什么默认走和风而不是 Open-Meteo：
+ *   和风是主预报源，测试就该测生产实际走的那条路；而且
+ *   api.open-meteo.com 在部分网络（含校园网、国内多数出口）不可达，
+ *   以前把它写死在测试里，本地跑不通、CI 也可能因第三方故障卡住发布。
+ *   现在两个源都试，谁通谁上，两个都不通才报错并说明原因。
  */
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
+
+// config.js / weather.js 是按浏览器全局写的，先补一个 window 别名
+globalThis.window = globalThis;
+require('./config.js');
+require('./weather.js');
+
 const T = require('./logic.js');
+const W = globalThis.TianZhiWeather;
+
+const arg = process.argv.find((a) => a.startsWith('--source='));
+const PREFER = arg ? arg.split('=')[1] : 'qweather';
+
+function withTimeout(p, ms, label) {
+  return Promise.race([
+    p,
+    new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' 超时 ' + ms + 'ms')), ms))
+  ]);
+}
+
+let lastSource = '';
+
+async function fetchWeather(lat, lon) {
+  const q = () => withTimeout(W._fromQWeather168(lat, lon), 20000, '和风');
+  const o = () => withTimeout(W._fromOpenMeteo(lat, lon), 20000, 'Open-Meteo');
+  const order = PREFER === 'open-meteo' ? [['open-meteo', o], ['qweather', q]]
+                                        : [['qweather', q], ['open-meteo', o]];
+  const errors = [];
+  for (const [name, fn] of order) {
+    try {
+      const r = await fn();
+      lastSource = name;
+      return r;
+    } catch (e) {
+      errors.push(name + ': ' + e.message);
+    }
+  }
+  throw new Error('两个数据源都取不到 —— ' + errors.join(' / '));
+}
 
 const CITIES = {
   '保定':   [38.8729, 115.4625],
@@ -13,19 +56,6 @@ const CITIES = {
   '邯郸':   [36.6103, 114.4900],
   '衡水':   [37.7392, 115.6758]
 };
-
-async function fetchWeather(lat, lon) {
-  const u = new URL('https://api.open-meteo.com/v1/forecast');
-  u.searchParams.set('latitude', lat);
-  u.searchParams.set('longitude', lon);
-  u.searchParams.set('hourly', 'temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m');
-  u.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,weather_code');
-  u.searchParams.set('timezone', 'Asia/Shanghai');
-  u.searchParams.set('forecast_days', '7');
-  const r = await fetch(u.toString());
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.json();
-}
 
 let pass = 0, fail = 0;
 const check = (c, m) => { c ? (pass++, console.log('  ✔ ' + m)) : (fail++, console.log('  ✘ ' + m)); };
@@ -81,9 +111,11 @@ for (const [city, [lat, lon]] of Object.entries(CITIES)) {
   WEEK.forEach((d, di) => {
     const hours = T.hoursOf(w.hourly, d.date);
     if (!hours.length) return;
-    const prev = di > 0 ? WEEK[di - 1] : null;
-    const blocked = d.dayRain > T.RULES.spray.rain_day_max ||
-                    (prev && prev.dayRain >= T.RULES.spray.rain_prev_max);
+    // 用引擎自己算出的 blocked，不要在这里重算一遍：
+    // 引擎的前一日降水是「逐小时累加」，而 d.dayRain 取的是逐日接口的值，
+    // 和风这两个数偶尔对不上（例如逐日 0.0 mm、逐时累加 1.2 mm），
+    // 重算就会得出"热力图有窗口、引擎说没有"的假不一致。
+    const blocked = d.spray.blocked;
     // 统计作业时段内连续 ok 的最长游程
     let run = 0, bestRun = 0;
     hours

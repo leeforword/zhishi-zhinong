@@ -1,6 +1,7 @@
 # AI 中转部署 · 手把手
 
-> 目的：让网站能用大模型，但**源码里不出现 key**。
+> 目的：让网站能用大模型，但**源码里不出现 key**；
+> 顺带把国内打不开的 Open-Meteo 转出去，保住"置信度"这块功能。
 > 全程免费，大约 10 分钟。
 
 ---
@@ -89,6 +90,32 @@ llmProxyUrl: 'https://zhishi-ai.你的账号名.workers.dev',
 ```
 
 提交推送即可。地址是公开的没关系——**key 不在里面**。
+
+---
+
+## 三·五、顺带解决：Open-Meteo 直连超时
+
+和风负责主预报，但**集合预报（置信度）和多模式分歧只有 Open-Meteo 有**。
+而 `api.open-meteo.com` 在国内多数网络（校园网尤其明显）是 TCP 超时，
+直连时页面只能显示「主预报余量评估」，拿不到真置信度。
+
+同一个 Worker 已经带了一条中转路由，不用额外配置、不用再加 key：
+
+```
+浏览器 ──GET──▶ Worker /om/api.open-meteo.com/v1/forecast?... ──▶ Open-Meteo
+```
+
+部署好之后，把地址填进 `web/config.js`：
+
+```js
+openMeteoProxy: 'https://zhishi-ai.你的账号名.workers.dev',
+```
+
+- 只放行 `api.open-meteo.com`、`ensemble-api.open-meteo.com` 等白名单主机，
+  不会变成谁都能用的开放代理
+- 响应缓存 5 分钟，少吃上游额度
+- 留空就是直连，行为和没配完全一样
+- **这条路由不需要 `DEEPSEEK_KEY`**，只想要置信度、不要 AI 的话，环境变量可以只填 `ALLOWED_ORIGINS`
 
 ---
 

@@ -211,6 +211,7 @@ zhishi-zhinong/
 | **村名不保证每块地都能识别** | 行政村名字靠地图服务商的 POI/AOI 数据，不是官方行政区划库。识别不到时界面会如实退到"乡镇/街道"，不会拿乡镇名冒充村名 |
 | **高德逆地理编码需要正确的安全密钥** | 安全密钥（`amapSecurityJsCode`）配错时所有"服务类"接口返回 `INVALID_USER_SCODE`，地图还能显示但取不到村名。控制台重新复制一次即可 |
 | **域名白名单会挡住本地预览** | 白名单里没有 `localhost` 时，本机打开地图会失败（线上正常）。本地开发需要把 `localhost` 也加进去 |
+| **Open-Meteo 国内直连可能超时** | 集合预报与多模式分歧只有 Open-Meteo 提供，校园网/部分出口是 TCP 超时。此时置信度会退化为「主预报余量评估」，界面写明口径，不会假装是 50 成员支持率。填 `config.js` 的 `openMeteoProxy` 走 Worker 中转即可恢复 |
 | 农事阈值未经核定 | 风速、气温等来自公开农技常识，**未**经当地农技部门核定，界面已标注"待核实" |
 | 天气预报本身有不确定性 | 不同模式结论可能相反，作品的做法是如实暴露分歧，而不是假装单点预报可靠 |
 | 天气网格约 9–11 km | 代表县域范围，不是单个地块 |
@@ -240,10 +241,13 @@ zhishi-zhinong/
 ## 自检
 
 ```bash
-cd web && node test-logic.mjs      # 规则引擎 240 项
+cd web && node test-logic.mjs      # 规则引擎（默认取和风，和风不通才退 Open-Meteo）
 node web/e2e.mjs                   # 浏览器端到端 51 项（需先启动服务）
 node scripts/test-pwa.mjs          # 安装 / 离线 35 项
 ```
+
+> 测试默认走**和风**——和线上一致，也不受 Open-Meteo 国内超时影响；
+> 想单独验 Open-Meteo 那条路，用 `node test-logic.mjs --source=open-meteo`。
 
 ---
 

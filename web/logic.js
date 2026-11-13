@@ -1,5 +1,5 @@
 /* =============================================================
-   田智 · 逻辑层
+   知时智农 · 逻辑层
    -------------------------------------------------------------
    纯函数，不依赖 DOM，浏览器与 Node 均可运行。
    浏览器：<script src="logic.js"> 后通过 window.TianZhi 访问
@@ -431,7 +431,7 @@
         weather: code === null ? '' : weatherText(code),
         tmax: tmax, tmin: tmin,
         dayRain: dayRain, dayProb: dayProb, windMax: windMax,
-        spray: { status: sprayStatus, why: sprayWhy, windows: windows },
+        spray: { status: sprayStatus, why: sprayWhy, windows: windows, blocked: blocked },
         irrigation: { status: irrStatus, why: irrWhy },
         harvest: { status: harvStatus, why: harvWhy }
       };

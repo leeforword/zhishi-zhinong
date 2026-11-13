@@ -46,6 +46,16 @@ export default {
       return new Response(null, { status: 204, headers: cors(request, env) });
     }
 
+    /* ---- Open-Meteo 中转：GET /om/<host>/<path>?<query> ----
+       为什么要这条路由：集合预报和多模式分歧只有 Open-Meteo 提供，
+       而 api.open-meteo.com 在国内多数网络（校园网尤其明显）直连是 TCP 超时，
+       浏览器里拿不到置信度。前端把这个 Worker 地址填进 config.openMeteoProxy，
+       请求就改从这里出去，回程照常带 CORS。
+       只放行白名单主机，不做成任意 URL 的开放代理。 */
+    if (request.method === 'GET' && url.pathname.indexOf('/om/') === 0) {
+      return proxyOpenMeteo(request, env, url);
+    }
+
     if (request.method !== 'POST') {
       return json({ error: '只接受 POST' }, 405, request, env);
     }
@@ -125,6 +135,57 @@ export default {
 
 /* ---------------- 工具函数 ---------------- */
 
+/* Open-Meteo 中转：只允许这几个主机，避免变成开放代理被拿去刷别的东西 */
+const OM_HOSTS = new Set([
+  'api.open-meteo.com',
+  'ensemble-api.open-meteo.com',
+  'archive-api.open-meteo.com',
+  'air-quality-api.open-meteo.com'
+]);
+
+async function proxyOpenMeteo(request, env, url) {
+  const origin = request.headers.get('Origin') || '';
+  if (!originAllowed(origin, env)) {
+    return json({ error: '来源不被允许：' + (origin || '(空)') }, 403, request, env);
+  }
+
+  const rest = url.pathname.slice('/om/'.length);
+  const slash = rest.indexOf('/');
+  if (slash <= 0) {
+    return json({ error: '路径应形如 /om/api.open-meteo.com/v1/forecast' }, 400, request, env);
+  }
+
+  const host = rest.slice(0, slash);
+  const path = rest.slice(slash);
+  if (!OM_HOSTS.has(host)) {
+    return json({ error: '不允许的主机：' + host }, 403, request, env);
+  }
+
+  const upstream = 'https://' + host + path + (url.search || '');
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+
+  try {
+    const r = await fetch(upstream, {
+      signal: ctrl.signal,
+      headers: { 'User-Agent': 'zhishi-zhinong-proxy/1.0' }
+    });
+    const body = await r.text();
+    return new Response(body, {
+      status: r.status,
+      headers: Object.assign({
+        'Content-Type': r.headers.get('Content-Type') || 'application/json; charset=utf-8',
+        // 预报 5 分钟内不会变，缓存一下省额度也快
+        'Cache-Control': 'public, max-age=300'
+      }, cors(request, env))
+    });
+  } catch (e) {
+    return json({ error: '上游取数失败：' + (e && e.message) }, 502, request, env);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function sanitizeMessages(list) {
   if (!Array.isArray(list) || list.length === 0) return null;
   if (list.length > MAX_MESSAGES) return null;
@@ -171,7 +232,7 @@ function cors(request, env) {
   const allow = originAllowed(origin, env) && origin ? origin : (env.ALLOWED_ORIGINS || '*').split(',')[0].trim();
   return {
     'Access-Control-Allow-Origin': allow || '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin'

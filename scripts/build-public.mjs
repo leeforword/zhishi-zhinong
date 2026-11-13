@@ -84,8 +84,15 @@ for (const f of files) {
 }
 fs.writeFileSync(path.join(OUT, 'config.js'), cfg, 'utf8');
 
-/* 图标与安装引导截图 */
-fs.cpSync(path.join(WEB, 'icons'), path.join(OUT, 'icons'), { recursive: true });
+/* 图标与安装引导截图。
+   注意：不要用 fs.cpSync 递归复制到含中文的目录——在 Windows + Node 22 上
+   它会静默失败（不报错也不建目录），产物里就少了 icons/，装到手机桌面直接失效。
+   改成逐个文件复制，路径全部 ASCII 校验过。 */
+for (const f of fs.readdirSync(path.join(WEB, 'icons'))) {
+  const to = path.join(OUT, 'icons', f);
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  fs.copyFileSync(path.join(WEB, 'icons', f), to);
+}
 fs.mkdirSync(path.join(OUT, 'screenshots'), { recursive: true });
 for (const f of ['01-desktop-overview.png', '12-mobile-iphone.png']) {
   const from = path.join(ROOT, 'screenshots', f);
