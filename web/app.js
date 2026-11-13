@@ -1910,6 +1910,17 @@
     form.village = fine.village || '';
     form.precision = fine.precision;
 
+    // 用户是从"附近地点"里挑的，就别用村镇名盖掉他选的那一条
+    if (form.poiLock && form.poiLock.name) {
+      var pl = form.poiLock;
+      var city = fine.city || form.city || '';
+      $('fHint').className = 'hint';
+      $('fHint').textContent = '已选地点：' + (city ? city + ' · ' : '') + pl.name +
+        (pl.distance != null ? '（' + pl.distance + ' 米）' : '');
+      $('mapRead').innerHTML = '已选点：<span class="loc">' + pl.name + '</span>';
+      return;
+    }
+
     var tag = PRECISION_TAG[fine.precision];
     var suffix = tag ? '（' + tag + '）' : '';
 
@@ -2374,6 +2385,8 @@
     form.lon = lon;
     form.lat = lat;
     form.source = source || 'search';
+    // 从别处重新选点时，之前"选中的附近地点"作废
+    if (form.source !== 'poi') form.poiLock = null;
 
     var loc = locateCounty(lon, lat);
     var desc;
@@ -2397,6 +2410,117 @@
       $('fHint').textContent = '已选地点：' + desc + '（正在识别到村…）';
     }
     kickFinePlace(lon, lat);
+    // 从列表里选的点不重拉列表，否则刚选中的高亮会被刷新掉
+    if (form.source !== 'poi') refreshNearby(lon, lat);
+  }
+
+  /* =========================================================
+     附近地点（仿腾讯地图选点）
+     restapi/v3/place/around 给出 1 公里内按距离排序的 POI，
+     点一条直接把地块坐标挪过去，名字也顺手填好。
+     ========================================================= */
+  var NEARBY = { items: [], sel: -1, seq: 0 };
+
+  function placeOpts() {
+    var cfg = window.TIANZHI_CONFIG || {};
+    return {
+      amapWebKey: cfg.amapWebKey || '',
+      city: form.city || '',
+      radius: 1000,
+      toGcj: function (lo, la) {
+        try { return T.wgs84ToGcj(lo, la); } catch (e) { return [lo, la]; }
+      }
+    };
+  }
+
+  function refreshNearby(lon, lat) {
+    var box = $('nearbyList');
+    if (!box || !window.TianZhiPlace || !window.TianZhiPlace.around) return;
+    NEARBY.sel = -1;
+    var seq = ++NEARBY.seq;
+    box.innerHTML = '<div class="nearby-empty">正在找周边地点…</div>';
+
+    window.TianZhiPlace.around(lon, lat, placeOpts()).then(function (r) {
+      if (seq !== NEARBY.seq) return;             // 快速连点时只认最后一次
+      if (!r.list.length) {
+        box.innerHTML = '<div class="nearby-empty">' +
+          (r.error ? '周边地点加载失败（' + esc(r.error) + '）' : '这一带 1 公里内没有可识别的地点') +
+          '</div>';
+        return;
+      }
+      NEARBY.items = r.list;
+      renderNearbyList();
+    });
+  }
+
+  function searchNearby(kw) {
+    var box = $('nearbyList');
+    if (!box) return;
+    var seq = ++NEARBY.seq;
+    NEARBY.sel = -1;
+    box.innerHTML = '<div class="nearby-empty">正在搜索…</div>';
+
+    window.TianZhiPlace.searchPoi(kw, form.lon, form.lat, placeOpts()).then(function (r) {
+      if (seq !== NEARBY.seq) return;
+      if (!r.list.length) {
+        box.innerHTML = '<div class="nearby-empty">没搜到「' + esc(kw) + '」，换个词试试</div>';
+        return;
+      }
+      NEARBY.items = r.list;
+      renderNearbyList();
+    });
+  }
+
+  function renderNearbyList() {
+    var box = $('nearbyList');
+    if (!box) return;
+    box.innerHTML = NEARBY.items.map(function (p, i) {
+      var d = p.distance == null ? '' : (p.distance >= 1000 ? (p.distance / 1000).toFixed(1) + 'km' : p.distance + 'm');
+      var meta = [d, p.area, p.address || p.type].filter(Boolean).join(' · ');
+      return '<button class="nb-item' + (i === NEARBY.sel ? ' on' : '') + '" data-i="' + i + '">' +
+        '<span class="nb-main"><span class="nb-name">' + esc(p.name) + '</span>' +
+        '<span class="nb-meta">' + esc(meta) + '</span></span>' +
+        '<span class="nb-dist">' + (i === NEARBY.sel ? '已选' : '选') + '</span>' +
+      '</button>';
+    }).join('');
+  }
+
+  function selectNearby(i) {
+    var p = NEARBY.items[i];
+    if (!p || p.lng == null || p.lat == null) return;
+    NEARBY.sel = i;
+    renderNearbyList();
+
+    var w = T.gcjToWgs84(p.lng, p.lat);
+    form.poiLock = { name: p.name, distance: p.distance };
+    setFormPlace(p.name, w[0], w[1], p.area, 'poi');
+    if (MAP.instance) drawMarker(w[1], w[0]);
+    if (MAP.instance) MAP.instance.setZoomAndCenter(15, [p.lng, p.lat]);
+    $('fHint').textContent = '已选地点：' + (form.city ? form.city + ' · ' : '') + p.name +
+      (p.distance != null ? '（' + p.distance + ' 米）' : '');
+  }
+
+  function bindNearby() {
+    var box = $('nearbyList');
+    if (box) {
+      box.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('.nb-item') : null;
+        if (!b) return;
+        selectNearby(Number(b.getAttribute('data-i')));
+      });
+    }
+    var kw = $('nearbyKw');
+    if (kw) {
+      var timer = null;
+      kw.addEventListener('input', function () {
+        clearTimeout(timer);
+        var v = kw.value.trim();
+        timer = setTimeout(function () {
+          if (!form || form.lon == null) return;
+          if (v) searchNearby(v); else refreshNearby(form.lon, form.lat);
+        }, 420);
+      });
+    }
   }
 
   /* 锁滚动时把滚动条宽度补回去，否则页面会横向抖一下 */
@@ -3142,6 +3266,7 @@
   }
 
   save();
+  bindNearby();       // 弹窗里的「附近地点」
   bindDrawer();       // 手机端侧栏抽屉
   renderSolarTerm();  // 节气条
   setTimeout(function () { moveTabPill(currentView || 'content'); }, 120);

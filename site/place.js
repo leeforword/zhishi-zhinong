@@ -299,6 +299,74 @@
     };
   }
 
+
+  /* ============================================================
+     周边地点：restapi/v3/place/around
+     返回按距离排序的 POI（名称 / 距离 / 地址 / 类型），
+     和腾讯地图选点页那种"附近地点"列表一个来源。
+     ============================================================ */
+  function around(lon, lat, opts) {
+    opts = opts || {};
+    var key = String(opts.amapWebKey || '').trim();
+    if (!key) return Promise.resolve({ error: 'NO_WEB_KEY', list: [] });
+
+    var gcj;
+    try { gcj = opts.toGcj ? opts.toGcj(lon, lat) : [lon, lat]; } catch (e) { gcj = [lon, lat]; }
+
+    var url = 'https://restapi.amap.com/v3/place/around' +
+      '?key=' + encodeURIComponent(key) +
+      '&location=' + Number(gcj[0]).toFixed(6) + ',' + Number(gcj[1]).toFixed(6) +
+      '&radius=' + (opts.radius || 1000) +
+      '&offset=20&page=1&extensions=base&sortrule=distance';
+
+    return fetchJSON(url, 6000).then(function (j) {
+      if (!j || String(j.status) !== '1' || !Array.isArray(j.pois)) {
+        return { error: (j && (j.info || j.infocode)) || 'AMAP_AROUND_FAIL', list: [] };
+      }
+      return { error: '', list: j.pois.map(normPoi).filter(function (x) { return x.name; }) };
+    }).catch(function () { return { error: 'NETWORK', list: [] }; });
+  }
+
+  /* 关键词搜地点（限定在当前城市），带距离排序 */
+  function searchPoi(keyword, lon, lat, opts) {
+    opts = opts || {};
+    var key = String(opts.amapWebKey || '').trim();
+    var kw = String(keyword || '').trim();
+    if (!key || !kw) return Promise.resolve({ error: '', list: [] });
+
+    var gcj;
+    try { gcj = opts.toGcj ? opts.toGcj(lon, lat) : [lon, lat]; } catch (e) { gcj = [lon, lat]; }
+
+    var url = 'https://restapi.amap.com/v3/place/text' +
+      '?key=' + encodeURIComponent(key) +
+      '&keywords=' + encodeURIComponent(kw) +
+      '&city=' + encodeURIComponent(opts.city || '全国') +
+      '&citylimit=' + (opts.city ? 'true' : 'false') +
+      '&location=' + Number(gcj[0]).toFixed(6) + ',' + Number(gcj[1]).toFixed(6) +
+      '&sortrule=distance&offset=20&page=1&extensions=base';
+
+    return fetchJSON(url, 6000).then(function (j) {
+      if (!j || String(j.status) !== '1' || !Array.isArray(j.pois)) {
+        return { error: (j && (j.info || j.infocode)) || 'AMAP_SEARCH_FAIL', list: [] };
+      }
+      return { error: '', list: j.pois.map(normPoi).filter(function (x) { return x.name; }) };
+    }).catch(function () { return { error: 'NETWORK', list: [] }; });
+  }
+
+  /* 高德 POI → 统一结构；location 是 "lng,lat" 的 GCJ-02 */
+  function normPoi(p) {
+    var ll = String(p.location || '').split(',');
+    return {
+      name: cleanName(p.name),
+      distance: p.distance === undefined || p.distance === '' ? null : Math.round(Number(p.distance)),
+      address: cleanName(p.address || ''),
+      type: cleanName(p.type || '').split(';').pop(),
+      area: cleanName(p.adname || ''),
+      lng: Number(ll[0]) || null,
+      lat: Number(ll[1]) || null
+    };
+  }
+
   var PRECISION_TEXT = {
     village: '村',
     township: '乡镇/街道',
@@ -374,6 +442,8 @@
   root.TianZhiPlace = {
     resolve: resolve,
     _fromAMapRest: fromAMapRest,
+    around: around,
+    searchPoi: searchPoi,
     cached: cached,
     precisionText: function (p) { return PRECISION_TEXT[p] || PRECISION_TEXT.none; },
     // 便于测试
