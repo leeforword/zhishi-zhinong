@@ -1326,8 +1326,15 @@ html.zz-chat #zzBar{display:none!important}
   .tabbar button.on{color:var(--brand);font-weight:600}
   .tabbar button svg{width:19px;height:19px}
   .side-nav{display:none}          /* 手机用底部 Tab，左侧栏只放地块 */
-  /* 给底部 Tab 让出空间，否则最后一张卡片会被挡住 */
+  /* 给底部 Tab 让出空间，否则最后一张卡片会被挡住。
+     ⚠️ 必须同时把 html/body 的 height:100% 去掉：body 固定成视口高度后，
+        padding-bottom 落在这块固定盒子的底边，内容再多也不会在末尾留白，
+        最后一段文字就会被 Tab 直接压住。 */
+  html,body{height:auto}
   body{padding-bottom:calc(52px + env(safe-area-inset-bottom,0px))}
+  .content{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+  /* 安装条浮在底部时，额外给它让位，避免盖住最后一段文字 */
+  body.zz-bar-on .content{padding-bottom:calc(168px + env(safe-area-inset-bottom,0px))}
   #viewChat.on{height:calc(100vh - 52px - 52px - env(safe-area-inset-bottom,0px))}
   /* 手机上"问一句"这行副标题太长，会顶掉输入框的高度，直接省掉 */
   #viewChat .chat-sub{display:none}

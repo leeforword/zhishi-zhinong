@@ -157,10 +157,12 @@
       el.appendChild(x);
     }
     el.classList.add('on');
+    document.body.classList.add('zz-bar-on');
   }
 
   function hideBar() {
     if (barEl) barEl.classList.remove('on');
+    document.body.classList.remove('zz-bar-on');
   }
 
   function dismissed() {

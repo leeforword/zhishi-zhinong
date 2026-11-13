@@ -226,7 +226,9 @@
 
     // 横轴
     [0, 6, 12, 18, 23].forEach(function (h) {
-      p.push('<text x="' + x(h).toFixed(1) + '" y="' + (H - 10) + '" font-size="9.5" text-anchor="middle">' + h + '时</text>');
+      // 首尾标签改成左/右对齐，否则会被 viewBox 边缘切掉半个字
+      var a = h === 0 ? 'start' : (h === 23 ? 'end' : 'middle');
+      p.push('<text x="' + x(h).toFixed(1) + '" y="' + (H - 10) + '" font-size="9.5" text-anchor="' + a + '">' + h + '时</text>');
     });
     p.push('<text x="' + L + '" y="' + (TP - 4) + '" font-size="9" fill="#9ca3af">风速 m/s</text>');
 
@@ -353,7 +355,8 @@
     p.push('<text x="' + (L - 7) + '" y="' + (rainBase + 3).toFixed(1) + '" font-size="8.5" text-anchor="end" fill="#9ca3af">mm</text>');
 
     days.forEach(function (d, i) {
-      p.push('<text x="' + x(i).toFixed(1) + '" y="' + (H - 8) + '" font-size="10" text-anchor="middle">' +
+      var a = i === 0 ? 'start' : (i === days.length - 1 ? 'end' : 'middle');
+      p.push('<text x="' + x(i).toFixed(1) + '" y="' + (H - 8) + '" font-size="10" text-anchor="' + a + '">' +
         (i === 0 ? '今天' : d.dow.slice(1)) + '</text>');
     });
     p.push('<text x="' + (W - R) + '" y="' + (TP - 4) + '" font-size="9" fill="#9ca3af" text-anchor="end">温度 ℃ / 降水 mm</text>');
@@ -429,7 +432,8 @@
     p.push('<path d="' + d + '" fill="none" stroke="#22c55e" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>');
     pts.forEach(function (pt, i) {
       p.push('<circle cx="' + x(i).toFixed(1) + '" cy="' + y(pt.value).toFixed(1) + '" r="3" fill="#fff" stroke="#22c55e" stroke-width="1.8"/>');
-      p.push('<text x="' + x(i).toFixed(1) + '" y="' + (H - 10) + '" font-size="9" text-anchor="middle">' + pt.label + '</text>');
+      var a = i === 0 ? 'start' : (i === pts.length - 1 ? 'end' : 'middle');
+      p.push('<text x="' + x(i).toFixed(1) + '" y="' + (H - 10) + '" font-size="9" text-anchor="' + a + '">' + pt.label + '</text>');
     });
     p.push('<text x="' + L + '" y="' + (H - 22) + '" font-size="9" fill="#9ca3af">长势指数</text>');
 
