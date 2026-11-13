@@ -262,22 +262,10 @@
       return;
     }
 
-    // 安卓：等 beforeinstallprompt 拿到调用资格
-    if (deferredPrompt) {
-      // 别一进页面就糊在首屏上，等用户看两眼再出现
-      setTimeout(function () {
-        if (isStandalone || dismissed() || !deferredPrompt) return;
-        showBar({
-          title: '装到桌面，下次一秒打开',
-          desc: '添加后有自己的图标，不再需要在浏览器里找网址。占用不到 1 MB。',
-          dismiss: dismissForever,
-          actions: [
-            { label: '安装', primary: true, onClick: doInstall },
-            { label: '以后再说', later: true, onClick: dismissForever }
-          ]
-        });
-      }, 3500);
-    }
+    // 安卓：有安装资格时只在顶栏亮一个图标。
+    // 底部已经改成悬浮毛玻璃底栏 + AI 胶囊，再叠一条安装提示会挡内容，
+    // 所以不再自动弹底部条——想装的人点顶栏那个按钮即可。
+    if (deferredPrompt) showTopButton();
   }
 
   function showIOSGuide() {

@@ -909,8 +909,9 @@
           '" stroke-width="1" opacity="' + (0.12 - i * 0.012).toFixed(3) + '"/>';
       }
     } else if (kind === 'cloud') {
-      g += '<ellipse cx="600" cy="96" rx="150" ry="66" fill="url(#skGlow)" opacity=".7"/>';
-      g += skyCloud(440, 92, 1.5, ac) + skyCloud(612, 70, 1.9, ac) + skyCloud(560, 150, 1.2, ac);
+      // 云别画太大：在宽屏上会被拉成一团灰块，压住四宫格
+      g += '<ellipse cx="600" cy="86" rx="130" ry="56" fill="url(#skGlow)" opacity=".55"/>';
+      g += skyCloud(540, 62, 1.05, ac) + skyCloud(700, 104, 0.8, ac);
     } else if (kind === 'rain') {
       g += '<ellipse cx="420" cy="86" rx="190" ry="74" fill="url(#skGlow)" opacity=".8"/>';
       g += skyCloud(320, 84, 1.7, ac) + skyCloud(480, 66, 2.0, ac);
@@ -939,7 +940,7 @@
   }
 
   function skyCloud(x, y, s, c) {
-    return '<g transform="translate(' + x + ',' + y + ') scale(' + s + ')" opacity=".5" fill="' + c + '">' +
+    return '<g transform="translate(' + x + ',' + y + ') scale(' + s + ')" opacity=".32" fill="' + c + '">' +
       '<ellipse cx="0" cy="0" rx="42" ry="24"/><ellipse cx="-26" cy="8" rx="26" ry="16"/>' +
       '<ellipse cx="28" cy="9" rx="30" ry="17"/><ellipse cx="6" cy="-14" rx="24" ry="16"/></g>';
   }
@@ -2745,6 +2746,18 @@
      ========================================================= */
   var currentView = 'content';
 
+  /* 底部 Tab 的滑动胶囊：跟着当前视图走，用 transform 保证 60fps */
+  function moveTabPill(name) {
+    var pill = $('tabPill');
+    if (!pill) return;
+    var tabs = document.querySelectorAll('#tabBar [data-view]');
+    var idx = 0;
+    Array.prototype.forEach.call(tabs, function (b, i) {
+      if (b.getAttribute('data-view') === name) idx = i;
+    });
+    pill.style.transform = 'translateX(' + (idx * 100) + '%)';
+  }
+
   function setView(name) {
     if (['content', 'chat', 'mine'].indexOf(name) < 0) name = 'content';
     currentView = name;
@@ -2766,6 +2779,7 @@
       var log = $('qaLog');
       if (log) setTimeout(function () { log.scrollTop = log.scrollHeight; }, 30);
     }
+    moveTabPill(name);
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* file:// 下可能不允许 */ }
   }
 
@@ -3083,6 +3097,7 @@
   }
 
   save();
+  if ($('aiFab')) $('aiFab').onclick = function () { setView('chat'); };
   bindDrawer();       // 手机端侧栏抽屉
   renderSolarTerm();  // 节气条
   bindAdvToggle();    // 手机端"换个假设"折叠开关
