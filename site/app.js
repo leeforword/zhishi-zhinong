@@ -2754,21 +2754,39 @@
        · 选中地块后自动关闭（用户接下来要看的是内容）
        · 抽屉打开时锁住背景滚动，避免滑动穿透
      ========================================================= */
+  /* 反事实按钮在手机上默认收起，点标题展开。
+     用事件委托挂在 #heroIn 上：这块内容每次重算都会重建，直接绑按钮会丢。 */
+  function bindAdvToggle() {
+    var box = $('heroIn');
+    if (!box) return;
+    box.addEventListener('click', function (e) {
+      var t = e.target.closest ? e.target.closest('.whatif-t') : null;
+      if (!t) return;
+      var wrap = t.parentNode;
+      if (wrap && wrap.classList.contains('whatif')) wrap.classList.toggle('open');
+    });
+  }
+
   function bindDrawer() {
     var mask = $('drawerMask');
     var side = $('sidebar');
     var btn = $('menuBtn');
+    var closeBtn = $('drawerClose');
     if (!mask || !side || !btn) return;
 
     function open() {
       side.classList.add('open');
       mask.classList.add('on');
       document.body.style.overflow = 'hidden';
+      document.body.classList.add('drawer-open');
+      btn.setAttribute('aria-expanded', 'true');
     }
     function close() {
       side.classList.remove('open');
       mask.classList.remove('on');
       document.body.style.overflow = '';
+      document.body.classList.remove('drawer-open');
+      btn.setAttribute('aria-expanded', 'false');
     }
     function isOpen() { return side.classList.contains('open'); }
 
@@ -2777,10 +2795,30 @@
       if (isOpen()) close(); else open();
     };
     mask.onclick = close;
+    if (closeBtn) closeBtn.onclick = close;
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && isOpen()) close();
     });
+
+    // 在抽屉里向左划也能关掉：手机上第一直觉就是划走
+    var tx = 0, ty = 0, tracking = false;
+    side.addEventListener('touchstart', function (e) {
+      if (!isOpen() || e.touches.length !== 1) return;
+      tracking = true; tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+    }, { passive: true });
+    side.addEventListener('touchend', function (e) {
+      if (!tracking) return;
+      tracking = false;
+      var t = e.changedTouches[0];
+      var dx = t.clientX - tx, dy = t.clientY - ty;
+      // 横向位移够大且明显大于纵向才当"划走"，否则会和上下滚动打架
+      if (dx < -55 && Math.abs(dx) > Math.abs(dy) * 1.6) close();
+    }, { passive: true });
+
+    // 切到别的 Tab 时顺手收起，否则抽屉会盖在新页面上
+    var tabbar = $('tabBar');
+    if (tabbar) tabbar.addEventListener('click', function () { if (isOpen()) close(); });
 
     // 选中地块后自动收起
     side.addEventListener('click', function (e) {
@@ -2796,6 +2834,7 @@
 
   save();
   bindDrawer();       // 手机端侧栏抽屉
+  bindAdvToggle();    // 手机端"换个假设"折叠开关
   buildPresets();     // 预设城市按钮已移除，这里只清理旧 DOM
   bindTaskSwitch();   // 未来七天：打药 / 灌溉 / 晾晒 切换
   bindViews();        // 内容 / 对话 / 我的 三个视图

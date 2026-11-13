@@ -68,6 +68,8 @@
       '  box-shadow:0 10px 30px rgba(16,24,40,.16),0 2px 6px rgba(16,24,40,.06);',
       '  padding:12px 13px;font-family:var(--font,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif);',
       '  animation:zzUp .26s cubic-bezier(.2,.8,.3,1) both}',
+      /* 手机上把说明那行收掉，只留标题和按钮：这条固定在底部，太高一屏就没内容了 */
+      '@media (max-width:640px){#zzBar{padding:9px 11px;gap:8px}#zzBar .zz-d{display:none}#zzBar .zz-ico{width:28px;height:28px}}',
       '#zzBar.on{display:flex;gap:10px;align-items:flex-start}',
       '@keyframes zzUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}',
       '@media (prefers-reduced-motion:reduce){#zzBar.on{animation:none}}',
@@ -260,15 +262,19 @@
 
     // 安卓：等 beforeinstallprompt 拿到调用资格
     if (deferredPrompt) {
-      showBar({
-        title: '装到桌面，下次一秒打开',
-        desc: '添加后有自己的图标，不再需要在浏览器里找网址。占用不到 1 MB。',
-        dismiss: dismissForever,
-        actions: [
-          { label: '安装', primary: true, onClick: doInstall },
-          { label: '以后再说', later: true, onClick: dismissForever }
-        ]
-      });
+      // 别一进页面就糊在首屏上，等用户看两眼再出现
+      setTimeout(function () {
+        if (isStandalone || dismissed() || !deferredPrompt) return;
+        showBar({
+          title: '装到桌面，下次一秒打开',
+          desc: '添加后有自己的图标，不再需要在浏览器里找网址。占用不到 1 MB。',
+          dismiss: dismissForever,
+          actions: [
+            { label: '安装', primary: true, onClick: doInstall },
+            { label: '以后再说', later: true, onClick: dismissForever }
+          ]
+        });
+      }, 3500);
     }
   }
 
