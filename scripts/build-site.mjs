@@ -107,6 +107,17 @@ if (fs.existsSync(WELL)) {
   if (wellFiles.length) log('  OK   .well-known/' + wellFiles.join(', '));
 }
 
+/* ---- 6.6 安卓安装包 ---- */
+const DL = path.join(WEB, 'download');
+if (fs.existsSync(DL)) {
+  fs.mkdirSync(path.join(OUT, 'download'), { recursive: true });
+  for (const f of fs.readdirSync(DL)) {
+    if (!/\.(apk|aab)$/i.test(f)) continue;
+    fs.copyFileSync(path.join(DL, f), path.join(OUT, 'download', f));
+    log('  OK   download/' + f);
+  }
+}
+
 /* ---- 7. 安装引导里用到的两张截图 ---- */
 fs.mkdirSync(path.join(OUT, 'screenshots'), { recursive: true });
 for (const f of ['01-desktop-overview.png', '12-mobile-iphone.png']) {

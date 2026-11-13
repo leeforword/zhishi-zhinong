@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.leeforword.twa",
+        "sha256_cert_fingerprints": ["C3:85:6A:E6:D4:68:7F:E3:33:E8:DD:72:3C:9A:DD:A1:2F:B8:18:6A:32:1A:73:82:BE:64:F3:24:F4:91:A3:79"]
+      }
+    }]
