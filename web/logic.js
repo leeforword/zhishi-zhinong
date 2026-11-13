@@ -316,9 +316,14 @@
     var di = {};
     daily.time.forEach(function (t, i) { di[t] = i; });
 
-    var days = g.order.map(function (date, idx) {
-      var hours = g.map[date];
-      var prev = idx > 0 ? g.map[g.order[idx - 1]] : null;
+    /* 按「逐日」来建天，而不是按「逐时」——
+       和风 168h 是从当前小时往后数的，晚上 23 点之后第一批小时就落到明天 0 点，
+       今天整天都不在逐时里；如果按逐时建天，今天会整块消失（只剩 6 天）。
+       改成以 daily.time 为准，缺逐时的天就按"无可作业时段"处理。 */
+    var dayDates = daily.time.slice();
+    var days = dayDates.map(function (date, idx) {
+      var hours = g.map[date] || [];
+      var prev = idx > 0 ? (g.map[dayDates[idx - 1]] || null) : null;
       var j = di[date];
 
       var dayRain = round1(daily.precipitation_sum[j] || 0);
@@ -338,6 +343,10 @@
       if (blocked) {
         sprayStatus = 'bad';
         sprayWhy = '当天或前一天有降雨，药液容易被冲刷，不建议作业';
+      } else if (windows.length === 0 && hours.length === 0) {
+        // 今天已经过完 / 逐时从明天开始：按逐日判一下雨，其余情况说清原因
+        sprayStatus = 'bad';
+        sprayWhy = '当天已没有可作业时段（逐小时预报从明天开始）';
       } else if (windows.length === 0) {
         sprayStatus = 'bad';
         var work = hours.filter(function (h) { return h.hour >= r.hours[0] && h.hour < r.hours[1]; });
