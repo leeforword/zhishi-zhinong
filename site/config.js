@@ -56,6 +56,17 @@ window.TIANZHI_CONFIG = {
   amapSecurityJsCode: '6b429de056e2bcafb5c8a8ae12ffc33',
   amapVersion: '2.0',
 
+  /* Web 服务 key（可选，强烈建议配）
+     ------------------------------------------------------------
+     JS API 的逆地理编码要走安全密钥，一旦 key 与 securityJsCode 不配对，
+     就会返回 INVALID_USER_SCODE，只能退到乡镇级。
+     Web 服务 key 走 restapi，不需要安全密钥，最稳，能到村/POI。
+
+     申请：console.amap.com → 应用管理 → 我的应用 → 添加 Key
+           服务平台选「Web服务」，不要设 IP 白名单（浏览器端调用）
+     填进来之后，逆地理会优先走它，不再依赖 JS 的安全密钥。 */
+  amapWebKey: '',
+
   /* ---------- 和风天气 ----------
      ⚠️ 新版和风必须使用「账号专属 API Host」（控制台 → 项目详情页顶部）。
         填错会返回 Invalid Host。

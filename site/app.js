@@ -1893,6 +1893,7 @@
     return window.TianZhiPlace.resolve(lon, lat, {
       // 高德 SDK 加载好才用得上；没加载就只走 BigDataCloud
       AMap: window.AMap || null,
+      amapWebKey: (window.TIANZHI_CONFIG && window.TIANZHI_CONFIG.amapWebKey) || '',
       toGcj: function (lo, la) {
         try { return T.wgs84ToGcj(lo, la); } catch (e) { return [lo, la]; }
       }

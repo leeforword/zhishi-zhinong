@@ -132,6 +132,62 @@
     }).catch(function () { return null; });
   }
 
+
+  /* ============================================================
+     源二·B：高德 Web 服务（restapi）逆地理
+     -------------------------------------------------------------
+     为什么不走 JS 插件的 Geocoder：
+       它要 _AMapSecurityConfig.securityJsCode 与 key 严格配对，
+       配错就是 INVALID_USER_SCODE，只能退到乡镇。
+       Web 服务 key 走 restapi，没有安全密钥这一层，能稳定到村/POI。
+
+     注意：
+       · 坐标同样必须是 GCJ-02，调用方换算好再传进来
+       · Web 服务 key 必须「不设 IP 白名单」，否则浏览器调用会被拒
+     ============================================================ */
+  function fromAMapRest(lon, lat, toGcj, key) {
+    var gcj;
+    try {
+      gcj = (typeof toGcj === 'function') ? toGcj(lon, lat) : [lon, lat];
+    } catch (e) { gcj = [lon, lat]; }
+
+    var url = 'https://restapi.amap.com/v3/geocode/regeo' +
+      '?key=' + encodeURIComponent(key) +
+      '&location=' + Number(gcj[0]).toFixed(6) + ',' + Number(gcj[1]).toFixed(6) +
+      '&extensions=all&radius=1000&batch=false';
+
+    return fetchJSON(url, 6000).then(function (j) {
+      if (!j || String(j.status) !== '1' || !j.regeocode) {
+        // 把高德的原文原因带出去（INVALID_USER_KEY / DAILY_QUERY_OVER_LIMIT / INSUFFICIENT_PRIVILEGES）
+        return { error: (j && (j.info || j.infocode)) || 'AMAP_REST_FAIL' };
+      }
+      var r = j.regeocode;
+      var ac = r.addressComponent || {};
+      var pick = function (v) { return Array.isArray(v) ? (v[0] || '') : cleanName(v); };
+
+      var cands = [];
+      (r.aois || []).forEach(function (a) {
+        cands.push({ name: a.name, distance: Number(a.distance) || 0 });
+      });
+      (r.pois || []).forEach(function (a) {
+        cands.push({ name: a.name, distance: Number(a.distance) || 0 });
+      });
+      cands.sort(function (a, b) { return a.distance - b.distance; });
+
+      var v = pickVillage(cands);
+      return {
+        city: pick(ac.city),
+        county: pick(ac.district),
+        township: pick(ac.township),
+        village: v ? v.name : '',
+        villageDistance: v ? Math.round(v.distance) : null,
+        adcode: pick(ac.adcode),
+        formatted: r.formattedAddress || '',
+        source: 'amap-rest'
+      };
+    }).catch(function () { return null; });
+  }
+
   /* ============================================================
      源二：高德 JS API 逆地理编码（能到村）
      -------------------------------------------------------------
@@ -264,9 +320,24 @@
     var hit = cacheGet(k);
     if (hit) return Promise.resolve(hit);
 
-    var amapP = opts.AMap
-      ? fromAMap(opts.AMap, lon, lat, opts.toGcj)
-      : Promise.resolve(null);
+    var webKey = String(opts.amapWebKey || '').trim();
+    var amapP;
+    if (webKey) {
+      // Web 服务 key 最稳：先走 restapi，失败再试 JS 插件
+      amapP = fromAMapRest(lon, lat, opts.toGcj, webKey).then(function (r) {
+        if (r && !r.error) return r;
+        if (opts.AMap) {
+          return fromAMap(opts.AMap, lon, lat, opts.toGcj).then(function (r2) {
+            return (r2 && !r2.error) ? r2 : (r || r2);
+          });
+        }
+        return r;
+      });
+    } else {
+      amapP = opts.AMap
+        ? fromAMap(opts.AMap, lon, lat, opts.toGcj)
+        : Promise.resolve(null);
+    }
     var bdcP = fromBigDataCloud(lon, lat);
 
     return Promise.all([amapP, bdcP]).then(function (arr) {
@@ -302,6 +373,7 @@
 
   root.TianZhiPlace = {
     resolve: resolve,
+    _fromAMapRest: fromAMapRest,
     cached: cached,
     precisionText: function (p) { return PRECISION_TEXT[p] || PRECISION_TEXT.none; },
     // 便于测试
