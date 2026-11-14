@@ -1622,6 +1622,178 @@ html.zz-chat #zzBar{display:none!important}
   .modal .field{height:44px;border-radius:12px;font-size:15px}
 }
 
+/* ============================================================
+   内容层（v4.3）：定位条 / 知识依据 / 资料来源 / 作品说明 / 回答依据条
+   ------------------------------------------------------------
+   配色职责：绿=可行动，金=时令，红=主题点睛，蓝灰=数据图例。
+   所有新增块都沿用 .card / .cbox 的圆角与阴影语言，不另起一套视觉。
+   ============================================================ */
+:root{
+  --harvest:#C9A227;--harvest-weak:#FBF3DC;
+  --youth:#C8453B;--youth-weak:#FBEAE8;
+  --data-blue:#2F6F9F;--data-blue-weak:#E8F0F7;
+}
+.src-note{font-size:11px;line-height:1.65;color:var(--text-3);margin-top:10px}
+.lead-quote{
+  margin:12px 0;padding:11px 14px;border-left:3px solid var(--youth);
+  background:var(--youth-weak);border-radius:0 12px 12px 0;
+  font-size:13px;color:var(--text);line-height:1.7;
+}
+/* ---- 首屏定位条：把「谁用 / 解决什么 / 主题」压成两行 ---- */
+.pos-strip{
+  position:relative;margin:2px 0 12px;padding:13px 16px 13px 18px;
+  background:linear-gradient(100deg,rgba(255,255,255,.94),rgba(231,239,233,.72));
+  border:1px solid var(--border);border-radius:18px;
+  box-shadow:var(--shadow);overflow:hidden;
+}
+.pos-strip:before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;
+  border-radius:9px;background:linear-gradient(180deg,var(--brand),var(--harvest))}
+.pos-strip .pos-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+.pos-kicker{
+  font-size:10.5px;font-weight:600;letter-spacing:.06em;color:#fff;
+  background:var(--brand);border-radius:99px;padding:3px 9px;
+}
+.pos-kicker.youth{background:var(--youth)}
+.pos-strip h2{font-size:14.5px;font-weight:600;color:var(--text);letter-spacing:-.01em}
+.pos-strip p{font-size:12px;line-height:1.7;color:var(--text-2)}
+.pos-strip .pos-meta{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.pos-meta span{font-size:10.5px;color:var(--text-2);background:rgba(255,255,255,.8);
+  border:1px solid var(--border);border-radius:99px;padding:3px 9px}
+/* ---- 节气农事提示 ---- */
+.jq-farm{
+  margin:8px 0 2px;padding:9px 12px;border-radius:12px;
+  background:var(--harvest-weak);border:1px solid rgba(201,162,39,.28);
+  font-size:11.5px;line-height:1.65;color:#6B5514;
+}
+.jq-farm b{color:#8A6A0E;font-weight:600}
+/* ---- 知识依据 / 名词解释 ---- */
+.kb-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.kb-item{display:flex;gap:10px;padding:12px 13px;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:14px}
+.kb-no{flex:none;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
+  background:var(--brand-weak);color:var(--brand);font-size:11px;font-weight:700}
+.kb-item b{display:block;font-size:12.5px;color:var(--text);margin-bottom:4px;font-weight:600}
+.kb-item p{font-size:11.5px;line-height:1.65;color:var(--text-2)}
+.kb-item p.kb-why{margin-top:5px;color:var(--text-3)}
+.kb-item p.kb-src{margin-top:3px;color:var(--brand);font-size:10.5px}
+.kb-gloss{margin-top:12px;padding-top:12px;border-top:1px dashed var(--border-strong)}
+.kb-gloss>b{font-size:12px;color:var(--text)}
+.kb-gloss dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;margin-top:8px}
+.kb-gloss dl>div{display:flex;gap:7px;align-items:baseline;font-size:11px;line-height:1.6}
+.kb-gloss dt{flex:none;color:var(--text);font-weight:600;white-space:nowrap}
+.kb-gloss dd{color:var(--text-3);min-width:0}
+/* ---- 资料来源清单 ---- */
+.src-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.src-item{display:flex;gap:10px;padding:11px 12px;border:1px solid var(--border);
+  border-radius:13px;background:var(--surface-solid)}
+.src-i{flex:none;width:22px;height:22px;border-radius:7px;display:grid;place-items:center;
+  background:var(--data-blue-weak);color:var(--data-blue);font-size:10.5px;font-weight:700}
+.src-item b{font-size:12px;color:var(--text);font-weight:600}
+.src-item span:not(.src-i){font-size:10px;color:var(--data-blue);margin-left:6px}
+.src-item p{font-size:11px;line-height:1.6;color:var(--text-3);margin-top:3px}
+/* ---- 对话页：知识范围卡 ---- */
+.chat-scope{margin-bottom:10px;padding:12px 14px;border-radius:16px;
+  background:var(--surface-solid);border:1px solid var(--border);box-shadow:var(--shadow)}
+.chat-scope .cs-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.chat-scope .cs-h b{font-size:12.5px;color:var(--text)}
+.chat-scope .cs-h span{font-size:10px;color:var(--brand);background:var(--brand-weak);
+  border-radius:99px;padding:2px 8px}
+.chat-scope p{font-size:11.5px;line-height:1.7;color:var(--text-2)}
+.scope-mini{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px}
+.scope-mini>div{padding:8px 10px;background:var(--surface-2);border-radius:11px}
+.scope-mini b{display:block;font-size:10.5px;color:var(--brand);margin-bottom:3px}
+.scope-mini p{font-size:10.5px;line-height:1.6;color:var(--text-3)}
+/* ---- 回答底部的「依据与边界」条 ---- */
+.an-note{margin-top:9px;padding-top:8px;border-top:1px dashed var(--border-strong);
+  display:flex;flex-direction:column;gap:3px}
+.an-note .an-row{font-size:10.5px;line-height:1.6;color:var(--text-3)}
+.an-note .an-row b{color:var(--data-blue);font-weight:600}
+.an-btns{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.an-btns button{font-size:10.5px;color:var(--text-2);background:rgba(255,255,255,.7);
+  border:1px solid var(--border);border-radius:99px;padding:3px 10px;cursor:pointer}
+.an-btns button:active{background:var(--brand-weak)}
+.an-form{margin-top:7px;display:flex;flex-direction:column;gap:6px}
+.an-form textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;
+  padding:8px 10px;font-size:11.5px;line-height:1.6;font-family:inherit;color:var(--text);
+  background:#fff;resize:vertical}
+.an-form textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(61,107,85,.13)}
+.an-form>div{display:flex;gap:6px}
+.an-form>div button{font-size:10.5px;color:var(--text-2);background:rgba(255,255,255,.8);
+  border:1px solid var(--border);border-radius:99px;padding:4px 12px;cursor:pointer}
+.an-form>div button:first-child{background:var(--brand);color:#fff;border-color:var(--brand)}
+/* ---- 作品说明（说明书） ---- */
+.proj-item{border:1px solid var(--border);border-radius:16px;background:var(--surface-solid);
+  margin-bottom:8px;overflow:hidden}
+.proj-item[open]{box-shadow:var(--shadow-md)}
+.proj-item summary{display:flex;align-items:center;gap:11px;padding:12px 14px;
+  cursor:pointer;list-style:none;user-select:none}
+.proj-item summary::-webkit-details-marker{display:none}
+.proj-n{flex:none;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
+  background:var(--brand-weak);color:var(--brand);font-size:11px;font-weight:700}
+.proj-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.proj-t b{font-size:13px;color:var(--text);font-weight:600}
+.proj-t small{font-size:10.5px;color:var(--text-3)}
+.proj-arrow{color:var(--text-3);font-size:15px;transition:transform .24s}
+.proj-item[open] .proj-arrow{transform:rotate(180deg)}
+.proj-body{padding:2px 15px 15px;font-size:12px;line-height:1.8;color:var(--text-2);
+  border-top:1px solid var(--border)}
+.proj-body p{margin:8px 0}
+.proj-body b{color:var(--text);font-weight:600}
+.proj-body ul,.proj-body ol{margin:8px 0 8px 18px;padding:0}
+.proj-body li{margin:5px 0}
+.proj-body code{font-family:var(--mono);font-size:11px;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:5px;padding:1px 5px;color:var(--brand)}
+.proj-body .src-table{width:100%;border-collapse:collapse;margin:10px 0;font-size:11px}
+.src-table th,.src-table td{border:1px solid var(--border);padding:7px 9px;text-align:left;
+  vertical-align:top;line-height:1.6}
+.src-table th{background:var(--surface-2);color:var(--text);font-weight:600;white-space:nowrap}
+.src-table td{color:var(--text-2)}
+.scope-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
+.scope-cols>div{padding:10px 12px;border-radius:12px;background:var(--surface-2)}
+.scope-cols b{display:block;font-size:11.5px;margin-bottom:5px}
+.scope-cols .ok-t{color:var(--brand)}
+.scope-cols .no-t{color:var(--youth)}
+.scope-cols ul{margin-left:16px}
+.scope-cols li{font-size:11px;line-height:1.7}
+.flow-steps{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:12px 0}
+.flow-steps span{font-size:10.5px;line-height:1.5;text-align:center;padding:8px 10px;
+  border-radius:11px;background:var(--brand-weak);color:var(--brand);font-weight:600}
+.flow-steps span i{font-style:normal;font-weight:400;color:var(--text-3)}
+.flow-steps em{font-style:normal;color:var(--text-3);font-size:13px}
+.palette-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.palette-item{padding:9px;border:1px solid var(--border);border-radius:12px;min-width:0}
+.palette-item i{display:block;height:26px;border-radius:7px;margin-bottom:6px}
+.palette-item b{display:block;font-size:11px;color:var(--text)}
+.palette-item span{display:block;font-size:10px;color:var(--text-3);font-family:var(--mono)}
+.palette-item small{display:block;font-size:10px;color:var(--text-3);line-height:1.5;margin-top:3px}
+/* ---- 手机端：全部改单列 / 堆叠，绝不产生横向滚动 ---- */
+@media (max-width:640px){
+  .kb-grid,.src-list,.kb-gloss dl,.scope-mini,.scope-cols,.palette-row{grid-template-columns:1fr}
+  .palette-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pos-strip{padding:13px 14px 13px 16px;border-radius:18px}
+  .pos-strip h2{font-size:14px}
+  .pos-strip p{font-size:12px}
+  .proj-body{font-size:12.5px}
+  .proj-body .src-table,.proj-body .src-table tbody,.proj-body .src-table tr,
+  .proj-body .src-table td{display:block;width:100%;box-sizing:border-box}
+  .proj-body .src-table thead{display:none}
+  .proj-body .src-table tr{margin-bottom:8px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .proj-body .src-table td{border:0;border-bottom:1px solid var(--border);padding:7px 10px}
+  .proj-body .src-table td:last-child{border-bottom:0}
+  .proj-body .src-table td:before{content:attr(data-l);display:block;font-size:10px;color:var(--text-3)}
+  .flow-steps{gap:4px}
+  .flow-steps span{flex:1 1 40%;font-size:10px}
+  .flow-steps em{display:none}
+  .an-note .an-row{font-size:10.5px}
+  .qa-foot>.src-note{display:none}
+  .chat-scope{margin-bottom:8px;padding:10px 12px}
+  .chat-scope p{font-size:11px}
+  .scope-mini{gap:6px}
+}
+.chat-scope summary{list-style:none;cursor:pointer;user-select:none}
+.chat-scope summary::-webkit-details-marker{display:none}
+.chat-scope summary.cs-h:after{content:"⌄";margin-left:auto;color:var(--text-3);font-size:14px}
+.chat-scope[open] summary.cs-h:after{content:"⌃"}
 </style>
 </head>
 <body>
@@ -1649,7 +1821,7 @@ html.zz-chat #zzBar{display:none!important}
       </div>
       <div>
         <div class="brand-name">知时智农</div>
-        <div class="brand-sub">农事决策控制台</div>
+        <div class="brand-sub">农事时机问答智能体</div>
       </div>
       <button class="drawer-close" id="drawerClose" aria-label="关闭地块列表">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -1665,13 +1837,13 @@ html.zz-chat #zzBar{display:none!important}
           <rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/>
           <rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>
         </svg>
-        内容
+        决策
       </button>
       <button data-view="chat">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-4-.9L3 21l1.9-4.6A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/>
         </svg>
-        对话
+        问答
         <span class="dot-tip" id="chatDot" style="display:none"></span>
       </button>
       <button data-view="mine">
@@ -1693,8 +1865,9 @@ html.zz-chat #zzBar{display:none!important}
 
     <div class="side-foot">
       <span id="footWeather">气象 和风天气（主预报）+ Open-Meteo（集合）</span><br>
-      地图 高德 JS API<br>
-      建议仅供参考 · 以当地农技部门为准
+      地图 高德 · 边界 DataV GeoAtlas<br>
+      结论由本地规则引擎算出，AI 不产生数字<br>
+      建议仅供参考 · 以当地农技部门与农药标签为准
     </div>
   </aside>
 
@@ -1731,6 +1904,21 @@ html.zz-chat #zzBar{display:none!important}
     <section class="view on" id="viewContent">
     <div class="content">
 
+      <!-- ---------- 作品定位：谁用、解决什么、主题 ---------- -->
+      <div class="pos-strip">
+        <div class="pos-top">
+          <span class="pos-kicker">交互智能体</span>
+          <span class="pos-kicker youth">青春中国 · 把 AI 用到田埂上</span>
+          <h2>把天气预报，翻译成此刻能不能下地</h2>
+        </div>
+        <p>预报只说「多云、3 级风」，可站在地头要决定的是：今天几点风最小、雨前够不够打完一遍药。这里给的不是天气，是一个能说清依据的时间点。</p>
+        <div class="pos-meta">
+          <span>服务对象：华北平原种植户 / 下地实践的同学</span>
+          <span>知识范围：农事时机，不答病虫害与药名</span>
+          <span>数字来源：实时气象 + 本地规则引擎</span>
+        </div>
+      </div>
+
       <!-- ---------- 告警 ---------- -->
       <div class="alerts" id="alerts"></div>
 
@@ -1740,8 +1928,8 @@ html.zz-chat #zzBar{display:none!important}
         <div class="sky-body">
           <div class="verdict" id="heroIn">
             <div class="date-b"><span id="todayDate">—</span></div>
-            <h1>正在获取天气…</h1>
-            <p>数据来自和风天气主预报，集合预报用于置信度。</p>
+            <h1>正在读取实时天气…</h1>
+            <p>窗口结论由本地规则引擎计算，AI 不产生数字；不使用缓存数据冒充实时结论。</p>
           </div>
           <div class="kpi-grid" id="skyKpi"></div>
         </div>
@@ -1772,13 +1960,14 @@ html.zz-chat #zzBar{display:none!important}
           <span class="jq-next" id="jqNext"></span>
         </div>
         <div class="jq-rail" id="jqRail"></div>
+        <div class="jq-farm" id="jqFarm"><b>节气农事</b>：正在读取当前节气…</div>
       </div>
 
       <!-- 详细依据：置信度 / 倒计时 / 推迟代价 / 反事实 -->
       <div class="detail-card" id="heroDetail"></div>
 
       <!-- ---------- 今日判读 ---------- -->
-      <div class="sec-h"><h2>今日判读</h2><span class="hint" id="heroMeta"></span></div>
+      <div class="sec-h"><h2>今日判读</h2><span class="hint" id="heroMeta">打药 / 灌溉 / 晾晒，逐条给结论与理由</span></div>
       <div class="verdict-grid" id="cards">
         <div class="skel" style="height:96px"></div>
       </div>
@@ -1786,7 +1975,7 @@ html.zz-chat #zzBar{display:none!important}
       <!-- ---------- 地块（手机端在这里切换；桌面用左侧栏） ---------- -->
 
       <!-- ---------- 七日 ---------- -->
-      <div class="sec-h"><h2>未来七天</h2><span class="hint" id="weekRainNote">逐日聚合</span>
+      <div class="sec-h"><h2>未来七天</h2><span class="hint" id="weekRainNote">点日期切换下方图表，先切作业类型再看窗口</span>
         <div class="act">
           <div class="task-switch" id="taskSwitch">
             <button class="task-btn on" data-task="spray">
@@ -1840,9 +2029,9 @@ html.zz-chat #zzBar{display:none!important}
 
       </div>
       <div class="chart-col">
-      <div class="sec-h"><h2>温度与降水</h2><span class="hint">柱为逐日雨量</span></div>
+      <div class="sec-h"><h2>温度与降水</h2><span class="hint">折线为逐日最高 / 最低温，柱为逐日雨量</span></div>
       <div class="cbox">
-        <div class="cbox-h"><b>气温区间与雨量</b><span>℃ / mm</span>
+        <div class="cbox-h"><b>逐日气温区间与雨量</b><span>℃ / mm</span>
           <div class="lg">
             <i style="color:#8C3025"><s></s>最高温</i>
             <i style="color:#255677"><s></s>最低温</i>
@@ -1854,9 +2043,9 @@ html.zz-chat #zzBar{display:none!important}
 
       </div>
       <div class="chart-col wide">
-      <div class="sec-h"><h2>作业窗口分布</h2><span class="hint">7 天 × 24 小时 · 点格子看详情</span></div>
+      <div class="sec-h"><h2>作业窗口分布</h2><span class="hint">7 天 × 24 小时 · 点格子看该时辰为什么不行</span></div>
       <div class="cbox">
-        <div class="cbox-h"><b>7 × 24 小时热力图</b><span>颜色越深越不适合作业</span>
+        <div class="cbox-h"><b>逐时作业条件热力图</b><span>每格 1 小时 · 按当前阈值判定</span>
           <div class="lg">
             <i style="color:#215C39"><s></s>可作业</i>
             <i style="color:#87600E"><s></s>风大</i>
@@ -1869,18 +2058,33 @@ html.zz-chat #zzBar{display:none!important}
 
       </div>
       <div class="chart-col wide">
-      <div class="sec-h"><h2>长势走势</h2><span class="hint">示意数据</span></div>
+      <div class="sec-h"><h2>长势判读 · 方法占位</h2><span class="hint">未接入遥感，本版本不输出任何苗情结论</span></div>
       <div class="cbox">
-        <div class="cbox-h"><b>NDVI 归一化植被指数</b><span>0—1</span>
+        <div class="cbox-h"><b>NDVI 计算思路示意</b><span>非实测 · 0—1</span>
           <div class="lg">
-            <i style="color:#3D6B55"><s></s>本季</i>
-            <i style="color:#8D958A"><s class="dash"></s>近三年均值</i>
+            <i style="color:#3D6B55"><s></s>形态示意</i>
+            <i style="color:#8D958A"><s class="dash"></s>对照形态</i>
           </div>
         </div>
         <div class="chart-scroll"><div id="growthChart"><div class="skel" style="height:150px"></div></div></div>
-        <div class="chart-note" style="margin-top:10px">真实遥感尚未接入，此曲线仅示意形态，不代表实际苗情。</div>
+        <div class="chart-note" style="margin-top:10px">
+          <b style="color:#8C3025">这不是实测数据。</b>曲线仅用于说明「接入遥感后该怎么画」，不代表任何地块的真实苗情，也不参与本作品的决策。
+          真实 NDVI 需要卫星影像与地物反演，属于后续版本工作，已在「作品说明 → 不足与改进」中如实列出。
+        </div>
       </div>
       </div>
+      </div>
+
+      <!-- ---------- 判定口径与知识范围 ---------- -->
+      <div class="sec-h"><h2>判定口径与知识范围</h2><span class="hint">每个结论都能追到阈值与数据源 · 也可以直接在「问答」里问「为什么这么判断」</span></div>
+      <div class="card pad" id="kbBox"></div>
+
+      <!-- ---------- 资料来源 ---------- -->
+      <div class="sec-h"><h2>资料来源与使用说明</h2><span class="hint">公开数据 + 本地规则，不使用未公开数据，不编造用户反馈</span></div>
+      <div class="card pad" id="srcBox"></div>
+      <div class="src-note" style="margin:10px 2px 0">
+        本页所有气象数字均为打开页面时实时请求；结论由本地规则引擎计算，AI 只做意图分类与口语化改写，不产生数字。
+        阈值可在「我的 → 农事阈值」按当地标准校准。建议仅供参考，实际决策以当地农技部门意见与农药标签为准。
       </div>
 
     </div>
@@ -1892,27 +2096,28 @@ html.zz-chat #zzBar{display:none!important}
       <div class="chatwrap">
         <div class="chat-head">
           <div>
-            <div class="chat-title">问一句</div>
-            <div class="chat-sub" id="chatSub">回答由规则引擎算出，AI 只负责把话说顺</div>
+            <div class="chat-title">问一句 · 农事时机</div>
+            <div class="chat-sub" id="chatSub">结论由规则引擎算出，AI 只把话说顺，不产生数字</div>
           </div>
           <span class="ask-meta">
             <span class="ai-tag" id="aiTag">AI 润色</span>
             <button class="ai-toggle" id="aiToggle" title="切换大模型润色">开</button>
           </span>
         </div>
+        <details class="chat-scope" id="chatScope">
+          <summary class="cs-h"><b>我能答什么 · 依据从哪来</b><span>知识范围 / 资料来源 / 边界</span></summary>
+          <p id="chatScopeText"></p>
+          <div id="chatScopeMini"></div>
+          <p class="src-note" id="chatScopeBoundary"></p>
+        </details>
         <div class="qa-log" id="qaLog"></div>
         <div class="qa-foot">
-          <div class="chips-row">
-            <button class="chip-btn" data-q="哪天能打药？">哪天能打药</button>
-            <button class="chip-btn" data-q="这几天要不要浇水？">要不要浇水</button>
-            <button class="chip-btn" data-q="今天天气怎么样？">今日天气</button>
-            <button class="chip-btn" data-q="可以晾晒吗？">可否晾晒</button>
-            <button class="chip-btn" data-q="我那几亩地长势怎么样？">长势怎么样</button>
-          </div>
+          <div class="chips-row" id="qaChips"></div>
           <div class="qa-input">
-            <input class="field" id="qaInput" placeholder="比如：这周哪天适合打药？" autocomplete="off">
+            <input class="field" id="qaInput" placeholder="比如：这周哪天适合打药？为什么这么判？" autocomplete="off">
             <button class="btn btn-primary" id="qaSend">发送</button>
           </div>
+          <div class="src-note" style="margin-top:8px">超出知识范围会明确说「不会」并告诉你该找谁；每条回答下方都附依据、边界与纠错入口。</div>
         </div>
       </div>
     </section>
@@ -1928,10 +2133,13 @@ html.zz-chat #zzBar{display:none!important}
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             新增地块
           </button>
-          <div class="note" style="margin-top:12px">地图选点可精确到村 / 乡镇。点地块右侧的笔可编辑，× 可删除。</div>
+          <div class="note" style="margin-top:12px">
+            在地图上点选位置，地名按<b>最小行政地名或具体地点</b>显示（村庄、乡镇、学校、园区都可能），不强行归到某个村。
+            点地块右侧的笔可改名称 / 作物 / 面积，× 可删除。地块信息只存在本机，不上传服务器。
+          </div>
         </div>
 
-        <div class="sec-h"><h2>农事阈值</h2><span class="hint">按本地农技标准自行校准</span></div>
+        <div class="sec-h"><h2>农事阈值</h2><span class="hint">判定规则的唯一可调入口 · 改完保存立即重算</span></div>
         <div class="card pad">
           <div class="th-row">
             <div class="th-top"><b>风速上限</b><span class="hint">超过即判定不宜喷施</span><span class="num" id="thWindV">3.4 m/s</span></div>
@@ -1952,8 +2160,10 @@ html.zz-chat #zzBar{display:none!important}
             <input class="slider" type="range" id="setRainDay" min="0" max="10" step="0.1">
           </div>
           <div class="note" style="margin-top:16px">
-            默认值来自公开农技常识（风速 <b>3.4 m/s ≈ 3 级风</b>），未经当地农技部门核定。
-            如果你们县有明确标准，以当地为准，改这里即可，不用改代码。
+            <b>为什么是这几个数：</b>风速上限默认 3.4 m/s（约 3 级风，药液开始明显漂移）；气温区间避开低温药效差与高温药害；
+            作业时段避开清晨露水 / 逆温与傍晚；当日降水上限用于避免雨前作业被冲刷。<br>
+            默认值来自<b>公开农技常识与农药标签通用要求</b>，<b>未经当地农技部门核定</b>。
+            如果你们县有明确标准，以当地为准，拖动滑轴即可，不用改代码。所有窗口、热力图、问答结论都会按新阈值重算。
           </div>
           <div class="btn-row" style="margin-top:14px">
             <button class="btn" id="setSaveRules">保存并重算</button>
@@ -1961,7 +2171,7 @@ html.zz-chat #zzBar{display:none!important}
           </div>
         </div>
 
-        <div class="sec-h"><h2>应用</h2><span class="hint">装到桌面，像 App 一样打开</span></div>
+        <div class="sec-h"><h2>安装与访问</h2><span class="hint">手机上不用记网址，也不需要浏览器地址栏</span></div>
         <div class="mine-list">
           <a class="mrow apk-row" id="apkRow" href="download/zhishi-zhinong.apk" download="知时智农.apk">
             <span class="mic">
@@ -1969,7 +2179,7 @@ html.zz-chat #zzBar{display:none!important}
                 <path d="M6 10h12v7a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-7Z"/><path d="M8 10 6.5 6.5M16 10l1.5-3.5"/><path d="M9.5 14h.01M14.5 14h.01"/>
               </svg>
             </span>
-            <span class="mtx"><b>下载安卓安装包</b><span>APK · 45 KB · 独立运行，不依赖浏览器</span></span>
+            <span class="mtx"><b>下载安卓安装包</b><span>独立 WebView 壳 · 无地址栏 · 页面内容随线上更新</span></span>
             <span class="mval">下载 ›</span>
           </a>
         </div>
@@ -2003,14 +2213,23 @@ html.zz-chat #zzBar{display:none!important}
           </div>
         </div>
 
-        <div class="sec-h"><h2>关于</h2><span class="hint">v4.2</span></div>
+        <div class="sec-h"><h2>作品说明 · 参赛材料</h2><span class="hint">背景 / 需求 / 方案 / 实现 / 测试 / 不足与改进 · 共 13 节，点标题展开</span></div>
+        <div id="projBox"></div>
+        <div class="src-note" style="margin:10px 2px 0">
+          本说明里所有「未接入」「未开展」均为如实标注；没有用户满意度、增产或准确率提升等未经核实的数据。
+          评审可直接按「三分钟演示提纲」一节走一遍。
+        </div>
+
+        <div class="sec-h"><h2>关于与合规声明</h2><span class="hint">v4.3 · 内容版</span></div>
         <div class="disc">
-          <b>知时智农 · 华北平原冬小麦 / 夏玉米农事决策助手</b>
+          <b>知时智农 · 面向华北平原冬小麦 / 夏玉米的农事时机问答智能体</b>
           <p>气象 <span id="aboutWeather">和风天气（主预报）+ Open-Meteo（集合预报，用于置信度）</span></p>
-          <p>地图 高德 JS API · 地名 高德逆地理编码 + BigDataCloud</p>
-          <p>行政区划 阿里 DataV GeoAtlas（离线内置）</p>
-          <p style="margin-top:10px;color:#8C3025"><b style="color:#8C3025;display:inline">免责声明：</b>本工具输出的一切建议仅供参考。农事操作受土壤、品种、苗情、历史管理等多重因素影响，实际决策请以当地农技部门指导意见和农药标签说明为准。</p>
-          <p style="color:#215C39"><b style="color:#215C39;display:inline">隐私：</b>不收集任何个人信息；地块与设置仅存于本机浏览器；定位坐标只用于请求天气，不上传服务器。</p>
+          <p>地图 高德 JS API / Web 服务 · 地名 高德逆地理编码 + BigDataCloud</p>
+          <p>行政区划 阿里 DataV GeoAtlas（离线内置）· 阈值 公开农技常识（可自行校准）</p>
+          <p style="margin-top:10px"><b>AI 使用声明：</b>AI 仅用于意图分类、答案口语化改写、拒答措辞与开发辅助；规则引擎、阈值口径、数据处理、界面与测试由人工编写并复核。改写一旦出现新数字即被拦截回退。声明与实际使用一致。</p>
+          <p><b>素材与许可：</b>图标、背景、插画均为项目内程序化生成 / 手绘 SVG，未使用第三方图片、字体、音乐、真实人物肖像或声音；使用公开气象与地图服务，遵循其公开接口使用方式。</p>
+          <p style="color:#8C3025"><b style="color:#8C3025;display:inline">免责声明：</b>本工具输出的一切建议仅供参考。农事操作受土壤、品种、苗情、历史管理等多重因素影响，实际决策请以当地农技部门指导意见和农药标签说明为准。</p>
+          <p style="color:#215C39"><b style="color:#215C39;display:inline">隐私：</b>不收集任何个人信息；地块、阈值、AI 配置与纠错记录仅存于本机浏览器；定位坐标只用于请求天气与地图选点，不上传本项目服务器。</p>
         </div>
         <div id="aboutBox" style="display:none"></div>
 
@@ -2028,13 +2247,13 @@ html.zz-chat #zzBar{display:none!important}
       <rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/>
       <rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>
     </svg>
-    内容
+    决策
   </button>
   <button data-view="chat">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-4-.9L3 21l1.9-4.6A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/>
     </svg>
-    对话
+    问答
   </button>
   <button data-view="mine">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2132,6 +2351,7 @@ html.zz-chat #zzBar{display:none!important}
 <script src="hebei-geo.js"></script>
 <script src="place.js"></script>
 <script src="logic.js"></script>
+<script src="content.js"></script>
 <script src="ensemble.js"></script>
 <script src="app.js"></script>
 <!-- 安装 / 离线：放在最后加载，失败也不影响主界面 -->

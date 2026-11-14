@@ -428,6 +428,58 @@ async function waitData(timeoutMs) {
     check(overflow <= 2, 'no horizontal overflow: ' + overflow + 'px');
     await shotFull('05-mobile.png');
 
+    /* ---------- 12 ---------- */
+    /* 内容层回归：知识依据、资料来源、作品说明、范围卡、示例问题、
+       以及问答的「依据 / 边界 / 纠错」闭环。
+       这些是交互智能体选题的评分点，必须有测试兜着，不能只靠肉眼看。 */
+    console.log('\n== 12. content layer ==');
+    await device(1000, 900, false, 1);
+    await send('Page.navigate', { url: PAGE_URL });
+    await sleep(1800);
+    check(await ev("!!window.TianZhiContent"), 'content.js loaded');
+    check(await ev("document.querySelectorAll('#kbBox .kb-item').length") === 6, 'six rule / basis cards');
+    check(await ev("document.querySelectorAll('#srcBox .src-item').length") >= 6, 'source list rendered');
+    check(await ev("document.querySelectorAll('#projBox .proj-item').length") === 13, 'project brief: 13 sections');
+    check(await ev("document.querySelectorAll('#qaChips .chip-btn').length") >= 8, 'chat presets rendered');
+    check(await ev("document.getElementById('jqFarm').textContent.length") > 12, 'solar-term farming tip');
+    check(await ev("document.querySelectorAll('.pos-strip .pos-kicker').length") >= 2, 'positioning strip');
+    check(await ev("document.getElementById('chatScopeText').textContent.indexOf('服务对象') >= 0"), 'scope card text');
+
+    await waitData();
+    /* 本地若配了大模型，refine / refuse 是异步的，会让「最后一条消息」的断言
+       抢在回答前面跑。内容层测的是规则与文案，先切回纯规则引擎更可靠。 */
+    await ev("(function(){var b=document.getElementById('aiToggle');if(b&&b.textContent.trim()==='开')b.click();return b?b.textContent:'';})()");
+    await ev("document.querySelectorAll('#qaChips .chip-btn')[0].click();");
+    let noteReady = false;
+    for (let i = 0; i < 12; i++) {
+      await sleep(250);
+      if (await ev("!!document.querySelector('#qaLog .msg.bot .an-note')")) { noteReady = true; break; }
+    }
+    check(noteReady, 'answer has basis / boundary note');
+    await ev("document.getElementById('qaInput').value='为什么这么判断？';document.getElementById('qaSend').click();");
+    await sleep(350);
+    check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return x.textContent.indexOf('我把')>=0})"), 'method question answered');
+    await ev("document.getElementById('qaInput').value='这个结论准不准？';document.getElementById('qaSend').click();");
+    await sleep(350);
+    check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return x.textContent.indexOf('老实说')>=0})"), 'reliability question answered');
+    await ev("document.getElementById('qaInput').value='我家小麦该打什么药？';document.getElementById('qaSend').click();");
+    await sleep(350);
+    check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return /能力范围|处理范围|不在我的/.test(x.textContent)})"), 'out-of-scope refused honestly');
+    await ev("document.querySelector('.an-btns button[data-act=fix]').click();");
+    await sleep(150);
+    check(await ev("!!document.querySelector('.an-form')"), 'correction form opens');
+    await ev("document.querySelector('.an-form textarea').value='test feedback';document.querySelector('.an-form>div button').click();");
+    await sleep(200);
+    check(await ev("JSON.parse(localStorage.getItem('tianzhi.corrections.v1')||'[]').length") >= 1, 'correction stored locally');
+    check(pageErrors.length === 0, 'no JS error in content layer');
+
+    /* 「我的」页的作品说明含表格与 13 个折叠章节，是最容易把手机撑宽的一块 */
+    await ev("document.querySelector('[data-view=mine]').click();");
+    await device(390, 844, true, 2);
+    await sleep(600);
+    const mineOverflow = await ev("document.documentElement.scrollWidth - window.innerWidth");
+    check(mineOverflow <= 2, 'project brief no overflow on mobile: ' + mineOverflow + 'px');
+
     console.log('\n===== RESULT: pass ' + pass + ' / fail ' + fail + ' =====');
     if (pageErrors.length) console.log('page errors:', pageErrors.slice(0, 3));
     if (consoleErrors.length) console.log('console errors:', consoleErrors.slice(0, 3));

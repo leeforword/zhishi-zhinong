@@ -7,6 +7,10 @@
     return;
   }
 
+  // 内容层：面向用户的全部文字、知识口径、资料来源与作品说明（content.js）
+  // 缺失时只是不渲染新增模块，不影响天气与规则引擎，避免单点故障拖垮整页。
+  var CONTENT = window.TianZhiContent || null;
+
   // 集合预报层（可选）：取不到时为 undefined，界面自动退回确定性窗口
   var E = window.TianZhiEnsemble || null;
 
@@ -768,6 +772,12 @@
     if ($('jqNow')) $('jqNow').textContent = c.name;
     if ($('jqSub')) $('jqSub').textContent = ['初候', '二候', '三候'][hou - 1] + ' · 第 ' + (days + 1) + ' 天';
     if ($('jqNext')) $('jqNext').textContent = '距' + n.name + ' ' + toNext + ' 天';
+    if ($('jqFarm') && CONTENT) {
+      var tip = CONTENT.termNote(c.name);
+      $('jqFarm').innerHTML = '<b>' + CONTENT.esc(c.name) + ' · 农事提醒</b>：' +
+        CONTENT.esc(tip || '按当前天气窗口安排田间作业。') +
+        ' <span style="color:var(--text-3)">（通用常识，非这块地的苗情结论）</span>';
+    }
 
     var from = Math.max(0, cur - 2), to = Math.min(evs.length - 1, cur + 3), html = '';
     for (var k = from; k <= to; k++) {
@@ -2747,7 +2757,13 @@
   /* =========================================================
      问答
      ========================================================= */
-  function appendMsg(role, text) {
+  /**
+   * 追加一条对话消息。
+   * withNote=true 时给机器人回答挂上「依据 / 边界 / 核实」条与纠错入口——
+   * 评审里「知识准确性」「对话体验」「AI 伦理与合规」都要求回答能被核对、
+   * 能被指出错误，而不是一句来路不明的结论。
+   */
+  function appendMsg(role, text, withNote) {
     var log = $('qaLog');
     var d = document.createElement('div');
     d.className = 'msg ' + role;
@@ -2758,9 +2774,143 @@
     body.className = 'body';
     body.textContent = text;
     d.appendChild(who); d.appendChild(body);
+
+    if (role === 'bot' && withNote && CONTENT) {
+      var note = document.createElement('div');
+      note.className = 'an-note';
+      [
+        ['依据', CONTENT.chat.frame.source],
+        ['边界', CONTENT.chat.frame.caveat],
+        ['核实', CONTENT.chat.frame.verify]
+      ].forEach(function (pair) {
+        var r = document.createElement('div');
+        r.className = 'an-row';
+        var b = document.createElement('b');
+        b.textContent = pair[0] + ' · ';
+        r.appendChild(b);
+        r.appendChild(document.createTextNode(pair[1]));
+        note.appendChild(r);
+      });
+      var btns = document.createElement('div');
+      btns.className = 'an-btns';
+      var kbBtn = document.createElement('button');
+      kbBtn.type = 'button'; kbBtn.textContent = '查看判定口径'; kbBtn.setAttribute('data-act', 'kb');
+      var fixBtn = document.createElement('button');
+      fixBtn.type = 'button'; fixBtn.textContent = '记一条纠错'; fixBtn.setAttribute('data-act', 'fix');
+      btns.appendChild(kbBtn); btns.appendChild(fixBtn);
+      note.appendChild(btns);
+      body.appendChild(note);
+    }
+
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
     return d;
+  }
+
+  /* =========================================================
+     内容层挂载：知识依据 / 资料来源 / 作品说明 / 范围卡 / 示例问题
+     ========================================================= */
+  function renderContentLayer() {
+    if (!CONTENT) return;
+    if ($('kbBox')) $('kbBox').innerHTML = CONTENT.knowledgeHtml();
+    if ($('srcBox')) $('srcBox').innerHTML = CONTENT.sourcesHtml();
+    if ($('projBox')) $('projBox').innerHTML = CONTENT.projectHtml();
+    if ($('chatScopeText')) $('chatScopeText').textContent = CONTENT.chat.welcome;
+    if ($('chatScopeMini')) $('chatScopeMini').innerHTML = CONTENT.scopeCardHtml();
+    if ($('chatScopeBoundary')) $('chatScopeBoundary').textContent =
+      CONTENT.scope.boundaryNote + ' ' + CONTENT.chat.frame.correction;
+
+    var chips = $('qaChips');
+    if (chips) {
+      chips.innerHTML = CONTENT.chat.presets.map(function (p) {
+        return '<button class="chip-btn" data-q="' + CONTENT.esc(p.q) + '">' +
+          CONTENT.esc(p.label) + '</button>';
+      }).join('');
+      // 事件委托：按钮是动态渲染的，绑定必须在容器上
+      chips.addEventListener('click', function (e) {
+        var b = e.target && e.target.closest ? e.target.closest('.chip-btn') : null;
+        if (b && b.getAttribute('data-q')) ask(b.getAttribute('data-q'));
+      });
+    }
+  }
+
+  /* 回答下方两个按钮：跳到判定口径 / 记一条本机纠错 */
+  function bindAnswerNotes() {
+    var log = $('qaLog');
+    if (!log) return;
+    log.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest ? e.target.closest('.an-btns button') : null;
+      if (!b) return;
+      if (b.getAttribute('data-act') === 'kb') {
+        setView('content');
+        setTimeout(function () {
+          var el = $('kbBox');
+          if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 140);
+        return;
+      }
+      if (b.getAttribute('data-act') === 'fix') openCorrectionForm(b);
+    });
+  }
+
+  function openCorrectionForm(btn) {
+    var note = btn.parentNode;
+    if (!note || note.querySelector('.an-form')) return;
+    var form = document.createElement('div');
+    form.className = 'an-form';
+    var ta = document.createElement('textarea');
+    ta.rows = 2;
+    ta.placeholder = '哪里说错了？正确信息是什么？（只存本机，不上传）';
+    var row = document.createElement('div');
+    var ok = document.createElement('button');
+    ok.type = 'button'; ok.textContent = '保存纠错';
+    var no = document.createElement('button');
+    no.type = 'button'; no.textContent = '取消';
+    row.appendChild(ok); row.appendChild(no);
+    form.appendChild(ta); form.appendChild(row);
+    note.appendChild(form);
+    ta.focus();
+    no.onclick = function () { form.remove(); };
+    ok.onclick = function () {
+      var v = (ta.value || '').trim();
+      if (!v) { toast('先写一句哪里不对'); return; }
+      try {
+        var key = 'tianzhi.corrections.v1';
+        var arr = JSON.parse(localStorage.getItem(key) || '[]');
+        arr.push({ t: new Date().toISOString(), q: v });
+        if (arr.length > 50) arr = arr.slice(-50);
+        localStorage.setItem(key, JSON.stringify(arr));
+      } catch (err) { /* 隐私模式下 localStorage 可能不可写，不因此打断对话 */ }
+      form.remove();
+      appendMsg('bot', CONTENT ? CONTENT.chat.correctionSaved : '已记录在本机，谢谢反馈。');
+      toast('纠错已记在本机，不会上传');
+    };
+  }
+
+  /* 评审要求：能解释依据、能承认不确定、能理解追问、超范围诚实 */
+  var qaContext = { intent: null };
+
+  function preAnswer(q, result, plot) {
+    if (!CONTENT) return null;
+    if (/为什么|依据|怎么判|怎么算|判定|口径|规则|阈值|凭什么/.test(q)) return CONTENT.chat.methodAnswer;
+    if (/准不准|可靠|可信|置信|把握|有多准|准吗|会不会错/.test(q)) return CONTENT.chat.reliabilityAnswer;
+    if (/节气|该忙什么|现在忙|农事安排/.test(q)) {
+      var nm = $('jqNow') ? $('jqNow').textContent : '';
+      var tip = CONTENT.termNote(nm);
+      if (!nm || nm === '—') return null;
+      return '现在是「' + nm + '」。' + (tip || '') +
+        '\n\n节气农事是通用常识提醒，不含这块地的苗情判断；要不要下地，还是看上面按实时天气算出来的窗口。';
+    }
+    if (/说错|不对|纠错|有误|错了|反馈/.test(q)) {
+      return '如果哪条结论你觉得不对，点回答下方的「记一条纠错」写下来，记录只存在这台设备上。\n\n' +
+        '我不会在没有依据的情况下当场改口；后续版本会把这类反馈用于规则复核。拿不准时请以当地农技部门与农药标签为准。';
+    }
+    if (qaContext.intent && /^(那|接着|再|然后|换)/.test(q) && T.INTENT_QUERY[qaContext.intent]) {
+      try {
+        return CONTENT.chat.contextHint + T.answerByIntent(qaContext.intent, result, plot);
+      } catch (e) { return null; }
+    }
+    return null;
   }
 
   function appendTyping() {
@@ -2799,17 +2949,30 @@
     appendMsg('me', q);
     input.value = '';
 
-    if (!state.result) { appendMsg('bot', '天气数据还没加载好，稍等一下再问。'); return; }
+    if (!state.result) {
+      appendMsg('bot', CONTENT ? CONTENT.chat.loading : '天气数据还没加载好，稍等一下再问。');
+      return;
+    }
 
     var plot = activePlot();
     var result = state.result;
-    var capabilities = '哪天几点适合打药、要不要浇水、能不能晾晒、这几天什么天气';
+    // 拒答话术里报给用户的「能力清单」，与范围卡保持同一套口径
+    var capabilities = CONTENT
+      ? CONTENT.scope.can.slice(0, 4).join('、')
+      : '哪天几点适合打药、要不要浇水、能不能晾晒、这几天什么天气';
+
+    // --- 第 0 步：依据 / 可靠性 / 节气 / 纠错 / 追问，先由内容层直接答 ---
+    // 这些问题的答案不含实时数字，但可以解释「怎么算的、有多悬、边界在哪」，
+    // 是交互智能体区别于「天气查询框」的关键。
+    var pre = preAnswer(q, result, plot);
+    if (pre) { appendMsg('bot', pre, true); return; }
 
     // --- 第一步：规则层意图 ---
     var intent = T.ruleIntent(q);
     var typing = null;
 
     if (intent) {
+      qaContext.intent = intent === 'out' ? null : intent;
       respondWith(intent, q, result, plot, capabilities);
       return;
     }
@@ -2819,10 +2982,11 @@
       typing = appendTyping();
       LLM.classify(q).then(function (k) {
         if (typing) typing.remove();
+        qaContext.intent = (k && k !== 'out') ? k : null;
         respondWith(k, q, result, plot, capabilities);
       }).catch(function () {
         if (typing) typing.remove();
-        appendMsg('bot', T.answerQuestion(q, result, plot)); // 兜底模板
+        appendMsg('bot', T.answerQuestion(q, result, plot), true); // 兜底模板
       });
       return;
     }
@@ -2832,26 +2996,26 @@
   }
 
   function respondWith(intent, q, result, plot, capabilities) {
-    // 超出范围
+    // 超出范围：诚实说不会，并给出该找谁（评审「知识边界」硬指标）
     if (intent === 'out') {
       if (aiOn && LLM && LLM.isEnabled()) {
         var tp = appendTyping();
         LLM.refuse(q, capabilities).then(function (txt) {
           tp.remove();
-          appendMsg('bot', txt);
+          appendMsg('bot', txt, true);
         }).catch(function () {
           tp.remove();
-          appendMsg('bot', T.answerQuestion(q, result, plot));
+          appendMsg('bot', T.answerQuestion(q, result, plot), true);
         });
         return;
       }
-      appendMsg('bot', T.answerQuestion(q, result, plot));
+      appendMsg('bot', T.answerQuestion(q, result, plot), true);
       return;
     }
 
     // 没有意图（规则和大模型都没识别）→ 模板兜底
     if (!intent || !T.INTENT_QUERY[intent]) {
-      appendMsg('bot', T.answerQuestion(q, result, plot));
+      appendMsg('bot', T.answerQuestion(q, result, plot), true);
       return;
     }
 
@@ -2859,7 +3023,7 @@
     var template = T.answerByIntent(intent, result, plot);
 
     if (!aiOn || !LLM || !LLM.isEnabled()) {
-      appendMsg('bot', template);
+      appendMsg('bot', template, true);
       return;
     }
 
@@ -2870,17 +3034,17 @@
       crop: CROP_NAME[plot.crop]
     }).then(function (nice) {
       ty.remove();
-      appendMsg('bot', nice);
+      appendMsg('bot', nice, true);
     }).catch(function (err) {
       ty.remove();
-      // 校验失败或被拒时，明确告知并回退模板
+      // 校验失败或被拒时回退模板；出现新数字时留痕，说明「AI 不碰数字」不是口号
       if (err && /数字不一致/.test(err.message || '')) {
-        appendMsg('bot', template);
+        appendMsg('bot', template, true);
         if (err.extra && err.extra.length) {
           console.warn('[知时智农] 大模型改写出现新数字，已拦截:', err.extra);
         }
       } else {
-        appendMsg('bot', template);
+        appendMsg('bot', template, true);
       }
     });
   }
@@ -2923,9 +3087,8 @@
   $('refreshBtn').onclick = function () { if (!state.loading) load(); };
   $('qaSend').onclick = function () { ask(); };
   $('qaInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') ask(); });
-  Array.prototype.forEach.call(document.querySelectorAll('.chip-btn'), function (b) {
-    b.onclick = function () { ask(b.getAttribute('data-q')); };
-  });
+  // 示例问题由 content.js 动态渲染，点击走 #qaChips 上的事件委托
+  // （见 renderContentLayer，不要在这里逐个绑定，否则渲染后按钮是死的）
   $('aiToggle').onclick = function () {
     if (!LLM || !LLM.hasKey()) { toast('未配置大模型 key，当前为纯规则模式'); return; }
     aiOn = !aiOn;
@@ -3340,7 +3503,9 @@
   save();
   bindNearby();       // 弹窗里的「附近地点」
   bindDrawer();       // 手机端侧栏抽屉
-  renderSolarTerm();  // 节气条
+  renderSolarTerm();     // 节气条 + 节气农事提醒
+  renderContentLayer();  // 知识依据 / 资料来源 / 作品说明 / 范围卡 / 示例问题
+  bindAnswerNotes();     // 回答下方的「查看判定口径」「记一条纠错」
   setTimeout(function () { moveTabPill(currentView || 'content'); }, 120);
   window.addEventListener('resize', function () { moveTabPill(currentView || 'content'); });
   buildPresets();     // 预设城市按钮已移除，这里只清理旧 DOM
@@ -3353,7 +3518,8 @@
   if (S) S.applyRules();
 
   renderAiToggle();
-  appendMsg('bot', '你好。可以问我哪天适合打药、要不要浇水、这几天什么天气。\n数字都从实时气象数据算出来，不是我编的。');
+  appendMsg('bot', CONTENT ? CONTENT.chat.welcomeShort
+    : '你好。可以问我哪天适合打药、要不要浇水、这几天什么天气。数字都从实时气象数据算出来，不是我编的。');
   renderPlots();
   load();
 
