@@ -1364,6 +1364,9 @@ html.zz-chat #zzBar{display:none!important}
     left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));
     height:64px;padding:0 6px;border:1px solid rgba(255,255,255,.7);
     border-radius:26px;z-index:140;
+    /* flex 默认 align-items:stretch，而按钮有固定 52px 高，会在 62px 的内容区里
+       顶部对齐——下面白空 10px，看着就是"上下不居中"。显式居中即可。 */
+    align-items:center;
     background:rgba(255,255,255,.58);
     -webkit-backdrop-filter:blur(30px) saturate(190%);
     backdrop-filter:blur(30px) saturate(190%);
