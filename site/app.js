@@ -1930,9 +1930,10 @@
   var PLACE_SEQ = 0;
 
   var PRECISION_TAG = {
+    poi: '精确到地点',
     village: '精确到村',
     township: '精确到乡镇/街道',
-    county: '仅到县区',
+    county: '仅到区县',
     city: '仅到市'
   };
 
@@ -2109,14 +2110,15 @@
       : '已选点（省外或海上）';
     $('fHint').className = 'hint';
     $('fHint').textContent = loc
-      ? '已选地点：' + describePlace(loc) + '（正在识别到村…）'
+      ? '已选地点：' + describePlace(loc) + '（正在识别精确位置…）'
       : '已选地点：' + lat.toFixed(2) + '°N, ' + lon.toFixed(2) + '°E';
 
-    // 后台升级到村名（高德能给到村，BigDataCloud 兜底到乡镇）
+    // 后台补一次更细的地名（村名或具体地点，取不到就退回乡镇）
     kickFinePlace(lon, lat);
 
     drawMarker(lat, lon);
     drawPlotMarkers();
+    flyToPoint(lon, lat, 560);   // 点一下就把镜头推到这块地，不是留在原地
   }
 
   /* ---------- 地图标记 ---------- */
@@ -2391,13 +2393,37 @@
    * 把高德地图视野移到指定 WGS-84 坐标
    * （入参为 WGS-84，内部自动转 GCJ-02）
    */
-  function mapCenterOn(lon, lat, zoom) {
+  /**
+   * 地图移动
+   * @param {number} dur 毫秒；给了就走平滑运镜（setZoomAndCenter 的第 3 个参数
+   *                     immediately=false + duration），不给就是瞬移
+   */
+  function mapCenterOn(lon, lat, zoom, dur) {
     if (!MAP.instance || !T || !T.wgs84ToGcj) return;
     try {
+      var m = MAP.instance;
       var gc = T.wgs84ToGcj(lon, lat);
-      MAP.instance.setCenter(gc);
-      if (zoom) MAP.instance.setZoom(zoom);
+      if (dur && m.setZoomAndCenter) {
+        var z = zoom || m.getZoom();
+        if (m.getMaxZoom) z = Math.min(z, m.getMaxZoom());
+        m.setZoomAndCenter(z, gc, false, dur);   // 平滑推近，不是瞬间跳
+      } else {
+        m.setCenter(gc);
+        if (zoom) m.setZoom(zoom);
+      }
     } catch (e) { /* 地图未就绪时忽略 */ }
+  }
+
+  /** 点选后"推镜头"到这块地：放大到最大级别，带缓动 */
+  function flyToPoint(lon, lat, dur) {
+    if (!MAP.instance) return;
+    var z = 18;
+    try {
+      if (MAP.instance.getMaxZoom) z = MAP.instance.getMaxZoom();
+      if (z > 18) z = 18;          // 再高底图就糊成马赛克了
+      if (z < 16) z = 16;
+    } catch (e) { z = 17; }
+    mapCenterOn(lon, lat, z, dur || 620);
   }
 
   /* =========================================================
@@ -2529,7 +2555,7 @@
     form.poiLock = { name: p.name, distance: p.distance };
     setFormPlace(p.name, w[0], w[1], p.area, 'poi');
     if (MAP.instance) drawMarker(w[1], w[0]);
-    if (MAP.instance) MAP.instance.setZoomAndCenter(15, [p.lng, p.lat]);
+    flyToPoint(w[0], w[1], 600);
     $('fHint').textContent = '已选地点：' + (form.city ? form.city + ' · ' : '') + p.name +
       (p.distance != null ? '（' + p.distance + ' 米）' : '');
   }
@@ -2630,7 +2656,7 @@
       el.onclick = function () {
         var r = list[i];
         setFormPlace(r.name, r.lon, r.lat, r.admin, 'search');
-        mapCenterOn(r.lon, r.lat, 9);
+        mapCenterOn(r.lon, r.lat, 11, 700);
         renderMap({ lat: r.lat, lon: r.lon });
       };
     });
@@ -2661,7 +2687,7 @@
         var nm = j.city || j.locality || j.principalSubdivision || '我的位置';
         setFormPlace(nm, lon, lat, '', 'geo');
         $('fHint').textContent = '已定位到：' + $('fHint').textContent.replace('已选地点：', '');
-        mapCenterOn(lon, lat, 10);
+        flyToPoint(lon, lat, 700);
         renderMap({ lat: lat, lon: lon });
       }).catch(function () {
         var nm = placeLabel(lon, lat) || '我的位置';

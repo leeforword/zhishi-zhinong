@@ -64,19 +64,53 @@
     return VILLAGE_SUFFIX.test(n);
   }
 
+  /** 停车场之类虽然最近，但当"地点名"没有意义 */
+  /* 这些虽然可能最近，但当"地点名"没有意义：
+     停车场、出入口是地物；公司/工厂是单位，不是地点。 */
+  var NOISE_PLACE = /^(停车场|公共厕所|卫生间|出入口|大门|通道|楼梯|电梯|地下车库|地面停车场|充电桩)/;
+  var BUSINESS_PLACE = /(有限公司|股份有限公司|分公司|集团|工厂|制造|实业|物流|仓储|批发)/;
+  /* 商业类 POI：店铺、餐馆、车行、代办点……不是地名 */
+  var COMMERCIAL = /购物服务|餐饮服务|汽车服务|汽车维修|生活服务|金融保险|公司企业|医疗保健服务;药店/;
+
   /**
-   * 从候选里挑村名
-   * @param {Array} cands [{name, distance}]  已按距离升序
-   * @returns {{name, distance}|null}
+   * 从候选里挑"最小可识别地点"
+   * ------------------------------------------------------------
+   * 早期版本用名字后缀猜村（"XX店" 算村），结果"乔木书店"被当成村，
+   * 界面就出现"乔木书店（精确到村）"这种荒唐标注。
+   * 现在改成：按距离取最近的候选，是村还是具体地点由高德返回的 type 决定。
+   * @param {Array} cands [{name, distance, type}]  已按距离升序
+   * @returns {{name, distance, type, kind}|null}
    */
-  function pickVillage(cands) {
+  function pickPlace(cands) {
     for (var i = 0; i < cands.length; i++) {
       var c = cands[i];
-      if (looksLikeVillage(c.name)) {
-        return { name: cleanName(c.name).replace(/村委会$/, '').replace(/社区$/, ''), distance: c.distance };
-      }
+      var n = cleanName(c.name).replace(/村委会$/, '').replace(/社区$/, '');
+      if (!n || n.length > 20) continue;
+      if (NOISE_PLACE.test(n) || BUSINESS_PLACE.test(n)) continue;
+
+      /* 店铺名只在"人几乎就站在它门口"时才算地名（≤60m）；
+         远一点还拿"某某总代理""某某专卖店"当地名，比村名还离谱。
+         远距离只接受聚落（村/社区）和公共设施（学校、医院、公园、小区）。 */
+      var far = (Number(c.distance) || 0) > 60;
+      if (far && COMMERCIAL.test(String(c.type || ''))) continue;
+
+      return {
+        name: n,
+        distance: c.distance,
+        type: c.type || '',
+        kind: placeKindOf(c.type, n)
+      };
     }
     return null;
+  }
+
+  /** type 优先，没 type 才退回名字后缀 */
+  function placeKindOf(type, name) {
+    var t = String(type || '');
+    // 只认真正的村庄。「地名」这个大类里还有道路名、交通地名，不能都算村
+    if (/村庄|自然村/.test(t)) return 'village';
+    if (!t && looksLikeVillage(name)) return 'village';
+    return 'place';
   }
 
   /* ---------------- 通用请求 ---------------- */
@@ -167,20 +201,21 @@
 
       var cands = [];
       (r.aois || []).forEach(function (a) {
-        cands.push({ name: a.name, distance: Number(a.distance) || 0 });
+        cands.push({ name: a.name, distance: Number(a.distance) || 0, type: a.type || '' });
       });
       (r.pois || []).forEach(function (a) {
-        cands.push({ name: a.name, distance: Number(a.distance) || 0 });
+        cands.push({ name: a.name, distance: Number(a.distance) || 0, type: a.type || '' });
       });
       cands.sort(function (a, b) { return a.distance - b.distance; });
 
-      var v = pickVillage(cands);
+      var v = pickPlace(cands);
       return {
         city: pick(ac.city),
         county: pick(ac.district),
         township: pick(ac.township),
         village: v ? v.name : '',
         villageDistance: v ? Math.round(v.distance) : null,
+        placeKind: v ? v.kind : '',
         adcode: pick(ac.adcode),
         formatted: r.formattedAddress || '',
         source: 'amap-rest'
@@ -236,14 +271,14 @@
 
               var cands = [];
               (r.aois || []).forEach(function (a) {
-                cands.push({ name: a.name, distance: Number(a.distance) || 0 });
+                cands.push({ name: a.name, distance: Number(a.distance) || 0, type: a.type || '' });
               });
               (r.pois || []).forEach(function (a) {
-                cands.push({ name: a.name, distance: Number(a.distance) || 0 });
+                cands.push({ name: a.name, distance: Number(a.distance) || 0, type: a.type || '' });
               });
               cands.sort(function (a, b) { return a.distance - b.distance; });
 
-              var v = pickVillage(cands);
+              var v = pickPlace(cands);
 
               finish({
                 city: pick(ac.city),
@@ -251,6 +286,7 @@
                 township: pick(ac.township),
                 village: v ? v.name : '',
                 villageDistance: v ? Math.round(v.distance) : null,
+                placeKind: v ? v.kind : '',
                 adcode: pick(ac.adcode),
                 formatted: r.formattedAddress || '',
                 source: 'amap'
@@ -283,7 +319,11 @@
     else if (sub) label = sub;
     else label = '';
 
-    var precision = village ? 'village' : (township ? 'township' : (county ? 'county' : (city ? 'city' : 'none')));
+    /* 名字是村就标"到村"，是学校/书店这类具体地点就标"到地点"。
+       不能再一律写"精确到村"——坐标在河北农业大学里却显示某个村，是错的。 */
+    var precision = village
+      ? (parts.placeKind === 'village' ? 'village' : 'poi')
+      : (township ? 'township' : (county ? 'county' : (city ? 'city' : 'none')));
 
     return {
       city: city,
@@ -293,6 +333,7 @@
       sub: sub,                 // 用于 plot.place 的最细可用名称
       label: label,             // "保定市 · 东洼村"
       precision: precision,
+      placeKind: parts.placeKind || '',
       source: parts.source || '',
       distance: parts.villageDistance || null,
       error: parts.error || ''
@@ -419,8 +460,9 @@
         township: a.township || b.township || '',
         // 县区
         county: a.county || b.county || '',
-        // 村：只有高德能给
+        // 最细一级的名称（村名或具体地点），只有高德能给
         village: a.village || '',
+        placeKind: a.placeKind || '',
         villageDistance: a.villageDistance,
         // 出错原因（例如 INVALID_USER_SCODE），界面上要能说清为什么只到乡镇
         error: a.error || '',
@@ -448,7 +490,8 @@
     precisionText: function (p) { return PRECISION_TEXT[p] || PRECISION_TEXT.none; },
     // 便于测试
     _looksLikeVillage: looksLikeVillage,
-    _pickVillage: pickVillage,
+    _pickPlace: pickPlace,
+    _placeKindOf: placeKindOf,
     _compose: compose,
     _clearCache: function () { CACHE = {}; CACHE_ORDER = []; }
   };
