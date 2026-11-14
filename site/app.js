@@ -3011,6 +3011,9 @@
       setTimeout(function () { window.scrollTo(0, target); }, 40);
     }
     moveTabPill(name);
+    // 点击瞬间 :active 可能还在生效，等手指松开后再按真实矩形校准一次，
+    // 避免胶囊停在按压态的框上（连点切页时以当前视图为准，不写错位置）。
+    setTimeout(function () { if (currentView === name) moveTabPill(name); }, 220);
 
     // 图表是按容器宽度画的：如果数据是在别的视图里加载完的，
     // 那时 content 还是 display:none，量到的宽度是 0，图会按 620 画成小字。
