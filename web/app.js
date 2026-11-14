@@ -173,12 +173,36 @@
      SVG 图表（手写，无图表库）
      ========================================================= */
 
+  /* 图表宽度按容器实测：
+     固定 620px 在手机上塞不进 336px 的卡片，只能横向滚动，
+     滚到右边就被容器"切"掉——用户看到的就是截断。
+     这里按容器实时取宽度，字号保持绝对像素，图就不会被裁也不需要滑。 */
+  function chartW(el, fallback) {
+    var w = 0;
+    try { w = el && el.clientWidth ? el.clientWidth : 0; } catch (e) { w = 0; }
+    if (!w) w = fallback || 620;
+    return Math.max(300, Math.min(820, Math.round(w)));
+  }
+
   /** 逐小时风速折线 + 阈值线 + 可作业时段底色 */
-  function windChartSvg(hours, maxWind) {
-    var W = 620, H = 210, L = 40, R = 14, TP = 16, B = 30;
+  function windChartSvg(hours, maxWind, width) {
+    var W = width || 620, H = 210, L = 40, R = 14, TP = 16, B = 30;
     var iw = W - L - R, ih = H - TP - B;
-    var ymax = Math.max(4, Math.ceil(Math.max(maxWind, RULES.spray.wind_max) + 1));
-    var x = function (h) { return L + (h / 23) * iw; };
+
+    /* Y 轴上限要按「逐小时」的真实峰值来定，不能信逐日的 wind_speed_10m_max：
+       和风这两个数偶尔对不上（逐时峰值比逐日最大值还高），
+       上限给低了折线就会顶出绘图区，被 viewBox 裁成一条平线。 */
+    var realMax = 0;
+    hours.forEach(function (h) { if (h.wind > realMax) realMax = h.wind; });
+    var seed = Math.max(realMax, Number(maxWind) || 0, RULES.spray.wind_max);
+    var ymax = Math.max(4, Math.ceil(seed + 1));
+    if (ymax % 2) ymax += 1;   // 网格按 2 步进，上限取偶数才不会出现半格
+    /* X 轴按数据的实际小时范围铺满，而不是固定 0–23：
+       和风 168h 从当前小时起算，晚上打开时今天只剩几个小时的数据，
+       固定 0–23 会让折线挤在最右边一小段，看着像"图没画完"。 */
+    var h0 = hours[0].hour, h1 = hours[hours.length - 1].hour;
+    if (h1 - h0 < 1) h1 = h0 + 1;
+    var x = function (h) { return L + ((h - h0) / (h1 - h0)) * iw; };
     var y = function (v) { return TP + ih - (v / ymax) * ih; };
 
     var p = [];
@@ -225,9 +249,18 @@
     });
 
     // 横轴
-    [0, 6, 12, 18, 23].forEach(function (h) {
-      // 首尾标签改成左/右对齐，否则会被 viewBox 边缘切掉半个字
-      var a = h === 0 ? 'start' : (h === 23 ? 'end' : 'middle');
+    var span = h1 - h0;
+    var step = span > 16 ? 6 : (span > 9 ? 3 : 2);
+    var ticks = [];
+    for (var tt = h0; tt <= h1; tt += step) ticks.push(tt);
+    // 末位刻度离 h1 太近就直接顶替，否则会出现「22时23时」黏在一起
+    if (ticks[ticks.length - 1] !== h1) {
+      if (h1 - ticks[ticks.length - 1] < step / 2) ticks[ticks.length - 1] = h1;
+      else ticks.push(h1);
+    }
+    ticks.forEach(function (h, i) {
+      // 首尾标签左/右对齐，否则会被 viewBox 边缘切掉半个字
+      var a = i === 0 ? 'start' : (i === ticks.length - 1 ? 'end' : 'middle');
       p.push('<text x="' + x(h).toFixed(1) + '" y="' + (H - 10) + '" font-size="9.5" text-anchor="' + a + '">' + h + '时</text>');
     });
     p.push('<text x="' + L + '" y="' + (TP - 4) + '" font-size="9" fill="#9ca3af">风速 m/s</text>');
@@ -240,9 +273,13 @@
   }
 
   /** 7 天 × 24 小时 作业窗口热力图 */
-  function heatChartSvg(raw, result) {
+  function heatChartSvg(raw, result, width) {
     var days = result.days;
-    var W = 1180, H = 250, L = 52, R = 12, TP = 22, B = 30;
+    /* 原来写死 1180 宽：手机卡片只有 330px 量级，整张图被容器切掉右半边，
+       24 列的刻度和色块都看不全。改成按容器宽实时算，列宽自动收窄。 */
+    var W = width || 620;
+    var narrow = W < 470;
+    var H = 250, L = narrow ? 38 : 52, R = 12, TP = 22, B = 30;
     var cw = (W - L - R) / 24, chh = (H - TP - B) / days.length;
 
     var p = [];
@@ -281,22 +318,25 @@
       p.push('<line x1="' + wx(h).toFixed(1) + '" y1="' + (TP - 7) + '" x2="' + wx(h).toFixed(1) +
         '" y2="' + (TP + days.length * chh).toFixed(1) + '" stroke="#c9d4b8" stroke-width="1" stroke-dasharray="3 3"/>');
     });
-    p.push('<text x="' + (wx(RULES.spray.hours[0]) + 4).toFixed(1) + '" y="' + (TP - 9) +
-      '" font-size="9.5" fill="#9ca3af">6:00 作业时段开始</text>');
-    p.push('<text x="' + (wx(RULES.spray.hours[1]) - 4).toFixed(1) + '" y="' + (TP - 9) +
-      '" font-size="9.5" fill="#9ca3af" text-anchor="end">17:00 结束</text>');
+    var h0 = RULES.spray.hours[0], h1 = RULES.spray.hours[1];
+    p.push('<text x="' + (wx(h0) + 3).toFixed(1) + '" y="' + (TP - 9) +
+      '" font-size="' + (narrow ? 9 : 9.5) + '" fill="#9ca3af">' + (narrow ? h0 + '时' : h0 + ':00 作业时段开始') + '</text>');
+    if (!narrow) {
+      p.push('<text x="' + (wx(h1) - 4).toFixed(1) + '" y="' + (TP - 9) +
+        '" font-size="9.5" fill="#9ca3af" text-anchor="end">' + h1 + ':00 结束</text>');
+    }
 
-    [0, 3, 6, 9, 12, 15, 18, 21].forEach(function (h) {
+    (narrow ? [0, 6, 12, 18] : [0, 3, 6, 9, 12, 15, 18, 21]).forEach(function (h) {
       p.push('<text x="' + (L + h * cw + cw / 2).toFixed(1) + '" y="' + (H - 9) +
-        '" font-size="10" text-anchor="middle">' + h + ':00</text>');
+        '" font-size="' + (narrow ? 9.5 : 10) + '" text-anchor="middle">' + h + (narrow ? '' : ':00') + '</text>');
     });
 
     return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '">' + p.join('') + '</svg>';
   }
 
   /** 7 天温度双折线 + 降水柱（降水单独占底部区域，避免被温度带遮住） */
-  function tempChartSvg(result) {
-    var W = 620, H = 230, L = 40, R = 14, TP = 16, B = 30;
+  function tempChartSvg(result, width) {
+    var W = width || 620, H = 230, L = 40, R = 14, TP = 16, B = 30;
     var RAIN_BAND = 46;
     var iw = W - L - R;
     var ihT = H - TP - B - RAIN_BAND;          // 温度区高度
@@ -411,9 +451,9 @@
   }
 
   /** 长势趋势（示意数据） */
-  function growthSvg(plot) {
+  function growthSvg(plot, width) {
     var pts = T.growthTrend(plot, 8);
-    var W = 620, H = 190, L = 40, R = 14, TP = 16, B = 30;
+    var W = width || 620, H = 190, L = 40, R = 14, TP = 16, B = 30;
     var iw = W - L - R, ih = H - TP - B;
     var ymin = 0.30, ymax = 0.85;
     var x = function (i) { return L + i / (pts.length - 1) * iw; };
@@ -444,6 +484,15 @@
       p.join('') + '</svg>';
   }
 
+  /* 转屏 / 改窗口后按新宽度重绘：svg 只是等比缩放，重绘后才不糊 */
+  var chartResizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(chartResizeTimer);
+    chartResizeTimer = setTimeout(function () {
+      if (state.result) renderCharts();
+    }, 220);
+  });
+
   function renderCharts() {
     var raw = state.raw, result = state.result, plot = activePlot();
     if (!raw || !result) return;
@@ -453,18 +502,19 @@
     var d = result.days.filter(function (x) { return x.date === day; })[0] || result.days[0];
     var hours = T.hoursOf(raw.hourly, d.date);
     var dt = new Date(d.date + 'T00:00:00');
-    $('windTitle').textContent = '逐小时风速 · ' + (dt.getMonth() + 1) + '月' + dt.getDate() + '日 ' + d.dow;
+    // 区块标题已经写了「逐小时风速」，卡片里只留日期，避免同一句话出现两遍
+    $('windTitle').textContent = (dt.getMonth() + 1) + '月' + dt.getDate() + '日 ' + d.dow;
     $('windSub').textContent = '虚线为 ' + RULES.spray.wind_max + ' m/s 作业上限；' + d.spray.why;
     // 图例里的上限数字跟着规则走，不要在 HTML 里写死（会跟实际判定对不上）
     if ($('windLimitTag')) $('windLimitTag').textContent = RULES.spray.wind_max + ' m/s 上限';
     $('windChart').innerHTML = hours.length
-      ? windChartSvg(hours, d.windMax)
+      ? windChartSvg(hours, d.windMax, chartW($('windChart')))
       : '<div class="chart-note">该日无逐小时数据</div>';
 
-    $('heatChart').innerHTML = heatChartSvg(raw, result);
-    $('tempChart').innerHTML = tempChartSvg(result);
+    $('heatChart').innerHTML = heatChartSvg(raw, result, chartW($('heatChart')));
+    $('tempChart').innerHTML = tempChartSvg(result, chartW($('tempChart')));
     if ($('donutChart')) $('donutChart').innerHTML = donutSvg(result);
-    $('growthChart').innerHTML = growthSvg(plot);
+    $('growthChart').innerHTML = growthSvg(plot, chartW($('growthChart')));
   }
 
   /* =========================================================
@@ -2325,20 +2375,6 @@
     $('layerRoad').onclick = function () { setMapLayer('road'); };
     $('layerSat').onclick = function () { setMapLayer('sat'); };
 
-    $('mapToggle').onclick = function () {
-      var panel = $('mapPanel');
-      var open = panel.style.display !== 'none';
-      panel.style.display = open ? 'none' : 'block';
-      $('mapToggleTxt').textContent = open ? '展开' : '收起';
-      if (!open) {
-        // 展开后等布局完成再初始化/重绘地图
-        setTimeout(function () {
-          renderMap(pickSel());
-          if (MAP.instance) MAP.instance.resize();
-        }, 60);
-      }
-    };
-
     // 预加载 SDK：打开弹窗时就后台开始拉取，
     // 这样用户点"展开地图"时基本已经就绪（避免首屏多等 1-2 秒）
     loadAMap().catch(function (err) {
@@ -2557,16 +2593,9 @@
       $('fHint').textContent = '已选地点：' + $('fHint').textContent.replace('已选地点：', '') + '（默认沿用当前地块，可修改）';
     }
 
-    /* 地图默认展开
-       -------------------------------------------------------------
-       早期版本默认收起，为的是让"保存"按钮在一屏内可见。
-       但实测下来：这个工具的核心动作就是"在地图上点自己的地"，
-       默认藏起来等于让每个人多按一次，还容易以为没有地图功能。
-       收起的问题改由「保存按钮固定在弹窗底部」解决（CSS 已改 sticky），
-       两边的诉求就都在了。 */
-    $('mapPanel').style.display = 'block';
-    $('mapToggleTxt').textContent = '收起';
-
+    /* 地图常驻弹窗上半屏，不再有「展开/收起」：
+       这个工具的核心动作就是在地图上点自己的地，藏起来等于让人多按一次。
+       表单放在地图下方独立滚动，键盘弹起时只压缩表单区，地图不会被挡。 */
     bindMapStage();
     mapCenterOn(base.lon, base.lat, plot ? 9 : 8);
     lockBody(true);
@@ -2834,9 +2863,10 @@
      事件
      ========================================================= */
   $('addPlotBtn').onclick = function () { openModal(null); };
-  $('modalClose').onclick = closeModal;
-  $('modalCancel').onclick = closeModal;
-  $('modalSave').onclick = formSave;
+  // 弹窗头部现在是「取消 / 标题 / 保存」，没有 × 了；
+  // 可选元素一律先判空，避免缺一个按钮就把整段初始化打断
+  if ($('modalCancel')) $('modalCancel').onclick = closeModal;
+  if ($('modalSave')) $('modalSave').onclick = formSave;
   /* 点遮罩空白处关闭弹窗
      -------------------------------------------------------------
      注意：不能简单用 click 判断。用户拖拽地图时，鼠标按下在地图上、
@@ -2955,6 +2985,13 @@
       setTimeout(function () { window.scrollTo(0, target); }, 40);
     }
     moveTabPill(name);
+
+    // 图表是按容器宽度画的：如果数据是在别的视图里加载完的，
+    // 那时 content 还是 display:none，量到的宽度是 0，图会按 620 画成小字。
+    // 切回来时重画一次，宽度才对。
+    if (name === 'content' && state.result) {
+      setTimeout(function () { renderCharts(); }, 80);
+    }
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* file:// 下可能不允许 */ }
   }
 

@@ -240,7 +240,7 @@ async function waitData(timeoutMs) {
     await sleep(600);
     check(await ev("document.getElementById('plotMask').classList.contains('on')"), 'modal opened');
 
-    await ev("document.getElementById('mapToggle').click();");
+    // 地图现在常驻在弹窗上半屏，不需要再点「展开」
     await sleep(2500);
     let mode = '', amapReady = false;
     for (let i = 0; i < 25; i++) {
@@ -301,7 +301,6 @@ async function waitData(timeoutMs) {
     console.log('\n== 5b. map drag keeps modal open ==');
     await ev("document.getElementById('addPlotBtn').click();");
     await sleep(600);
-    await ev("document.getElementById('mapToggle').click();");
     await sleep(2500);
     const box = JSON.parse(await ev(`
       (function(){
