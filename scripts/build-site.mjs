@@ -118,6 +118,16 @@ if (fs.existsSync(DL)) {
   }
 }
 
+/* ---- 6.7 微信「申请恢复访问」的域名验证文件 ----
+   微信会来取 https://<站点>/<32位hash>.txt，必须落在站点根，
+   且每次构建都不能被清空，所以源码放 web/ 根、构建时原样复制到 site/ 根。 */
+const VERIFY_FILES = fs.readdirSync(WEB).filter((f) => /^[a-f0-9]{32}\.txt$/i.test(f));
+for (const f of VERIFY_FILES) {
+  fs.copyFileSync(path.join(WEB, f), path.join(OUT, f));
+  copied++;
+  log('  OK   微信验证文件 ' + f);
+}
+
 /* ---- 7. 安装引导里用到的两张截图 ---- */
 fs.mkdirSync(path.join(OUT, 'screenshots'), { recursive: true });
 for (const f of ['01-desktop-overview.png', '12-mobile-iphone.png']) {
@@ -191,6 +201,11 @@ const missingShell = shellList.filter((u) => {
   return !fs.existsSync(path.join(OUT, u.replace(/^\.\//, '')));
 });
 check('SW 预缓存清单 ' + shellList.length + ' 项均存在', shellList.length > 0 && missingShell.length === 0, missingShell.join(', '));
+
+/* 3.4.1 微信验证文件必须出现在站点根（丢了会导致微信解除拦截失败） */
+check('微信验证文件已随构建发布 ' + VERIFY_FILES.length + ' 个',
+  VERIFY_FILES.every((f) => fs.existsSync(path.join(OUT, f))),
+  VERIFY_FILES.filter((f) => !fs.existsSync(path.join(OUT, f))).join(', '));
 
 /* 3.5 不该出现的文件确实没出现 */
 check('没有复制 config.local.js', !fs.existsSync(path.join(OUT, 'config.local.js')));
