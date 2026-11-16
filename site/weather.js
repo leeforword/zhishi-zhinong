@@ -78,14 +78,23 @@
     var u = new URL('https://api.open-meteo.com/v1/forecast');
     u.searchParams.set('latitude', lat);
     u.searchParams.set('longitude', lon);
-    u.searchParams.set('hourly', 'temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m');
+    u.searchParams.set('hourly', 'temperature_2m,precipitation,precipitation_probability,wind_speed_10m,' +
+      'wind_direction_10m,relative_humidity_2m,dew_point_2m,surface_pressure,cloud_cover,visibility');
     u.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,precipitation_sum,' +
-      'precipitation_probability_max,wind_speed_10m_max,weather_code');
+      'precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,weather_code,sunrise,sunset');
     u.searchParams.set('timezone', 'Asia/Shanghai');
     u.searchParams.set('forecast_days', '7');
 
     return fetchJSON(omUrl('api.open-meteo.com', '/v1/forecast?' + u.searchParams.toString()), 15000).then(function (j) {
       if (!j.hourly || !j.daily) throw new Error('Open-Meteo 返回不完整');
+      // Open-Meteo 的 visibility 单位是米，统一成 km；其余字段保持原样
+      if (Array.isArray(j.hourly.visibility)) {
+        j.hourly.visibility = j.hourly.visibility.map(function (v) {
+          return (v === null || v === undefined) ? null : Math.round(v / 100) / 10;
+        });
+      }
+      if (Array.isArray(j.daily.sunrise)) j.daily.sunrise = j.daily.sunrise.map(hhmm);
+      if (Array.isArray(j.daily.sunset)) j.daily.sunset = j.daily.sunset.map(hhmm);
       stats.base = 'open-meteo';
       return {
         hourly: j.hourly,
@@ -215,7 +224,8 @@
       var daily = {
         time: [], temperature_2m_max: [], temperature_2m_min: [],
         precipitation_sum: [], precipitation_probability_max: [],
-        wind_speed_10m_max: [], weather_code: []
+        wind_speed_10m_max: [], wind_direction_10m_dominant: [], weather_code: [],
+        sunrise: [], sunset: []
       };
       days.forEach(function (d) {
         var date = String(d.fxDate || '').slice(0, 10);
@@ -225,6 +235,9 @@
         daily.temperature_2m_min.push(r1(d.tempMin));
         daily.precipitation_sum.push(r1(d.precip));
         daily.wind_speed_10m_max.push(r1(num(d.windSpeedDay) / 3.6));
+        daily.wind_direction_10m_dominant.push(Math.round(num(d.wind360Day)));
+        daily.sunrise.push(hhmm(d.sunrise));
+        daily.sunset.push(hhmm(d.sunset));
         var wmo = QW_ICON_TO_WMO[String(d.iconDay)];
         daily.weather_code.push(wmo === undefined ? 3 : wmo);
       });
@@ -240,8 +253,9 @@
       daily.time.forEach(function (d) { keep[d] = 1; });
 
       var hourly = {
-        time: [], temperature_2m: [], precipitation: [],
-        wind_speed_10m: [], relative_humidity_2m: []
+        time: [], temperature_2m: [], precipitation: [], precipitation_probability: [],
+        wind_speed_10m: [], wind_direction_10m: [], relative_humidity_2m: [],
+        dew_point_2m: [], surface_pressure: [], cloud_cover: [], visibility: []
       };
       var popByDate = {};
 
@@ -257,7 +271,14 @@
         hourly.temperature_2m.push(r1(h.temp));
         hourly.precipitation.push(r1(h.precip));
         hourly.wind_speed_10m.push(r1(num(h.windSpeed) / 3.6));
+        hourly.wind_direction_10m.push(Math.round(num(h.wind360 !== undefined ? h.wind360 : h.windDir)));
         hourly.relative_humidity_2m.push(Math.round(num(h.humidity)));
+        hourly.precipitation_probability.push(Math.round(num(h.pop)));
+        hourly.dew_point_2m.push(optNum(h.dew));
+        hourly.surface_pressure.push(optNum(h.pressure));
+        hourly.cloud_cover.push(optNum(h.cloud));
+        // 和风 168h 不返回 vis（只有 7d/24h 有），这里必须留 null
+        hourly.visibility.push(optNum(h.vis));
 
         var pop = num(h.pop);
         if (popByDate[d] === undefined || pop > popByDate[d]) popByDate[d] = pop;
@@ -305,6 +326,18 @@
 
   function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
   function r1(v) { return Math.round(num(v) * 10) / 10; }
+  /** 缺字段返回 null；0 是合法值，不能和"没有"混为一谈 */
+  function optNum(v) {
+    if (v === undefined || v === null || v === '') return null;
+    var n = Number(v);
+    return isFinite(n) ? n : null;
+  }
+  /** 日出日落：兼容 "07:01" 与 "2026-11-16T07:01+08:00" */
+  function hhmm(v) {
+    var s2 = String(v || '');
+    if (!s2) return '';
+    return s2.indexOf('T') >= 0 ? s2.slice(11, 16) : s2.slice(-5);
+  }
 
   function fromQWeatherFallback(lat, lon) {
     var loc = locParam(lat, lon);
@@ -316,11 +349,14 @@
       var days = res[1].daily || [];
       if (!hours.length || !days.length) throw new Error('和风数据为空');
 
-      var hourly = { time: [], temperature_2m: [], precipitation: [], wind_speed_10m: [], relative_humidity_2m: [] };
+      var hourly = { time: [], temperature_2m: [], precipitation: [], precipitation_probability: [],
+        wind_speed_10m: [], wind_direction_10m: [], relative_humidity_2m: [],
+        dew_point_2m: [], surface_pressure: [], cloud_cover: [], visibility: [] };
       var daily = {
         time: [], temperature_2m_max: [], temperature_2m_min: [],
         precipitation_sum: [], precipitation_probability_max: [],
-        wind_speed_10m_max: [], weather_code: []
+        wind_speed_10m_max: [], wind_direction_10m_dominant: [], weather_code: [],
+        sunrise: [], sunset: []
       };
 
       // 真实逐时（未来 24 小时）
@@ -329,7 +365,13 @@
         hourly.temperature_2m.push(num(h.temp));
         hourly.precipitation.push(num(h.precip));
         hourly.wind_speed_10m.push(num(h.windSpeed) / 3.6);   // km/h → m/s
+        hourly.wind_direction_10m.push(Math.round(num(h.wind360 !== undefined ? h.wind360 : h.windDir)));
         hourly.relative_humidity_2m.push(num(h.humidity));
+        hourly.precipitation_probability.push(num(h.pop));
+        hourly.dew_point_2m.push(optNum(h.dew));
+        hourly.surface_pressure.push(optNum(h.pressure));
+        hourly.cloud_cover.push(optNum(h.cloud));
+        hourly.visibility.push(optNum(h.vis));
       });
 
       days.forEach(function (d) {
@@ -340,6 +382,9 @@
         daily.precipitation_sum.push(num(d.precip));
         daily.precipitation_probability_max.push(0);
         daily.wind_speed_10m_max.push(num(d.windSpeedDay) / 3.6);
+        daily.wind_direction_10m_dominant.push(Math.round(num(d.wind360Day)));
+        daily.sunrise.push(hhmm(d.sunrise));
+        daily.sunset.push(hhmm(d.sunset));
         daily.weather_code.push(
           QW_ICON_TO_WMO[String(d.iconDay)] !== undefined ? QW_ICON_TO_WMO[String(d.iconDay)] : 3
         );
@@ -358,6 +403,12 @@
           hourly.time.push(iso);
           hourly.temperature_2m.push(Math.round((tmin + (tmax - tmin) * (0.5 + 0.5 * phase)) * 10) / 10);
           hourly.precipitation.push(0);
+          hourly.precipitation_probability.push(0);
+          hourly.wind_direction_10m.push(0);
+          hourly.dew_point_2m.push(0);
+          hourly.surface_pressure.push(0);
+          hourly.cloud_cover.push(0);
+          hourly.visibility.push(0);
           hourly.wind_speed_10m.push(Math.round(w * 10) / 10);
           hourly.relative_humidity_2m.push(60);
         }
@@ -366,13 +417,11 @@
       // 按时间排序
       var idx = hourly.time.map(function (t, i) { return i; })
         .sort(function (a, b) { return hourly.time[a] < hourly.time[b] ? -1 : 1; });
-      var sorted = { time: [], temperature_2m: [], precipitation: [], wind_speed_10m: [], relative_humidity_2m: [] };
+      // 按时间重排所有平行数组：字段一多，逐个手写必然漏（前车之鉴）
+      var sorted = {};
+      Object.keys(hourly).forEach(function (k) { sorted[k] = []; });
       idx.forEach(function (i) {
-        sorted.time.push(hourly.time[i]);
-        sorted.temperature_2m.push(hourly.temperature_2m[i]);
-        sorted.precipitation.push(hourly.precipitation[i]);
-        sorted.wind_speed_10m.push(hourly.wind_speed_10m[i]);
-        sorted.relative_humidity_2m.push(hourly.relative_humidity_2m[i]);
+        Object.keys(hourly).forEach(function (k) { sorted[k].push(hourly[k][i]); });
       });
 
       stats.base = 'qweather';

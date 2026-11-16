@@ -150,6 +150,37 @@ const wheat = T.answerQuestion('要不要浇水', r2, { name: '麦地', crop: 'w
 const maize = T.answerQuestion('要不要浇水', r2, { name: '玉米地', crop: 'maize' });
 check(wheat !== maize, '不同作物灌溉建议有区分');
 
+console.log('\n===== 降雨概率拦截（回归） =====');
+function synth(prob, rain) {
+  const hourly = { time: [], temperature_2m: [], precipitation: [], precipitation_probability: [],
+    wind_speed_10m: [], relative_humidity_2m: [] };
+  for (let h = 0; h < 24; h++) {
+    hourly.time.push('2026-06-01T' + String(h).padStart(2, '0') + ':00');
+    hourly.temperature_2m.push(20);
+    hourly.precipitation.push(rain);
+    hourly.precipitation_probability.push(prob);
+    hourly.wind_speed_10m.push(1.2);
+    hourly.relative_humidity_2m.push(65);
+  }
+  const daily = {
+    time: ['2026-06-01'], temperature_2m_max: [25], temperature_2m_min: [15],
+    precipitation_sum: [rain], precipitation_probability_max: [prob],
+    wind_speed_10m_max: [1.2], weather_code: [2]
+  };
+  return T.evaluateWeather(hourly, daily);
+}
+const highProb = synth(70, 0);
+check(highProb.days[0].spray.status === 'bad', '70% 降雨概率：不排窗口');
+check(/降雨概率/.test(highProb.days[0].spray.why), '70% 概率：原因写明概率');
+check(highProb.days[0].spray.windows.length === 0, '70% 概率：窗口为空');
+check(highProb.days[0].blockedBy === 'prob', '70% 概率：blockedBy=prob');
+const lowProb = synth(10, 0);
+check(lowProb.days[0].spray.status === 'ok', '10% 概率：正常给出窗口');
+check(lowProb.days[0].spray.windows[0].hours >= 6, '10% 概率：窗口覆盖作业时段');
+const wetHour = synth(10, 0.5);
+check(wetHour.days[0].spray.status === 'bad', '小时降水 0.5mm：不排窗口');
+check(wetHour.days[0].blockedBy === 'rain', '小时降水：blockedBy=rain');
+
 console.log('\n===== 城市字典 =====');
 check(Object.keys(T.CITIES).length >= 20, `城市字典 ${Object.keys(T.CITIES).length} 个`);
 check(T.CITIES['衡水'] && T.CITIES['安国'], '含衡水、安国等县级市');

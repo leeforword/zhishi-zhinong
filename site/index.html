@@ -8,7 +8,7 @@
 
 <!-- ========== 可安装到手机桌面（PWA） ========== -->
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#e6efe9">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
@@ -844,14 +844,14 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
   .menu-btn{
     display:flex;align-items:center;justify-content:center;
     position:absolute;left:10px;top:8px;
-    width:36px;height:36px;border-radius:var(--r-sm);
-    border:1px solid var(--border);background:var(--surface-solid);
+    width:40px;height:40px;border-radius:50%;border:0;background:transparent;
     color:var(--text-2);cursor:pointer;z-index:2;
+    top:calc(6px + env(safe-area-inset-top));
   }
-  .topbar{position:sticky}
+  .topbar{position:sticky;padding-left:56px;padding-right:14px}
 
   /* ---- 卡片内边距收紧 ---- */
-  .content{padding:12px 12px 30px;gap:11px}
+  .content{padding:14px 14px 34px;gap:15px}
   .alert{padding:9px 11px;gap:9px}
   .card-head{padding:10px 12px}
   .card-body{padding:11px 12px}
@@ -868,7 +868,7 @@ select.field{cursor:pointer;appearance:none;-webkit-appearance:none;
   .cd-l{font-size:11px}
 
   /* 标题不再被长说明挤成竖排：h2 独占不换行，说明落到下一行 */
-  .sec-h{flex-wrap:wrap;row-gap:3px}
+  .sec-h{margin:24px 2px 10px;flex-wrap:wrap;row-gap:3px}
   .sec-h .hint{flex:1 1 100%;order:3;white-space:normal;font-size:11px}
   .sec-h .act{order:2}
 
@@ -1151,15 +1151,15 @@ html.zz-chat #zzBar{display:none!important}
 .sky .kpi.warn .v{color:#87600E} .sky .kpi.bad .v{color:#8C3025} .sky .kpi.good .v{color:#215C39}
 
 /* ---- 适配度卡 ---- */
-.gauge-card{position:relative;z-index:2;margin:10px 0 0;padding:16px;
+.gauge-card{position:relative;z-index:2;margin:10px 0 0;padding:16px 18px;
   background:var(--surface-solid);border:1px solid var(--border);border-radius:18px;
-  box-shadow:var(--shadow-md);display:grid;grid-template-columns:132px minmax(0,1fr);
-  gap:16px;align-items:center}
-.gauge{position:relative;width:132px;height:132px;flex:none}
-.gauge svg{transform:rotate(-90deg);display:block}
-.gauge-t{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
-.gauge-n{font-size:34px;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--text)}
-.gauge-l{font-size:10.5px;color:var(--text-3);margin-top:4px;letter-spacing:.04em}
+  box-shadow:var(--shadow-md);display:flex;gap:18px;align-items:center}
+.vb-wrap{flex:0 0 auto;min-width:150px;max-width:190px;padding-right:18px;
+  border-right:1px solid var(--border);display:flex;flex-direction:column;gap:5px}
+.vb{font-size:18px;font-weight:600;line-height:1.3;letter-spacing:-.01em;color:var(--brand-d)}
+.vb.good{color:#215C39}.vb.warn{color:#87600E}.vb.bad{color:#8C3025}
+.vb-sub{font-size:10px;color:var(--text-3);line-height:1.5}
+.gauge-info{flex:1;min-width:0}
 .gauge-h{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .gauge-h b{font-size:14px;font-weight:600;color:var(--text)}
 .gauge-h span{font-size:11.5px;color:var(--text-3);margin-left:auto}
@@ -1322,20 +1322,22 @@ html.zz-chat #zzBar{display:none!important}
   .sky-body{grid-template-columns:1fr;gap:12px;padding:16px 14px 0;align-items:start}
   .sky .kpi-grid{grid-template-columns:1fr 1fr;gap:7px}
   .sky{padding-bottom:60px}
-  .verdict h1{font-size:21px}
+  .verdict h1{font-size:23px;line-height:1.18}
   .verdict p{font-size:12px}
   .sky .kpi{padding:9px 10px 10px;border-radius:10px}
   .sky .kpi .k{font-size:10.5px}
   .sky .kpi .v{font-size:17px;letter-spacing:-.035em}
   .sky .kpi .u{display:inline;font-size:10.5px}
   .sky .kpi .sub{font-size:10px;line-height:1.45}
-  .gauge-card{grid-template-columns:1fr;gap:12px;padding:14px;margin:10px 0 0}
+  .gauge-card{flex-direction:column;align-items:stretch;gap:12px;padding:14px;margin:10px 0 0}
+  .vb-wrap{max-width:none;padding-right:0;padding-bottom:10px;border-right:0;border-bottom:1px solid var(--border)}
+  .vb{font-size:16px}
   .sky{padding-bottom:56px}
   .gauge{width:112px;height:112px}
   .gauge-n{font-size:28px}
   .detail-card{margin:10px 0 0;padding:12px}
-  .sec-h{margin:18px 2px 8px}
-  .sec-h h2{font-size:15px}
+  .sec-h{margin:22px 2px 10px}
+  .sec-h h2{font-size:16px}
   .cbox{padding:12px}
   .verdict-grid{grid-template-columns:1fr;gap:8px}
   .plot-sec{display:flex}
@@ -1877,6 +1879,112 @@ html.zz-chat #zzBar{display:none!important}
 @media (max-width:640px){
   .basis-modal{max-width:none}
 }
+
+/* ---------- 顶部与天气主题（v4.6） ---------- */
+.topbar{
+  height:auto;min-height:52px;
+  padding-top:env(safe-area-inset-top);padding-left:20px;padding-right:20px;
+  background:rgba(255,255,255,.55);
+  border-bottom:1px solid rgba(210,216,204,.55);
+}
+.icon-btn{width:34px;height:34px;border:0;border-radius:50%;background:transparent;color:var(--text-2)}
+.icon-btn:hover{background:rgba(255,255,255,.7);color:var(--text)}
+.status{background:rgba(255,255,255,.55);border-color:rgba(210,216,204,.7)}
+
+/* 天气主题：只改天空层色相，正文仍是深色，保证可读性 */
+body.wx-clear .bg-blobs{background:
+  radial-gradient(42% 38% at 12% 2%, rgba(86,150,220,.46), transparent 62%),
+  radial-gradient(36% 34% at 88% 0%, rgba(245,190,110,.42), transparent 60%),
+  radial-gradient(46% 40% at 78% 46%, rgba(120,180,150,.30), transparent 64%),
+  linear-gradient(160deg,#dceaf8 0%,#e6f2e7 48%,#fdf2df 100%)}
+body.wx-cloud .bg-blobs{background:
+  radial-gradient(46% 40% at 14% 4%, rgba(120,150,178,.42), transparent 64%),
+  radial-gradient(40% 36% at 86% 8%, rgba(150,170,180,.36), transparent 62%),
+  radial-gradient(50% 44% at 60% 54%, rgba(130,160,150,.24), transparent 66%),
+  linear-gradient(160deg,#e4ebf1 0%,#e9f0ea 52%,#f5f3ea 100%)}
+body.wx-rain .bg-blobs{background:
+  radial-gradient(48% 42% at 12% 2%, rgba(70,110,140,.48), transparent 64%),
+  radial-gradient(44% 40% at 84% 6%, rgba(96,128,140,.40), transparent 62%),
+  radial-gradient(52% 46% at 66% 56%, rgba(86,120,120,.30), transparent 66%),
+  linear-gradient(160deg,#dfe8ea 0%,#e3ece8 50%,#eef1e9 100%)}
+body.wx-snow .bg-blobs{background:
+  radial-gradient(46% 40% at 10% 0%, rgba(160,190,220,.44), transparent 62%),
+  radial-gradient(42% 38% at 88% 4%, rgba(185,205,220,.40), transparent 60%),
+  linear-gradient(160deg,#e8f0f7 0%,#eef4f2 52%,#f8f6ef 100%)}
+body.wx-fog .bg-blobs{background:
+  radial-gradient(50% 44% at 20% 6%, rgba(160,168,160,.38), transparent 64%),
+  radial-gradient(46% 40% at 80% 10%, rgba(175,180,170,.34), transparent 62%),
+  linear-gradient(160deg,#e9ece7 0%,#eef1ec 52%,#f7f6f0 100%)}
+body.wx-storm .bg-blobs{background:
+  radial-gradient(48% 42% at 16% 2%, rgba(78,92,130,.46), transparent 64%),
+  radial-gradient(42% 38% at 84% 6%, rgba(110,96,140,.38), transparent 62%),
+  linear-gradient(160deg,#dfe4ee 0%,#e6e9ec 50%,#f2f1ea 100%)}
+body.wx-night .bg-blobs{background:
+  radial-gradient(44% 38% at 14% 0%, rgba(60,84,120,.40), transparent 64%),
+  radial-gradient(40% 36% at 86% 6%, rgba(80,96,120,.34), transparent 62%),
+  linear-gradient(160deg,#dfe6ee 0%,#e7ece9 52%,#f4f2e9 100%)}
+@media (max-width:640px){
+  .topbar{padding-left:56px;padding-right:14px}
+}
+body.wx-night .bg-veil{background:linear-gradient(180deg,
+  rgba(255,255,255,.16) 0%, rgba(255,255,255,.40) 120px,
+  rgba(255,255,255,.72) 230px, rgba(255,255,255,.90) 360px, #fff 620px)}
+
+/* ---------- 桌面专业视图 ---------- */
+.pro-only{display:none}
+@media (min-width:900px){.pro-only{display:block}}
+.pro-sum{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 10px}
+.pro-chip{font-size:10.5px;color:var(--text-2);background:var(--surface-2);
+  border:1px solid var(--border);border-radius:999px;padding:3px 9px}
+.pro-chip b{color:var(--text);font-weight:600;margin-left:3px;font-variant-numeric:tabular-nums}
+.pro-scroll{max-height:336px;overflow:auto;border:1px solid var(--border);border-radius:12px}
+.pro-table{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:tabular-nums}
+.pro-table th{position:sticky;top:0;background:var(--surface-2);color:var(--text-3);
+  font-weight:500;text-align:right;padding:7px 9px;border-bottom:1px solid var(--border);white-space:nowrap}
+.pro-table th:first-child,.pro-table td:first-child{text-align:left}
+.pro-table td{padding:6px 9px;text-align:right;border-bottom:1px solid #F1F3EE;color:var(--text-2)}
+.pro-table tr:last-child td{border-bottom:0}
+.pro-table tr.bad td{background:#FDF7F5;color:#8C4A3F}
+.pro-table tr.bad td:first-child{color:#8C4A3F;font-weight:600}
+.pro-table .ok-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--brand);margin-right:4px}
+.pro-table .bad-dot{background:var(--danger)}
+
+/* ---------- 本地知识库 ---------- */
+.kb-stat{font-size:10.5px;color:var(--text-3);line-height:1.5;margin-bottom:8px}
+.kb-stat b{color:var(--text);font-weight:600}
+.kb-input{width:100%;font-size:12px;padding:8px 10px}
+.kb-hits{display:grid;gap:6px;margin-top:8px;max-height:190px;overflow:auto}
+.kb-hit{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)}
+.kb-hit b{display:block;font-size:11.5px;color:var(--text)}
+.kb-hit span{display:block;font-size:10.5px;color:var(--text-2);line-height:1.55;margin-top:3px}
+.kb-hit i{display:block;font-style:normal;font-size:9.5px;color:var(--text-3);margin-top:4px}
+.kb-empty{font-size:10.5px;color:var(--text-3);padding:4px 2px}
+
+/* ---------- 回答后的推荐追问 ---------- */
+.sug-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.sug{border:1px solid var(--border);background:var(--surface-solid);color:var(--text-2);
+  font:inherit;font-size:10.5px;padding:4px 9px;border-radius:999px;cursor:pointer}
+.sug:active{background:var(--brand-weak);border-color:var(--brand);color:var(--brand-d)}
+
+.grow{display:grid;grid-template-columns:64px 1fr 56px;gap:8px;align-items:baseline;font-size:11.5px}
+.grow span{color:var(--text-3)}
+.grow b{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;text-align:right}
+.grow i{font-style:normal;font-size:10px;text-align:right}
+.grow i.ok{color:#215C39}
+.grow i.warn{color:#87600E}
+
+/* ---------- 桌面实况条 ---------- */
+.now-strip{display:none}
+@media (min-width:900px){
+  .now-strip{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));
+    background:rgba(255,255,255,.72);border:1px solid var(--border);border-radius:14px;
+    padding:8px 2px;backdrop-filter:blur(8px)}
+}
+.ns{padding:2px 12px;border-left:1px solid var(--border);min-width:0}
+.ns:first-child{border-left:0}
+.ns span{display:block;font-size:9.5px;color:var(--text-3);letter-spacing:.04em}
+.ns b{display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-top:3px;
+  font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>
 </head>
 <body>
@@ -1988,6 +2096,9 @@ html.zz-chat #zzBar{display:none!important}
       <!-- ---------- 告警 ---------- -->
       <div class="alerts" id="alerts"></div>
 
+      <!-- 桌面端实况条：一屏看到温湿风压能见度，手机隐藏 -->
+      <div class="now-strip pro-only" id="nowStrip"></div>
+
       <!-- ---------- 天象头：结论 + 四宫格 + 适配度 ---------- -->
       <section class="sky" id="sky">
         <svg class="sky-art" id="skyArt" viewBox="0 0 800 420" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
@@ -2002,18 +2113,12 @@ html.zz-chat #zzBar{display:none!important}
       </section>
 
         <div class="gauge-card" id="gaugeCard" style="display:none">
-          <div class="gauge">
-            <svg width="132" height="132" viewBox="0 0 132 132">
-              <circle cx="66" cy="66" r="55" stroke="#EDF0EA" stroke-width="9" fill="none"/>
-              <circle id="gaugeArc" cx="66" cy="66" r="55" stroke="var(--brand)" stroke-width="9" fill="none"
-                      stroke-linecap="round" stroke-dasharray="345.6" stroke-dashoffset="345.6"/>
-            </svg>
-            <div class="gauge-t">
-              <div><div class="gauge-n" id="gaugeN">0</div><div class="gauge-l">适配度 / 100</div></div>
-            </div>
+          <div class="vb-wrap">
+            <span class="vb" id="gaugeWord">—</span>
+            <span class="vb-sub" id="gaugeSub">风速 / 降雨概率 / 时长</span>
           </div>
-          <div>
-            <div class="gauge-h"><b>窗口适配度</b><span id="windowSub"></span></div>
+          <div class="gauge-info">
+            <div class="gauge-h"><b>这个窗口稳不稳</b><span id="windowSub"></span></div>
             <div class="gbars" id="gaugeBars"></div>
           </div>
         </div>
@@ -2078,14 +2183,24 @@ html.zz-chat #zzBar{display:none!important}
         <div class="days-note" id="daysNote" style="display:none"></div>
       </div>
 
+      <!-- ---------- 桌面专业视图：逐时明细（手机隐藏，避免堆信息） ---------- -->
+      <div class="pro-only">
+        <div class="sec-h"><h2>逐时明细</h2><span class="hint" id="proSub">桌面端专业视图 · 每一小时都可核对</span></div>
+        <div class="cbox">
+          <div class="cbox-h"><b id="proTitle">—</b><span>风速 / 风向 / 温湿 / 降水概率 / 判定</span></div>
+          <div class="pro-sum" id="proSum"></div>
+          <div class="pro-scroll"><table class="pro-table" id="proTable"></table></div>
+        </div>
+      </div>
+
       <!-- ---------- 图表 ---------- -->
       <div class="chart-grid">
       <div class="chart-col">
       <div class="sec-h"><h2>逐小时风速</h2><span class="hint" id="windSub"></span></div>
       <div class="cbox">
-        <div class="cbox-h"><b id="windTitle">风速走势</b><span>m/s</span>
+        <div class="cbox-h"><b id="windTitle">风速走势</b>
           <div class="lg">
-            <i style="color:#3D6B55"><s></s>实测风速</i>
+            <i style="color:#3D6B55"><s></s>预报风速</i>
             <i style="color:#BE4A3C"><s class="dash"></s><span id="windLimitTag">风速上限</span></i>
             <i style="color:#3B8A5A"><s></s>可作业</i>
           </div>
@@ -2230,7 +2345,7 @@ html.zz-chat #zzBar{display:none!important}
           </details>
         </div>
 
-        <div class="sec-h"><h2>关于</h2><span class="hint">v4.5</span></div>
+        <div class="sec-h"><h2>关于</h2><span class="hint">v4.6</span></div>
         <div class="disc">
           <b>知时智农 · 华北平原冬小麦 / 夏玉米农事时机助手</b>
           <p>气象 和风天气 + Open-Meteo · 地图 高德 · 标准 河北省 / 市级公开文件</p>
@@ -2409,6 +2524,12 @@ html.zz-chat #zzBar{display:none!important}
         <div class="basis-rules" id="basisRules"></div>
       </div>
       <div class="basis-sec">
+        <b>本地知识库</b>
+        <div class="kb-stat" id="kbStat"></div>
+        <input class="field kb-input" id="kbSearch" placeholder="搜标准 / 节气 / 县名，例如「石家庄」「霜降」「NY/T」" autocomplete="off">
+        <div class="kb-hits" id="kbHits"></div>
+      </div>
+      <div class="basis-sec">
         <b>数据从哪来</b>
         <div class="basis-src" id="basisSources"></div>
       </div>
@@ -2430,6 +2551,7 @@ html.zz-chat #zzBar{display:none!important}
 <script src="place.js"></script>
 <script src="logic.js"></script>
 <script src="content.js"></script>
+<script src="kb.js"></script>
 <script src="ensemble.js"></script>
 <script src="app.js"></script>
 <!-- 安装 / 离线：放在最后加载，失败也不影响主界面 -->

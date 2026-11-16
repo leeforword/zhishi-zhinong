@@ -18,7 +18,7 @@
 
 /* build-site.mjs 会把 __BUILD__ 替换成构建时间戳；
    开发时（web/ 目录直接打开）保持 dev，不影响使用 */
-const BUILD_ID = '20261116140132';
+const BUILD_ID = '20261116150308';
 const VERSION = /^__BUILD__$/.test(BUILD_ID) ? 'dev' : BUILD_ID;
 
 const CACHE = 'zhishi-zhinong-' + VERSION;
@@ -37,6 +37,7 @@ const SHELL = [
   './place.js',
   './logic.js',
   './content.js',
+  './kb.js',
   './ensemble.js',
   './app.js',
   './pwa.js',

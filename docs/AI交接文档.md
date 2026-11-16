@@ -57,11 +57,11 @@
 | 域名根 | `https://leeforword.github.io/` | HTTP 200，226 B（跳转页 + 微信验证文件） |
 | 最近提交 | `ec0a269 内容设计大改：新建内容层…` | `git log -1` |
 | Actions | `completed / success`，与 `ec0a269` 对应 | GitHub API |
-| 规则引擎测试 | 通过 238 / 失败 0（条数随实时数据波动） | `node web/test-logic.mjs` |
-| 标准库测试 | 通过 156 / 失败 0（离线） | `node web/test-standards.mjs` |
-| 端到端测试 | 通过 72 / 失败 2 | `node web/e2e.mjs`（需先起本地服务器） |
-| 构建 | 复制 25 个文件，产物 28 个 / 2602 KB，自检全过 | `node scripts/build-site.mjs` |
-| 页面版本号 | v4.5（「我的 → 关于」） | `web/index.html` |
+| 规则引擎测试 | 通过 242 / 失败 0（条数随实时数据波动） | `node web/test-logic.mjs` |
+| 标准库 / 本地库测试 | 通过 164 / 失败 0（离线） | `node web/test-standards.mjs` |
+| 端到端测试 | 通过 77 / 失败 2 | `node web/e2e.mjs`（需先起本地服务器） |
+| 构建 | 复制 26 个文件，产物 29 个 / 2606 KB，自检全过 | `node scripts/build-site.mjs` |
+| 页面版本号 | v4.6（「我的 → 关于」） | `web/index.html` |
 | 规则引擎版本 | 3.1（`RULES.meta.version`） | `web/logic.js` |
 | 安卓壳 | versionCode 3 / versionName 1.2，包名 `io.github.leeforword.twa` | `android-webview/AndroidManifest.xml` |
 | 本地 Node | v22.22.2；CI 用 Node 20 | `node -v`、`deploy.yml` |
@@ -82,6 +82,7 @@ D:\zhishi-zhinong\
 │   ├── place.js                 498 行：坐标 → 地名（多源）
 │   ├── ensemble.js              490 行：集合预报 / 多模型分歧
 │   ├── content.js               182 行：界面文案与口径（v4.5 精简到 12 KB；13 节作品说明已移出）
+│   ├── kb.js                    本地知识库索引：13 标准 + 24 节气 + 6 口径 + 167 县 = 210 条（离线）
 │   ├── standards.js             608 行：河北省 / 国家作业标准库，按属地取严（v4.4 新增）
 │   ├── pwa.js                   482 行：安装引导、SW 更新、断网提示
 │   ├── llm.js                   282 行：大模型意图 / 润色 / 数字校验
@@ -194,7 +195,7 @@ node web/e2e.mjs                     # 默认 http://127.0.0.1:8931/，截图输
 node web/e2e.mjs https://leeforword.github.io/zhishi-zhinong/ ../screenshots   # 测线上
 ```
 
-预期：`test-standards` 输出 `通过 156 / 失败 0`；`test-logic` 输出 `通过 238 / 失败 0`（数字随实时数据条数浮动，失败必须为 0）；`e2e` 输出 `pass 72 / fail 2`，2 个失败是已知的高德白名单问题（§11.1）。
+预期：`test-standards` 输出 `通过 164 / 失败 0`；`test-logic` 输出 `通过 242 / 失败 0`（数字随实时数据条数浮动，失败必须为 0）；`e2e` 输出 `pass 77 / fail 2`，2 个失败是已知的高德白名单问题（§11.1）。
 
 ### 5.3 构建
 
@@ -252,6 +253,7 @@ bash android-webview/build.sh
 | `place.js` | `window.TianZhiPlace` = `{resolve, around, searchPoi, cached, precisionText, _pickPlace, _placeKindOf, …}` | 坐标→地名（高德 REST + BigDataCloud + 本地县界），带内存缓存 | `config.js` |
 | `llm.js` | `window.TianZhiLLM` = `{isEnabled, classify, refine, refuse, numbersConsistent, …}` | 意图分类、口语化改写、数字一致性校验、超范围拒答 | `settings.js` |
 | `content.js` | `window.TianZhiContent` = `{meta, scope, rules, terms, chat, termNote, esc}` | 界面文案：边界、6 条口径、24 节气、问答预设。**13 节作品说明已移出到 `docs/作品说明（参赛材料）.md`** | 无 |
+| `kb.js` | `window.TianZhiKB` = `{build, stats, search}` | 本地知识库索引：标准 / 节气 / 口径 / 县级行政区；对话与「依据」弹层共用 | `standards.js`、`content.js`、`hebei-geo.js` |
 | `app.js` | 无全局导出（IIFE） | 状态、渲染、图表、地图、模块弹窗、问答交互、视图切换 | 上面全部 |
 | `pwa.js` | 无全局导出（IIFE） | 安装引导（安卓/iOS/微信分支）、SW 注册与更新、断网提示 | `sw.js` |
 | `sw.js` | Service Worker | 外壳预缓存、导航请求网络优先、静态资源网络优先、**跨域接口完全不碰** | — |
@@ -498,6 +500,15 @@ git push origin main
 ---
 
 ## 11. 已知问题与坑
+
+### 11.0 v4.6 修掉的几个严重问题（别再改回去）
+
+- **降雨概率漏判**：原实现只看当日/前日雨量，70% 概率仍会给"可作业窗口"。现在逐小时概率 ≥50%、单小时降水 >0.1 mm 都不排窗口，`test-logic.mjs` 有回归用例。
+- **夜间风速图像坏掉**：晚上 10 点打开时今天只剩 1 小时数据，图被压成一条竖线；现在 X 轴固定 0–24，且当天剩余作业时段不足 2 小时时自动切到明天。
+- **硬编码 6–17 时**：`logic.js` 的提示文案里写死过时段，已全部改成读 `RULES.spray.hours`。
+- **能见度假 0 / 日出日落空**：和风 168h 不返回 `vis`，旧代码 `num(undefined)=0` 会显示"能见度 0 km"；现改为缺字段返回 `null` 显示「—」，日出日落兼容 `07:01` 与 ISO 两种格式。
+- **具体节气问错**：问「霜降」却回答当前「立冬」，现在先匹配问句里的节气名。
+- **顶部白边与方块按钮**：`theme-color` 改为随天气主题变化，顶栏用安全区 padding + 透明图标按钮。
 
 ### 11.1 高德在本地不可用（e2e 2 项失败的直接原因）
 

@@ -228,7 +228,9 @@
       '2. 时间一律保持 24 小时制原样写法（如 10:00–14:00），不要改成"下午两点"。\n' +
       '3. 不要添加任何原文没有的结论或建议。\n' +
       '4. 不超过 120 字，不用 markdown，不用列表符号。\n' +
-      '5. 语气朴实，别说"作为AI"之类的话。';
+      '5. 语气朴实克制：开头直接给结论，不要称呼语、问候语、感叹句（禁用"乡亲们""注意啦""赶紧""大家好"），不用感叹号。\n' +
+      '6. 保持"结论 → 关键数字 → 依据"的顺序，不要写成散文。\n' +
+      '7. 别说"作为AI"之类的话。';
 
     var user = '地点：' + (opts.place || '本地块') +
       '\n作物：' + (opts.crop || '冬小麦') +
@@ -239,6 +241,13 @@
       { role: 'user', content: user }
     ], { temperature: 0.4, maxTokens: 260 }).then(function (out) {
       var check = numbersConsistent(template, out);
+      // 口语化不等于油滑：称呼语、感叹句、营销腔一律拒绝，回退结构化原文
+      if (/乡亲|注意啦|朋友们|大家好|赶紧|抓紧|！|!/.test(out)) {
+        stats.rejected++;
+        var e2 = new Error('语气不合格，已拒绝');
+        e2.raw = out;
+        throw e2;
+      }
       if (!check.ok) {
         stats.rejected++;
         var err = new Error('数字不一致，已拒绝');

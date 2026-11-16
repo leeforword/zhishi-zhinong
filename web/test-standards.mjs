@@ -105,8 +105,28 @@ check(!/undefined/.test(html), 'HTML 无 undefined');
 check(/std-badge/.test(S.limitsHtml('石家庄市')), '限值行带出处徽标');
 check(/target="_blank"/.test(S.sourcesHtml('石家庄市')), '文件列表可跳原文');
 
-/* ---------- 5. 与规则引擎联动 ---------- */
-console.log('\n===== 5. 规则引擎联动 =====');
+/* ---------- 5. 本地知识库 ---------- */
+console.log('\n===== 5. 本地知识库 =====');
+globalThis.window = globalThis;
+require('./hebei-geo.js');
+require('./content.js');
+require('./kb.js');
+const KB = globalThis.TianZhiKB;
+const kbStats = KB.stats();
+check(kbStats.total >= 200, '本地索引条数：' + kbStats.total + '（' + JSON.stringify(kbStats.by) + '）');
+check((kbStats.by['标准'] || 0) === S.LIST.length, '标准条目与标准库一致');
+check((kbStats.by['行政区'] || 0) > 100, '县级行政区已入索引');
+const hitTerm = KB.search('霜降', 3);
+check(hitTerm.length >= 1 && hitTerm[0].type === '节气', '搜「霜降」命中节气');
+const hitCity = KB.search('石家庄', 5);
+check(hitCity.some((x) => x.type === '标准') && hitCity.some((x) => x.type === '行政区'), '搜「石家庄」同时命中标准与行政区');
+const hitStd = KB.search('NY/T', 3);
+check(hitStd.length >= 1 && hitStd[0].type === '标准', '搜标准号命中标准');
+check(KB.search('霜降', 3).every((x) => !/undefined|NaN/.test(x.text)), '知识库正文无 undefined');
+check(KB.search('', 3).length === 0, '空查询不返回噪声');
+
+/* ---------- 6. 与规则引擎联动 ---------- */
+console.log('\n===== 6. 规则引擎联动 =====');
 const T = require('./logic.js');
 T.setRuleSource('测试');
 check(T.RULES.meta.source === '测试', 'setRuleSource 可写入出处');

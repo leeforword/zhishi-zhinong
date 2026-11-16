@@ -50,6 +50,8 @@
       temp_max: 30,            // 最高气温 ℃（NY/T 1276-2025）
       rain_day_max: 0.5,       // 当天降水超过此值 → 不宜
       rain_prev_max: 1,        // 前一天降水超过此值 → 不宜
+      prob_block: 50,          // 当天降雨概率达到此值 → 不排窗口（原实现漏了这条）
+      rain_hour_max: 0.1,      // 单个小时降水超过此值 → 该小时不可作业
       min_window_hours: 2      // 最小连续可作业时长
     },
     irrigation: {
@@ -277,6 +279,8 @@
   function hourOk(h, r) {
     if (h.temp < r.temp_min || h.temp > r.temp_max) return false;
     if (h.wind > r.wind_max) return false;
+    if (h.rain > r.rain_hour_max) return false;
+    if (h.prob !== null && h.prob !== undefined && h.prob >= r.prob_block) return false;
     return true;
   }
 
@@ -289,8 +293,10 @@
     var windows = [], cur = null;
     work.forEach(function (h) {
       if (hourOk(h, r)) {
-        if (!cur) cur = { start: h.hour, end: h.hour, winds: [h.wind], temps: [h.temp] };
+        if (!cur) cur = { start: h.hour, end: h.hour, winds: [h.wind], temps: [h.temp], probs: [], hums: [] };
         else { cur.end = h.hour; cur.winds.push(h.wind); cur.temps.push(h.temp); }
+        if (h.prob !== null && h.prob !== undefined) cur.probs.push(h.prob);
+        if (h.hum !== null && h.hum !== undefined) cur.hums.push(h.hum);
       } else if (cur) { windows.push(cur); cur = null; }
     });
     if (cur) windows.push(cur);
@@ -306,7 +312,9 @@
           hours: (w.end - w.start) + 1,
           avgWind: round1(sumW / w.winds.length),
           maxWind: round1(Math.max.apply(null, w.winds)),
-          avgTemp: round1(sumT / w.temps.length)
+          avgTemp: round1(sumT / w.temps.length),
+          avgProb: w.probs.length ? Math.round(w.probs.reduce(function (a, b) { return a + b; }, 0) / w.probs.length) : null,
+          avgHum: w.hums.length ? Math.round(w.hums.reduce(function (a, b) { return a + b; }, 0) / w.hums.length) : null
         };
       });
   }
@@ -341,14 +349,19 @@
 
       /* ---- 打药 ---- */
       var prevRain = prev ? round1(prev.reduce(function (a, h) { return a + (h.rain || 0); }, 0)) : 0;
-      var blocked = dayRain > r.rain_day_max || prevRain >= r.rain_prev_max;
+      var rainBlocked = dayRain > r.rain_day_max || prevRain >= r.rain_prev_max;
+      var probBlocked = dayProb >= r.prob_block;
+      var blocked = rainBlocked || probBlocked;
 
       var windows = blocked ? [] : findSprayWindows(hours, r);
       var sprayStatus, sprayWhy;
 
-      if (blocked) {
+      if (rainBlocked) {
         sprayStatus = 'bad';
         sprayWhy = '当天或前一天有降雨，药液容易被冲刷，不建议作业';
+      } else if (probBlocked) {
+        sprayStatus = 'bad';
+        sprayWhy = '降雨概率 ' + dayProb + '%，超过 ' + r.prob_block + '% 的作业上限，不排窗口';
       } else if (windows.length === 0 && hours.length === 0) {
         // 今天已经过完 / 逐时从明天开始：按逐日判一下雨，其余情况说清原因
         sprayStatus = 'bad';
@@ -373,11 +386,11 @@
         if (cnt.hot > 0) parts.push(cnt.hot + ' 小时气温高于 ' + r.temp_max + '℃');
 
         if (okCnt === 0) {
-          sprayWhy = '作业时段（6–17 时）' + parts.join('、') + '，没有可作业时间';
+          sprayWhy = '作业时段（' + r.hours[0] + '–' + r.hours[1] + ' 时）' + parts.join('、') + '，没有可作业时间';
         } else if (okCnt === workLen) {
           sprayWhy = '可作业小时不连续，凑不成 ' + r.min_window_hours + ' 小时以上的连续窗口';
         } else {
-          sprayWhy = '作业时段（6–17 时，共 ' + workLen + ' 小时）内' + parts.join('、') +
+          sprayWhy = '作业时段（' + r.hours[0] + '–' + r.hours[1] + ' 时，共 ' + workLen + ' 小时）内' + parts.join('、') +
                      '，只有 ' + okCnt + ' 小时达标且不连续，凑不成连续窗口';
         }
       } else {
@@ -442,6 +455,8 @@
       return {
         date: date,
         dow: DOW[new Date(date + 'T00:00:00').getDay()],
+        blockedBy: rainBlocked ? 'rain' : (probBlocked ? 'prob'
+          : (hours.some(function (h) { return h.rain > r.rain_hour_max; }) ? 'rain' : '')),
         code: code,
         weather: code === null ? '' : weatherText(code),
         tmax: tmax, tmin: tmin,
@@ -532,7 +547,8 @@
         '连续 ' + bw.hours + ' 小时，平均风速只有 ' + bw.avgWind + ' m/s。\n\n' +
         '判断依据：在 ' + pad2(RULES.spray.hours[0]) + ':00–' + pad2(RULES.spray.hours[1]) +
         ':00 作业时段内，逐小时风速不超过 ' + RULES.spray.wind_max +
-        ' m/s、气温在 ' + RULES.spray.temp_min + '–' + RULES.spray.temp_max + '℃ 之间，且前后没有降雨。';
+        ' m/s、气温在 ' + RULES.spray.temp_min + '–' + RULES.spray.temp_max +
+        '℃ 之间，降雨概率低于 ' + RULES.spray.prob_block + '%，且前后没有降雨。';
     }
 
     /* ---- 灌溉 ---- */
@@ -605,7 +621,14 @@
           hour: parseInt(hourly.time[i].slice(11, 13), 10),
           wind: hourly.wind_speed_10m[i],
           temp: hourly.temperature_2m[i],
-          rain: hourly.precipitation[i]
+          rain: hourly.precipitation[i],
+          prob: hourly.precipitation_probability ? hourly.precipitation_probability[i] : null,
+          dir: hourly.wind_direction_10m ? hourly.wind_direction_10m[i] : null,
+          hum: hourly.relative_humidity_2m ? hourly.relative_humidity_2m[i] : null,
+          dew: hourly.dew_point_2m ? hourly.dew_point_2m[i] : null,
+          press: hourly.surface_pressure ? hourly.surface_pressure[i] : null,
+          cloud: hourly.cloud_cover ? hourly.cloud_cover[i] : null,
+          vis: hourly.visibility ? hourly.visibility[i] : null
         });
       }
     }
@@ -618,6 +641,8 @@
     if (h.temp < r.temp_min) return 'cold';
     if (h.temp > r.temp_max) return 'hot';
     if (h.wind > r.wind_max) return 'wind';
+    if (h.rain !== null && h.rain !== undefined && h.rain > r.rain_hour_max) return 'rain';
+    if (h.prob !== null && h.prob !== undefined && h.prob >= r.prob_block) return 'rain';
     return 'ok';
   }
 

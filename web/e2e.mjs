@@ -192,9 +192,10 @@ async function waitData(timeoutMs) {
     const heatRects = await ev("document.querySelectorAll('#heatChart rect').length");
     check(heatRects >= 168, 'heatmap 7x24 cells: ' + heatRects);
     check(await ev("!!document.querySelector('#tempChart svg')"), 'temp chart svg');
-    // v2 首页把环形图换成了适配度环，断言跟着换
-    const gaugeArc = await ev("(() => { const a = document.getElementById('gaugeArc'); return a ? Number(a.getAttribute('stroke-dashoffset')) : -1; })()");
-    check(gaugeArc >= 0 && gaugeArc <= 346, 'gauge arc drawn: ' + gaugeArc);
+    // v4.6 起改成口语结论 + 三项可核对指标，不再有评分环
+    const gaugeWord = await ev("document.getElementById('gaugeWord').textContent");
+    check(gaugeWord.length >= 4, 'window verdict: ' + gaugeWord);
+    check(await ev("document.querySelectorAll('#gaugeBars .grow').length") === 3, 'three checkable metrics');
     check(await ev("!!document.querySelector('#growthChart svg')"), 'growth chart svg');
 
     await shotFit('02-charts.png');
@@ -454,6 +455,10 @@ async function waitData(timeoutMs) {
     check(await ev("document.getElementById('basisMask').classList.contains('on')"), 'basis sheet opens');
     check(await ev("document.querySelectorAll('#basisRules .basis-rule').length") === 4, 'basis sheet: four core rules');
     check(await ev("document.querySelectorAll('#basisSources > div').length") === 4, 'basis sheet: four source groups');
+    check(await ev("/\\d+ 条/.test(document.getElementById('kbStat').textContent)"), 'local KB count shown');
+    await ev("(function(){var i=document.getElementById('kbSearch');i.value='霜降';i.dispatchEvent(new Event('input',{bubbles:true}));})()");
+    await sleep(200);
+    check(await ev("document.querySelectorAll('#kbHits .kb-hit').length") >= 1, 'local KB search returns hits');
     await ev("document.getElementById('basisClose').click();");
     await sleep(150);
 
@@ -468,6 +473,10 @@ async function waitData(timeoutMs) {
       if (await ev("!!document.querySelector('#qaLog .msg.bot .an-line')")) { noteReady = true; break; }
     }
     check(noteReady, 'answer has basis / boundary note');
+    check(await ev("document.querySelectorAll('#qaLog .msg.bot .sug-row .sug').length") >= 2, 'follow-up suggestions shown');
+    await ev("document.getElementById('qaInput').value='明天和后天哪天更好？';document.getElementById('qaSend').click();");
+    await sleep(450);
+    check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return /优先选|两天都不合适/.test(x.textContent)})"), 'day comparison answered');
     await ev("document.getElementById('qaInput').value='为什么这么判断？';document.getElementById('qaSend').click();");
     await sleep(350);
     check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return x.textContent.indexOf('我把')>=0})"), 'method question answered');
