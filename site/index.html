@@ -1160,10 +1160,11 @@ html.zz-chat #zzBar{display:none!important}
 .vb.good{color:#215C39}.vb.warn{color:#87600E}.vb.bad{color:#8C3025}
 .vb-sub{font-size:10px;color:var(--text-3);line-height:1.5}
 .gauge-info{flex:1;min-width:0}
-.gauge-h{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-.gauge-h b{font-size:14px;font-weight:600;color:var(--text)}
-.gauge-h span{font-size:11.5px;color:var(--text-3);margin-left:auto}
-.gbars{display:grid;gap:8px}
+.gauge-h{display:flex;align-items:baseline;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.gauge-h .gh-l{font-size:10.5px;color:var(--text-3);letter-spacing:.03em}
+/* 只让日期靠右，别把左边的小标题也一起推走（曾经的 margin-left:auto 写在 span 上） */
+.gauge-h #windowSub{margin-left:auto;font-size:11px;color:var(--text-3)}
+.gbars{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
 .gbar{display:grid;grid-template-columns:72px minmax(0,1fr) 62px;gap:9px;align-items:center;font-size:11.5px}
 .gbar .bl{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gbar .bv{text-align:right;font-weight:600;font-size:11.5px;color:var(--text);font-variant-numeric:tabular-nums}
@@ -1213,15 +1214,18 @@ html.zz-chat #zzBar{display:none!important}
 .btn:hover{background:#2F5643}
 
 /* ---- 图表两列 ---- */
-.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px 30px;align-items:start}
-.chart-col{min-width:0}
-.chart-col.wide{grid-column:1/-1}
- .chart-grid .sec-h{margin-top:8px}
-/* 两列并排时说明文字会一路排到对面标题上，限宽 + 最多两行 */
-.chart-grid .sec-h .hint{
-  max-width:72%;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+.chart-card{display:flex;flex-direction:column;min-width:0;padding:13px 14px 11px}
+.chart-card.wide{grid-column:1/-1}
+.chart-card .cbox-h{min-height:20px;margin-bottom:6px;row-gap:2px}
+/* 注脚固定一行，卡片底边才不会因为文案长短参差 */
+.chart-card .chart-note{
+  margin-top:8px;font-size:10.5px;color:var(--text-3);line-height:1.5;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+.chart-scroll{display:flex;align-items:flex-start}
+.chart-scroll > div{width:100%;min-width:0}
+.chart-scroll svg.chart{width:100%;height:auto;display:block}
 
 /* ---- 节气条 ---- */
 .jq-strip{margin:10px 0 0;padding:12px 16px 6px;background:var(--surface-solid);
@@ -1246,6 +1250,7 @@ html.zz-chat #zzBar{display:none!important}
 
 @media (max-width:900px){
   .chart-grid{grid-template-columns:1fr;gap:10px}
+  .chart-card .chart-note{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 }
 /* ---- 七日 / 对话：贴合原型 ---- */
 .days{gap:6px}
@@ -1946,8 +1951,21 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 .pro-table tr:last-child td{border-bottom:0}
 .pro-table tr.bad td{background:#FDF7F5;color:#8C4A3F}
 .pro-table tr.bad td:first-child{color:#8C4A3F;font-weight:600}
+.pro-table td:nth-child(3),.pro-table td:last-child{white-space:nowrap}
+/* 手机上列太多会横向溢出：省掉湿度 / 降水 / 概率（露点差已覆盖湿度的作用） */
+@media (max-width:760px){
+  .pro-table{font-size:10px}
+  .pro-table th,.pro-table td{padding:6px 4px}
+  .pro-table .ok-dot{margin-right:3px}
+  .pro-table th:nth-child(5),.pro-table td:nth-child(5),
+  .pro-table th:nth-child(7),.pro-table td:nth-child(7),
+  .pro-table th:nth-child(8),.pro-table td:nth-child(8){display:none}
+}
 .pro-table .ok-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--brand);margin-right:4px}
 .pro-table .bad-dot{background:var(--danger)}
+.pro-table .off-dot{background:#CBD2C8}
+.pro-table tr.off td{color:#A8AFA4}
+.pro-table tr.off td:first-child{font-weight:400}
 
 /* ---------- 本地知识库 ---------- */
 .kb-stat{font-size:10.5px;color:var(--text-3);line-height:1.5;margin-bottom:8px}
@@ -1966,25 +1984,50 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
   font:inherit;font-size:10.5px;padding:4px 9px;border-radius:999px;cursor:pointer}
 .sug:active{background:var(--brand-weak);border-color:var(--brand);color:var(--brand-d)}
 
-.grow{display:grid;grid-template-columns:64px 1fr 56px;gap:8px;align-items:baseline;font-size:11.5px}
-.grow span{color:var(--text-3)}
-.grow b{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;text-align:right}
-.grow i{font-style:normal;font-size:10px;text-align:right}
+.grow{display:flex;flex-direction:column;gap:4px;padding:0 16px;border-left:1px solid var(--border);min-width:0}
+.grow:first-child{padding-left:0;border-left:0}
+.grow:last-child{padding-right:0}
+.grow span{font-size:10px;color:var(--text-3)}
+.grow b{font-size:14px;font-weight:600;color:var(--text);line-height:1.2;font-variant-numeric:tabular-nums}
+.grow i{font-style:normal;font-size:10px;line-height:1.3}
 .grow i.ok{color:#215C39}
 .grow i.warn{color:#87600E}
-
-/* ---------- 桌面实况条 ---------- */
-.now-strip{display:none}
-@media (min-width:900px){
-  .now-strip{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));
-    background:rgba(255,255,255,.72);border:1px solid var(--border);border-radius:14px;
-    padding:8px 2px;backdrop-filter:blur(8px)}
+@media (max-width:760px){
+  .gbars{grid-template-columns:1fr;gap:9px}
+  .grow{flex-direction:row;align-items:baseline;gap:8px;padding:0;border-left:0}
+  .grow b{margin-left:auto;font-size:12.5px}
+  .grow i{width:52px;text-align:right}
 }
-.ns{padding:2px 12px;border-left:1px solid var(--border);min-width:0}
+
+/* ---------- 详细数据面板（实况 + 逐时） ---------- */
+.adv{margin:2px 0 0;border:1px solid var(--border);border-radius:16px;
+  background:var(--surface-solid);box-shadow:var(--shadow)}
+.adv > summary{display:flex;align-items:center;gap:9px;padding:12px 15px;cursor:pointer;
+  list-style:none;user-select:none}
+.adv > summary::-webkit-details-marker{display:none}
+.adv > summary b{font-size:13px;font-weight:600;color:var(--text)}
+.adv > summary span{font-size:10.5px;color:var(--text-3);flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adv > summary i{font-style:normal;color:var(--text-3);font-size:15px;transition:transform .2s}
+.adv[open] > summary i{transform:rotate(90deg)}
+.adv[open] > summary{border-bottom:1px solid var(--border)}
+.adv-body{padding:10px 12px 12px}
+.now-strip{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));
+  gap:0;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);padding:9px 2px}
+.ns{padding:1px 9px;border-left:1px solid var(--border);min-width:0}
 .ns:first-child{border-left:0}
-.ns span{display:block;font-size:9.5px;color:var(--text-3);letter-spacing:.04em}
-.ns b{display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-top:3px;
+.ns span{display:block;font-size:9.5px;color:var(--text-3);letter-spacing:.03em;white-space:nowrap}
+.ns b{display:block;font-size:12px;font-weight:600;color:var(--text);margin-top:3px;
   font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ns b i{font-style:normal;font-size:9.5px;color:var(--text-3);font-weight:400;margin-left:2px}
+.ns.dew b{color:#8C3025}
+.adv-table{margin-top:10px;padding:12px 13px 11px}
+@media (max-width:900px){
+  .now-strip{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 0;padding:11px 2px}
+  .ns:nth-child(3n+1){border-left:0}
+  .ns{padding:0 8px}
+  .adv-body{padding:9px 10px 10px}
+}
 </style>
 </head>
 <body>
@@ -2097,7 +2140,6 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
       <div class="alerts" id="alerts"></div>
 
       <!-- 桌面端实况条：一屏看到温湿风压能见度，手机隐藏 -->
-      <div class="now-strip pro-only" id="nowStrip"></div>
 
       <!-- ---------- 天象头：结论 + 四宫格 + 适配度 ---------- -->
       <section class="sky" id="sky">
@@ -2118,7 +2160,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
             <span class="vb-sub" id="gaugeSub">风速 / 降雨概率 / 时长</span>
           </div>
           <div class="gauge-info">
-            <div class="gauge-h"><b>这个窗口稳不稳</b><span id="windowSub"></span></div>
+            <div class="gauge-h"><span class="gh-l">三项达标情况</span><span id="windowSub"></span></div>
             <div class="gbars" id="gaugeBars"></div>
           </div>
         </div>
@@ -2183,74 +2225,81 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
         <div class="days-note" id="daysNote" style="display:none"></div>
       </div>
 
-      <!-- ---------- 桌面专业视图：逐时明细（手机隐藏，避免堆信息） ---------- -->
-      <div class="pro-only">
-        <div class="sec-h"><h2>逐时明细</h2><span class="hint" id="proSub">桌面端专业视图 · 每一小时都可核对</span></div>
-        <div class="cbox">
-          <div class="cbox-h"><b id="proTitle">—</b><span>风速 / 风向 / 温湿 / 降水概率 / 判定</span></div>
-          <div class="pro-sum" id="proSum"></div>
-          <div class="pro-scroll"><table class="pro-table" id="proTable"></table></div>
+      <!-- ---------- 详细数据：实况 + 逐时，桌面默认展开，手机默认收起 ---------- -->
+      <details class="adv" id="advPanel">
+        <summary>
+          <b>详细数据</b>
+          <span>实况 11 项 · 24 小时逐时判定</span>
+          <i>›</i>
+        </summary>
+        <div class="adv-body">
+          <div class="now-strip" id="nowStrip"></div>
+          <div class="cbox adv-table">
+            <div class="cbox-h">
+              <b id="proTitle">—</b>
+              <span>风向角度与露点差也参与判定：贴露点即结露，日落后逆温收工</span>
+            </div>
+            <div class="pro-sum" id="proSum"></div>
+            <div class="pro-scroll"><table class="pro-table" id="proTable"></table></div>
+          </div>
         </div>
-      </div>
+      </details>
 
-      <!-- ---------- 图表 ---------- -->
+      <!-- ---------- 图表：四张卡同一骨架（标题+图例 / 图 / 一行注），高度自动对齐 ---------- -->
+      <div class="sec-h"><h2>图表</h2><span class="hint">点上方任一天，三张图跟着切换</span></div>
       <div class="chart-grid">
-      <div class="chart-col">
-      <div class="sec-h"><h2>逐小时风速</h2><span class="hint" id="windSub"></span></div>
-      <div class="cbox">
-        <div class="cbox-h"><b id="windTitle">风速走势</b>
-          <div class="lg">
-            <i style="color:#3D6B55"><s></s>预报风速</i>
-            <i style="color:#BE4A3C"><s class="dash"></s><span id="windLimitTag">风速上限</span></i>
-            <i style="color:#3B8A5A"><s></s>可作业</i>
+        <div class="cbox chart-card">
+          <div class="cbox-h">
+            <b id="windTitle">逐小时风速</b>
+            <div class="lg">
+              <i style="color:#3D6B55"><s></s>预报</i>
+              <i style="color:#BE4A3C"><s class="dash"></s><span id="windLimitTag">上限</span></i>
+              <i style="color:#3B8A5A"><s></s>可作业</i>
+            </div>
           </div>
+          <div class="chart-scroll"><div id="windChart"><div class="skel" style="height:150px"></div></div></div>
+          <div class="chart-note" id="windSub"></div>
         </div>
-        <div class="chart-scroll"><div id="windChart"><div class="skel" style="height:150px"></div></div></div>
-      </div>
 
-      </div>
-      <div class="chart-col">
-      <div class="sec-h"><h2>温度与降水</h2><span class="hint">折线为逐日最高 / 最低温，柱为逐日雨量</span></div>
-      <div class="cbox">
-        <div class="cbox-h"><b>逐日气温区间与雨量</b><span>℃ / mm</span>
-          <div class="lg">
-            <i style="color:#8C3025"><s></s>最高温</i>
-            <i style="color:#255677"><s></s>最低温</i>
-            <i style="color:#7BA3C4"><s></s>雨量</i>
+        <div class="cbox chart-card">
+          <div class="cbox-h">
+            <b>温度与降水</b>
+            <div class="lg">
+              <i style="color:#8C3025"><s></s>最高</i>
+              <i style="color:#255677"><s></s>最低</i>
+              <i style="color:#7BA3C4"><s></s>雨量</i>
+            </div>
           </div>
+          <div class="chart-scroll"><div id="tempChart"><div class="skel" style="height:150px"></div></div></div>
+          <div class="chart-note">折线为逐日最高 / 最低温，柱为逐日雨量</div>
         </div>
-        <div class="chart-scroll"><div id="tempChart"><div class="skel" style="height:150px"></div></div></div>
-      </div>
 
-      </div>
-      <div class="chart-col wide">
-      <div class="sec-h"><h2>作业窗口分布</h2><span class="hint">7 天 × 24 小时 · 点格子看该时辰为什么不行</span></div>
-      <div class="cbox">
-        <div class="cbox-h"><b>逐时作业条件热力图</b><span>每格 1 小时 · 按当前阈值判定</span>
-          <div class="lg">
-            <i style="color:#215C39"><s></s>可作业</i>
-            <i style="color:#87600E"><s></s>风大</i>
-            <i style="color:#255677"><s></s>低温/高温</i>
-            <i style="color:#8C3025"><s></s>雨阻</i>
+        <div class="cbox chart-card wide">
+          <div class="cbox-h">
+            <b>作业窗口热力图</b><span>7 天 × 24 小时 · 按当前阈值逐时判定</span>
+            <div class="lg">
+              <i style="color:#1F7A4C"><s></s>可作业</i>
+              <i style="color:#B07018"><s></s>风大</i>
+              <i style="color:#255677"><s></s>气温不宜</i>
+              <i style="color:#8C3025"><s></s>雨阻</i>
+              <i style="color:#6B7280"><s></s>露水</i>
+            </div>
           </div>
+          <div class="chart-scroll"><div id="heatChart"><div class="skel" style="height:150px"></div></div></div>
+          <div class="chart-note" id="heatNote">右侧红线为当日日落提前收工的时刻 · 点格子看该小时为什么不行</div>
         </div>
-        <div class="chart-scroll"><div id="heatChart"><div class="skel" style="height:150px"></div></div></div>
-      </div>
 
-      </div>
-      <div class="chart-col wide">
-      <div class="sec-h"><h2>长势判读 · 方法占位</h2><span class="hint">未接入遥感，本版本不输出任何苗情结论</span></div>
-      <div class="cbox">
-        <div class="cbox-h"><b>NDVI 计算思路示意</b><span>非实测 · 0—1</span>
-          <div class="lg">
-            <i style="color:#3D6B55"><s></s>形态示意</i>
-            <i style="color:#8D958A"><s class="dash"></s>对照形态</i>
+        <div class="cbox chart-card wide">
+          <div class="cbox-h">
+            <b>长势判读 · 方法占位</b><span>未接入遥感，本版本不输出任何苗情结论</span>
+            <div class="lg">
+              <i style="color:#3D6B55"><s></s>形态示意</i>
+              <i style="color:#8D958A"><s class="dash"></s>对照形态</i>
+            </div>
           </div>
+          <div class="chart-scroll"><div id="growthChart"><div class="skel" style="height:150px"></div></div></div>
+          <div class="chart-note">曲线仅示意 NDVI 计算思路，不代表任何地块的真实苗情</div>
         </div>
-        <div class="chart-scroll"><div id="growthChart"><div class="skel" style="height:150px"></div></div></div>
-        <div class="chart-note" style="margin-top:10px">未接入遥感，曲线仅示意方法，不代表实际苗情。</div>
-      </div>
-      </div>
       </div>
 
       <!-- ---------- 依据入口：口径与来源收进弹层，首页只留一个按钮 ---------- -->
@@ -2345,7 +2394,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           </details>
         </div>
 
-        <div class="sec-h"><h2>关于</h2><span class="hint">v4.6</span></div>
+        <div class="sec-h"><h2>关于</h2><span class="hint">v4.7</span></div>
         <div class="disc">
           <b>知时智农 · 华北平原冬小麦 / 夏玉米农事时机助手</b>
           <p>气象 和风天气 + Open-Meteo · 地图 高德 · 标准 河北省 / 市级公开文件</p>

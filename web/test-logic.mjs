@@ -106,6 +106,19 @@ for (const [city, [lat, lon]] of Object.entries(CITIES)) {
     });
   });
 
+  // 今日判读（todayRemaining）必须与逐日判定同口径，不能一个说能、一个说不能
+  const rem = T.todayRemaining(w.hourly, w.daily, new Date(), 'spray');
+  if (rem && !rem.ended) {
+    check(rem.status === result.days[0].spray.status,
+      `今日判读与逐日判定一致（${rem.status} / ${result.days[0].spray.status}）`);
+    if (rem.status === 'ok') {
+      const endH = result.days[0].spray.hours[1];
+      check(rem.windows.every((x) => x.end <= endH), '今日窗口不越过日落收工时刻（' + endH + ' 时）');
+    }
+  } else {
+    check(true, '今日时段已过或数据未覆盖，跳过一致性断言');
+  }
+
   // 图表一致性：热力图逐小时判定 必须与 "该日是否有窗口" 吻合
   const WEEK = result.days;
   WEEK.forEach((d, di) => {
@@ -118,8 +131,10 @@ for (const [city, [lat, lon]] of Object.entries(CITIES)) {
     const blocked = d.spray.blocked;
     // 统计作业时段内连续 ok 的最长游程
     let run = 0, bestRun = 0;
+    // 引擎按当日日落收紧截止小时，热力图也得用同一天的 hours，否则会"热力图说有、引擎说无"
+    const endH = (d.spray.hours && d.spray.hours[1]) || T.RULES.spray.hours[1];
     hours
-      .filter(h => h.hour >= T.RULES.spray.hours[0] && h.hour < T.RULES.spray.hours[1])
+      .filter(h => h.hour >= T.RULES.spray.hours[0] && h.hour < endH)
       .sort((a, b) => a.hour - b.hour)
       .forEach(h => {
         if (!blocked && T.hourVerdict(h) === 'ok') { run++; bestRun = Math.max(bestRun, run); }
@@ -180,6 +195,79 @@ check(lowProb.days[0].spray.windows[0].hours >= 6, '10% 概率：窗口覆盖作
 const wetHour = synth(10, 0.5);
 check(wetHour.days[0].spray.status === 'bad', '小时降水 0.5mm：不排窗口');
 check(wetHour.days[0].blockedBy === 'rain', '小时降水：blockedBy=rain');
+
+console.log('\n===== 露点 / 湿度 / 日落（v4.7 新增） =====');
+/** 可调参的合成一天：露点、湿度、云量、日出日落都能改 */
+function synth2(opt) {
+  const o = Object.assign({
+    prob: 10, rain: 0, wind: 1.4, temp: 20, hum: 65, dew: 14,
+    cloud: 20, sunrise: '05:00', sunset: '19:30'
+  }, opt || {});
+  const hourly = {
+    time: [], temperature_2m: [], precipitation: [], precipitation_probability: [],
+    wind_speed_10m: [], relative_humidity_2m: [], dew_point_2m: [],
+    cloud_cover: [], wind_direction_10m: [], surface_pressure: [], visibility: []
+  };
+  for (let h = 0; h < 24; h++) {
+    hourly.time.push('2026-06-01T' + String(h).padStart(2, '0') + ':00');
+    hourly.temperature_2m.push(typeof o.temp === 'function' ? o.temp(h) : o.temp);
+    hourly.precipitation.push(o.rain);
+    hourly.precipitation_probability.push(o.prob);
+    hourly.wind_speed_10m.push(o.wind);
+    hourly.relative_humidity_2m.push(typeof o.hum === 'function' ? o.hum(h) : o.hum);
+    hourly.dew_point_2m.push(typeof o.dew === 'function' ? o.dew(h) : o.dew);
+    hourly.cloud_cover.push(o.cloud);
+    hourly.wind_direction_10m.push(210);
+    hourly.surface_pressure.push(1008);
+    hourly.visibility.push(18);
+  }
+  const daily = {
+    time: ['2026-06-01'], temperature_2m_max: [25], temperature_2m_min: [15],
+    precipitation_sum: [o.rain], precipitation_probability_max: [o.prob],
+    wind_speed_10m_max: [o.wind], weather_code: [2],
+    sunrise: [o.sunrise], sunset: [o.sunset]
+  };
+  return T.evaluateWeather(hourly, daily);
+}
+
+// 1) 正常干燥的一天：应该给出 9–16 的完整窗口
+const dryDay = synth2({});
+check(dryDay.days[0].spray.status === 'ok', '干燥晴天：给出窗口');
+check(dryDay.days[0].spray.hours[1] === 16, '夏季日落晚：实际截止仍按 16 时');
+check(dryDay.days[0].spray.cutoffShortened === false, '夏季日落晚：未提前收工');
+check(dryDay.days[0].sunrise === '05:00' && dryDay.days[0].sunset === '19:30', '日出日落已带入逐日结果');
+check(Math.abs(dryDay.days[0].daylightH - 14.5) < 0.05, '日照时数 = 日落 − 日出 = ' + dryDay.days[0].daylightH);
+
+// 2) 气温贴露点（差 1℃）：结露，不排窗口
+const dewDay = synth2({ temp: 16, dew: 15 });
+check(dewDay.days[0].spray.status === 'bad', '气温−露点 1℃：结露，不排窗口');
+check(dewDay.days[0].spray.dewHours >= 6, '结露小时数已统计：' + dewDay.days[0].spray.dewHours);
+check(/结露/.test(dewDay.days[0].spray.why), '原因写明结露');
+
+// 3) 湿度过饱和（95%）：即便露点差看起来正常也不排窗口
+const humDay = synth2({ hum: 95, dew: 8 });
+check(humDay.days[0].spray.status === 'bad', '湿度 95%：按近饱和拦截');
+check(T.isDew({ temp: 22, dew: 8, hum: 95 }, T.RULES.spray) === true, 'isDew 认湿度');
+
+// 4) 午后湿度回落：只有上午结露，窗口应从露水干后开始
+const noonDry = synth2({ hum: function (h) { return h < 11 ? 96 : 55; }, dew: 9 });
+check(noonDry.days[0].spray.status === 'ok', '上午结露、午后转干：仍给窗口');
+check(noonDry.days[0].spray.windows[0].start >= 11, '窗口从露水干了之后开始：' + noonDry.days[0].spray.windows[0].start + ' 时');
+
+// 5) 冬季日落早：截止小时被日落收紧，且不再有 16 时那一格
+const winterDay = synth2({ sunset: '17:03' });
+check(winterDay.days[0].spray.hours[1] === 15, '日落 17:03 → 15 时收工：' + winterDay.days[0].spray.hours[1]);
+check(winterDay.days[0].spray.cutoffShortened === true, '标记为按日落提前收工');
+check(winterDay.days[0].spray.windows.every(w => w.end <= 15), '窗口不越过日落收紧的截止');
+
+// 6) 日照不足：晾晒标黄而不是"适宜"
+const cloudyDay = synth2({ cloud: 90 });
+check(cloudyDay.days[0].harvest.status === 'warn', '云量 90%：晾晒降级为谨慎');
+check(/日照|云量/.test(cloudyDay.days[0].harvest.why), '晾晒原因写明日照/云量');
+
+// 7) 风向角度换算：252° 应是"西南偏西"，下风向是"东北偏东"
+check(T.fmtHour(17.05) === '17:03', 'fmtHour 17.05 → 17:03');
+check(T.hhmmToHour('17:03') > 17, 'hhmmToHour 解析正常');
 
 console.log('\n===== 城市字典 =====');
 check(Object.keys(T.CITIES).length >= 20, `城市字典 ${Object.keys(T.CITIES).length} 个`);

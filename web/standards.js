@@ -496,6 +496,13 @@
       esc(txt) + '</span>';
   }
 
+  /* 运行时的实时值优先（可在「高级」里被改），取不到就用文档里的默认值 */
+  function ruleN(k, d) {
+    var T = (typeof globalThis !== 'undefined') ? globalThis.TianZhi : null;
+    var v = T && T.RULES && T.RULES.spray ? T.RULES.spray[k] : null;
+    return (v === null || v === undefined) ? d : v;
+  }
+
   function limitsHtml(city) {
     var e = effective(city);
     var p = e.patch;
@@ -504,7 +511,11 @@
       ['气温区间', p.temp_min + ' – ' + p.temp_max + ' ℃', '低于下限药效差、高于上限易药害', e.by.temp_max],
       ['作业时段', p.hours_start + ':00 – ' + p.hours_end + ':00', '省站建议的晴天施药时段', e.by.hours_start],
       ['当日降水', '≤ ' + p.rain_day_max + ' mm', '预计雨量超过即关闭窗口', 'tool'],
-      ['最短窗口', '≥ ' + p.min_window_hours + ' 小时', '太短的窗口来回折腾不值当', 'tool']
+      ['最短窗口', '≥ ' + p.min_window_hours + ' 小时', '太短的窗口来回折腾不值当', 'tool'],
+      ['结露门槛', '气温−露点 ≤ ' + ruleN('dew_gap_min', 1.5) + ' ℃',
+        '或湿度 ≥ ' + ruleN('hum_max', 92) + '%：叶面有游离水，药液流失且易药害', 'tool'],
+      ['日落收工', '日落前 ' + ruleN('sunset_margin_h', 1.5) + ' 小时',
+        '此后近地层逆温，雾滴悬空不落地，随气流飘走', 'tool']
     ];
     return '<div class="std-grid">' + rows.map(function (r) {
       return '<div class="std-row"><div class="std-k">' + esc(r[0]) + '</div>' +

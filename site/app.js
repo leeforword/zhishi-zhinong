@@ -193,7 +193,7 @@
 
   /** 逐小时风速折线 + 阈值线 + 可作业时段底色 + 降雨概率条 */
   function windChartSvg(hours, maxWind, width) {
-    var W = width || 620, H = 216, L = 38, R = 12, TP = 18, B = 30;
+    var W = width || 620, H = 238, L = 38, R = 12, TP = 18, B = 30;
     var iw = W - L - R, ih = H - TP - B;
 
     var realMax = 0;
@@ -251,7 +251,10 @@
     var ty = y(RULES.spray.wind_max).toFixed(1);
     p.push('<line x1="' + L + '" y1="' + ty + '" x2="' + (W - R) + '" y2="' + ty +
       '" stroke="#BE4A3C" stroke-width="1.2" stroke-dasharray="4 4" opacity=".85"/>');
-    p.push('<text x="' + (W - R - 2) + '" y="' + (+ty - 5).toFixed(1) + '" font-size="9" text-anchor="end" fill="#BE4A3C">上限 ' + RULES.spray.wind_max + '</text>');
+    // 加白色描边做底，标签压在虚线/曲线上也读得清
+    p.push('<text x="' + (L + 5) + '" y="' + (+ty - 6).toFixed(1) +
+      '" font-size="9" fill="#BE4A3C" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-linejoin="round">上限 ' +
+      RULES.spray.wind_max + '</text>');
 
     // 数据点
     hours.forEach(function (h) {
@@ -275,6 +278,12 @@
       p.join('') + '</svg>';
   }
 
+  /* 热力图色板：一处定义，图例文字与色块不会再漂 */
+  var HEAT_COLOR = {
+    ok: '#bbf7d0', wind: '#fed7aa', cold: '#C7DCE8', hot: '#fde68a',
+    rain: '#fecaca', dew: '#cbd5e1'
+  };
+
   /** 7 天 × 24 小时 作业窗口热力图 */
   function heatChartSvg(raw, result, width) {
     var days = result.days;
@@ -282,7 +291,7 @@
        24 列的刻度和色块都看不全。改成按容器宽实时算，列宽自动收窄。 */
     var W = width || 620;
     var narrow = W < 470;
-    var H = 250, L = narrow ? 38 : 52, R = 12, TP = 22, B = 30;
+    var H = 252, L = narrow ? 38 : 52, R = 12, TP = 22, B = 30;
     var cw = (W - L - R) / 24, chh = (H - TP - B) / days.length;
 
     var p = [];
@@ -295,24 +304,35 @@
       var prev = di > 0 ? days[di - 1] : null;
       var blocked = d.dayRain > RULES.spray.rain_day_max ||
                     (prev && prev.dayRain >= RULES.spray.rain_prev_max);
+      // 当日实际截止小时：冬季日落早，引擎会按逆温提前收工，热力图必须跟着切
+      var endH = (d.spray.hours && d.spray.hours[1]) || RULES.spray.hours[1];
 
       p.push('<text x="' + (L - 9) + '" y="' + (TP + di * chh + chh / 2 + 3.6).toFixed(1) +
         '" font-size="11" text-anchor="end" fill="#7d8f76">' + (di === 0 ? '今天' : d.dow) + '</text>');
 
       for (var h = 0; h < 24; h++) {
         var cell = map[h];
-        var inWork = h >= RULES.spray.hours[0] && h < RULES.spray.hours[1];
+        var inWork = h >= RULES.spray.hours[0] && h < endH;
         var color = '#f3f4f6';
         if (blocked && inWork) {
           color = '#c7d2fe';                       // 降雨拦截
         } else if (cell && inWork) {
           var v = T.hourVerdict(cell);
-          color = v === 'ok' ? '#bbf7d0' : v === 'wind' ? '#fed7aa' : v === 'cold' ? '#C7DCE8' : v === 'rain' ? '#fecaca' : '#fde68a';
+          color = HEAT_COLOR[v] || '#fde68a';
         }
         p.push('<rect x="' + (L + h * cw).toFixed(1) + '" y="' + (TP + di * chh).toFixed(1) +
           '" width="' + (cw - 2).toFixed(1) + '" height="' + (chh - 2.2).toFixed(1) +
           '" rx="2.5" fill="' + color + '"/>');
       }
+    });
+
+    // 提前收工的日子：在当日行末画一道刻线，说明"这天日落早就得早点收"
+    days.forEach(function (d, di) {
+      if (!d.spray.cutoffShortened || !d.spray.hours) return;
+      var xs = (L + d.spray.hours[1] * cw).toFixed(1);
+      p.push('<line x1="' + xs + '" y1="' + (TP + di * chh + 1).toFixed(1) +
+        '" x2="' + xs + '" y2="' + (TP + (di + 1) * chh - 2).toFixed(1) +
+        '" stroke="#BE4A3C" stroke-width="1.6" opacity=".55"/>');
     });
 
     var wx = function (h) { return L + h * cw; };
@@ -326,7 +346,7 @@
       '" font-size="' + (narrow ? 9 : 9.5) + '" fill="#9ca3af">' + (narrow ? h0 + '时' : h0 + ':00 作业时段开始') + '</text>');
     if (!narrow) {
       p.push('<text x="' + (wx(h1) - 4).toFixed(1) + '" y="' + (TP - 9) +
-        '" font-size="9.5" fill="#9ca3af" text-anchor="end">' + h1 + ':00 结束</text>');
+        '" font-size="9.5" fill="#9ca3af" text-anchor="end">' + h1 + ':00 省站上限</text>');
     }
 
     (narrow ? [0, 6, 12, 18] : [0, 3, 6, 9, 12, 15, 18, 21]).forEach(function (h) {
@@ -339,7 +359,7 @@
 
   /** 7 天温度双折线 + 降水柱（降水单独占底部区域，避免被温度带遮住） */
   function tempChartSvg(result, width) {
-    var W = width || 620, H = 230, L = 40, R = 14, TP = 16, B = 30;
+    var W = width || 620, H = 238, L = 40, R = 14, TP = 16, B = 30;
     var RAIN_BAND = 46;
     var iw = W - L - R;
     var ihT = H - TP - B - RAIN_BAND;          // 温度区高度
@@ -395,7 +415,6 @@
           '" font-size="8.5" text-anchor="middle" fill="#60a5fa">' + d.dayRain.toFixed(1) + '</text>');
       }
     });
-    p.push('<text x="' + (L - 7) + '" y="' + (rainBase + 3).toFixed(1) + '" font-size="8.5" text-anchor="end" fill="#9ca3af">mm</text>');
 
     days.forEach(function (d, i) {
       var a = i === 0 ? 'start' : (i === days.length - 1 ? 'end' : 'middle');
@@ -456,7 +475,7 @@
   /** 长势趋势（示意数据） */
   function growthSvg(plot, width) {
     var pts = T.growthTrend(plot, 8);
-    var W = width || 620, H = 190, L = 40, R = 14, TP = 16, B = 30;
+    var W = width || 620, H = 168, L = 40, R = 14, TP = 16, B = 30;
     var iw = W - L - R, ih = H - TP - B;
     var ymin = 0.30, ymax = 0.85;
     var x = function (i) { return L + i / (pts.length - 1) * iw; };
@@ -496,12 +515,26 @@
     }, 220);
   });
 
-  /* 风向角度 → 16 方位中文 */
+  /* 风向角度 → 中文方位
+     -------------------------------------------------------------
+     16 方位在《地面气象观测规范》里写作「北东北 / 西西南 / 西西北」，
+     那是给观测记录用的，念出来别扭。界面上改用同义的「偏」式说法：
+       西西南 (WSW) → 西南偏西，西西北 (WNW) → 西北偏西
+     再把度数一起给出，既好念又能核对。 */
   function dirText(deg) {
     if (deg === null || deg === undefined || isNaN(deg)) return '—';
-    var names = ['北', '北东北', '东北', '东东北', '东', '东东南', '东南', '南东南',
-      '南', '南西南', '西南', '西西南', '西', '西西北', '西北', '北西北'];
+    var names = ['北', '北偏东', '东北', '东北偏东', '东', '东南偏东', '东南', '南偏东',
+      '南', '南偏西', '西南', '西南偏西', '西', '西北偏西', '西北', '北偏西'];
     return names[Math.round(Number(deg) / 22.5) % 16];
+  }
+  function dirDeg(deg) {
+    if (deg === null || deg === undefined || isNaN(deg)) return '';
+    return Math.round(Number(deg)) + '°';
+  }
+  /* 下风向：风从哪来，雾滴就往反方向飘——这是打药最该看的方向 */
+  function driftText(deg) {
+    if (deg === null || deg === undefined || isNaN(deg)) return '—';
+    return dirText((Number(deg) + 180) % 360);
   }
 
   /** 桌面实况条：把温湿风压能见度摊开，一眼看到"数据有多全" */
@@ -516,29 +549,34 @@
     var h = hours.slice().sort(function (a, b) {
       return Math.abs(a.hour - nowH) - Math.abs(b.hour - nowH);
     })[0];
-    var di = raw.daily.time ? raw.daily.time.indexOf(d0.date) : -1;
-    function pick(arr) { return (arr && di >= 0 && arr[di] !== undefined && arr[di] !== '') ? arr[di] : null; }
-    var sunrise = pick(raw.daily.sunrise), sunset = pick(raw.daily.sunset);
+    var sunrise = d0.sunrise || '', sunset = d0.sunset || '';
     function v(x, unit, digits) {
       if (x === null || x === undefined) return '—';
       var n = Number(x);
       if (!isFinite(n)) return '—';
       return (digits === 1 ? round1(n) : Math.round(n)) + (unit || '');
     }
+    var gap = (h.dew !== null && h.dew !== undefined && h.temp !== null && h.temp !== undefined)
+      ? round1(h.temp - h.dew) : null;
+    var dew = gap !== null && gap <= RULES.spray.dew_gap_min;
     var items = [
-      ['气温', v(h.temp, ' ℃')],
-      ['风速', v(h.wind, ' m/s', 1)],
-      ['风向', h.dir === null || h.dir === undefined ? '—' : dirText(h.dir)],
-      ['湿度', v(h.hum, '%')],
-      ['露点', v(h.dew, ' ℃', 1)],
-      ['气压', v(h.press, ' hPa')],
-      ['能见度', v(h.vis, ' km', 1)],
-      ['云量', v(h.cloud, '%')],
-      ['日出', sunrise || '—'],
-      ['日落', sunset || '—']
+      ['气温', v(h.temp, ' ℃'), ''],
+      ['风速', v(h.wind, ' m/s', 1), ''],
+      ['风向', (h.dir === null || h.dir === undefined ? '—' : dirText(h.dir)),
+        (h.dir === null || h.dir === undefined ? '' : dirDeg(h.dir))],
+      ['湿度', v(h.hum, '%'), ''],
+      ['露点差', (gap === null ? '—' : gap.toFixed(1) + ' ℃'), (dew ? '结露' : '')],
+      ['气压', v(h.press, ' hPa'), ''],
+      ['能见度', v(h.vis, ' km', 1), ''],
+      ['云量', v(h.cloud, '%'), ''],
+      ['日出', sunrise || '—', ''],
+      ['日落', sunset || '—', ''],
+      ['日照', (d0.daylightH === null || d0.daylightH === undefined ? '—' : d0.daylightH.toFixed(1) + ' h'), '']
     ];
     box.innerHTML = items.map(function (x) {
-      return '<div class="ns"><span>' + x[0] + '</span><b>' + x[1] + '</b></div>';
+      return '<div class="ns' + (x[0] === '露点差' && dew ? ' dew' : '') + '">' +
+        '<span>' + x[0] + '</span><b>' + x[1] +
+        (x[2] ? '<i>' + x[2] + '</i>' : '') + '</b></div>';
     }).join('');
   }
 
@@ -574,25 +612,38 @@
         '<span class="pro-chip">累计降水<b>' + round1(sumRain) + ' mm</b></span>' +
         '<span class="pro-chip">平均湿度<b>' + (humN ? Math.round(sumHum / humN) : '—') + '%</b></span>' +
         '<span class="pro-chip">可作业<b>' + okH + ' 小时</b></span>' +
-        '<span class="pro-chip">判定口径<b>' + RULES.spray.wind_max + ' m/s · ' + RULES.spray.prob_block + '% 概率</b></span>';
+        '<span class="pro-chip">判定口径<b>' + RULES.spray.wind_max + ' m/s · ' +
+          RULES.spray.prob_block + '% 概率 · 露点差 ≤ ' + RULES.spray.dew_gap_min + '℃</b></span>' +
+        (d.spray.cutoffShortened
+          ? '<span class="pro-chip">已按日落收紧<b>' + d.sunset + ' → ' + d.spray.hours[1] + ':00 收工</b></span>'
+          : '');
     }
 
     var head = '<thead><tr><th>时刻</th><th>风速 m/s</th><th>风向</th><th>气温 ℃</th>' +
-      '<th>湿度 %</th><th>降水 mm</th><th>概率 %</th><th>判定</th></tr></thead>';
+      '<th>湿度 %</th><th>露点差 ℃</th><th>降水 mm</th><th>概率 %</th><th>判定</th></tr></thead>';
+    var endH = (d.spray.hours && d.spray.hours[1]) || RULES.spray.hours[1];
     var body = hours.map(function (h) {
+      var inWin = h.hour >= RULES.spray.hours[0] && h.hour < endH;
       var v = T.hourVerdict(h);
-      var label = v === 'ok' ? '可作业' : v === 'cold' ? '低温' : v === 'hot' ? '高温' : v === 'rain' ? '降水' : '风大';
-      if (h.rain > RULES.spray.rain_hour_max) { v = 'bad'; label = '降水'; }
-      else if (h.prob !== null && h.prob !== undefined && h.prob >= RULES.spray.prob_block) { v = 'bad'; label = '概率高'; }
-      return '<tr' + (v === 'ok' ? '' : ' class="bad"') + '>' +
+      var label = v === 'ok' ? '可作业' : v === 'cold' ? '低温' : v === 'hot' ? '高温'
+        : v === 'rain' ? '降水' : v === 'dew' ? '结露' : '风大';
+      var gap = (h.dew !== null && h.dew !== undefined && h.temp !== null && h.temp !== undefined)
+        ? round1(h.temp - h.dew) : null;
+      /* 作业时段之外的小时不是"判定不合格"，只是本来就不干活：
+         凌晨 0 点标成红色"低温"会让人以为窗口被这条挡住了。 */
+      var cls = !inWin ? 'off' : (v === 'ok' ? '' : 'bad');
+      if (!inWin) label = '非时段';
+      return '<tr' + (cls ? ' class="' + cls + '"' : '') + '>' +
         '<td>' + pad2(h.hour) + ':00</td>' +
         '<td>' + round1(h.wind) + '</td>' +
-        '<td>' + dirText(h.dir) + '</td>' +
+        '<td>' + dirText(h.dir) + (dirDeg(h.dir) ? ' ' + dirDeg(h.dir) : '') + '</td>' +
         '<td>' + Math.round(h.temp) + '</td>' +
         '<td>' + (h.hum === null || h.hum === undefined ? '—' : Math.round(h.hum)) + '</td>' +
+        '<td>' + (gap === null ? '—' : gap.toFixed(1)) + '</td>' +
         '<td>' + (h.rain === null || h.rain === undefined ? '—' : round1(h.rain)) + '</td>' +
         '<td>' + (h.prob === null || h.prob === undefined ? '—' : Math.round(h.prob)) + '</td>' +
-        '<td><span class="ok-dot' + (v === 'ok' ? '' : ' bad-dot') + '"></span>' + label + '</td>' +
+        '<td><span class="ok-dot' + (!inWin ? ' off-dot' : (v === 'ok' ? '' : ' bad-dot')) +
+          '"></span>' + label + '</td>' +
       '</tr>';
     }).join('');
     tb.innerHTML = head + '<tbody>' + body + '</tbody>';
@@ -609,8 +660,10 @@
     var dt = new Date(d.date + 'T00:00:00');
     // 区块标题已经写了「逐小时风速」，卡片里只留日期，避免同一句话出现两遍
     $('windTitle').textContent = (dt.getMonth() + 1) + '月' + dt.getDate() + '日 ' + d.dow;
+    var eh = (d.spray.hours && d.spray.hours[1]) || RULES.spray.hours[1];
     $('windSub').textContent = '虚线 ' + RULES.spray.wind_max + ' m/s = 上限 · 绿底 ' +
-      RULES.spray.hours[0] + '–' + RULES.spray.hours[1] + ' 时 = 可作业时段';
+      RULES.spray.hours[0] + '–' + eh + ' 时 = 可作业时段' +
+      (d.spray.cutoffShortened ? '（日落 ' + d.sunset + '，比省站 16 时提前收工）' : '');
     // 图例里的上限数字跟着规则走，不要在 HTML 里写死（会跟实际判定对不上）
     if ($('windLimitTag')) $('windLimitTag').textContent = RULES.spray.wind_max + ' m/s 上限';
     $('windChart').innerHTML = hours.length
@@ -893,6 +946,18 @@
     if ($('jqRail')) $('jqRail').innerHTML = html;
   }
 
+  /* 窗口内的风向：打药真正要看的是"雾滴往哪飘"，
+     西南风意味着下风向是东北——邻地有敏感作物就得先打招呼。 */
+  function windLine(day, w) {
+    if (!state.raw || !state.raw.hourly) return '';
+    var hours = T.hoursOf(state.raw.hourly, day.date);
+    var mid = hours.filter(function (h) { return h.hour === w.start; })[0] ||
+              hours.filter(function (h) { return h.hour >= w.start && h.hour < w.end; })[0];
+    if (!mid || mid.dir === null || mid.dir === undefined) return '';
+    return ' · ' + dirText(mid.dir) + '风 ' + dirDeg(mid.dir) +
+      '，雾滴飘向' + driftText(mid.dir);
+  }
+
   function renderHero(result) {
     var box = $('heroIn');
     var kpiBox = $('skyKpi');
@@ -939,7 +1004,7 @@
         '<h1>' + relDay(best.date) + ' <em>' + pad2(w.start) + '—' + pad2(w.end) + ' 时</em><br>' +
           ((best.dayProb || 0) <= 40 ? '可以下地' : '可作业，但雨说来就来') + '</h1>' +
         '<p>风速 ' + w.avgWind + ' / 上限 ' + sc.limit + ' m/s · 降雨概率 ' + (best.dayProb || 0) +
-          '% · 连续 ' + w.hours + ' 小时' +
+          '% · 连续 ' + w.hours + ' 小时' + windLine(best, w) +
           ((best.dayProb || 0) >= 30 ? '。出门前再看一眼雷达。' : '。') + '</p>';
     }
 
@@ -3096,7 +3161,7 @@
     irrigation: ['未来七天雨量多少？', '明天和后天哪天更好？'],
     harvest: ['未来七天雨量多少？', '几点风最小？'],
     standard: ['为什么是这个时段？', '这个结论准不准？'],
-    weather: ['几点风最小？', '未来七天雨量多少？'],
+    weather: ['日出日落几点？', '几点风最小？', '未来七天雨量多少？'],
     kb: ['按什么标准打药？']
   };
 
@@ -3133,6 +3198,20 @@
       '\n\n累计 ' + result.weekRain + ' mm。雨前不打药、不灌溉，这条比"今天有没有空"更重要。';
   }
 
+  /** 日出日落与日照：直接支撑“几点收工”“为什么晾晒降级” */
+  function sunAnswer(result, plot) {
+    var rows = result.days.slice(0, 3).map(function (d) {
+      return '· ' + d.date.slice(5) + ' ' + d.dow + '：日出 ' + (d.sunrise || '—') +
+        '，日落 ' + (d.sunset || '—') +
+        (d.daylightH !== null && d.daylightH !== undefined ? '，白天 ' + d.daylightH.toFixed(1) + ' 小时' : '');
+    }).join('\n');
+    var d0 = result.days[0];
+    var tail = d0.spray.cutoffShortened
+      ? '今天日落 ' + d0.sunset + '，按「日落前 1.5 小时」算，实际 ' + d0.spray.hours[1] + ':00 就得收工——再晚近地层起逆温，雾滴悬着不落。'
+      : '今天日落较晚，作业仍按文件口径 ' + d0.spray.hours[1] + ':00 收工。';
+    return '【' + plot.name + '】近三天日出日落：\n\n' + rows + '\n\n' + tail;
+  }
+
   /** 作业时段里风最小的一小时 */
   function bestHourAnswer(result, plot) {
     var day = result.days.filter(function (d) { return d.spray.status === 'ok'; })[0] || result.days[0];
@@ -3167,6 +3246,10 @@
     if (/(未来七天|这周|一周).*(雨|降水)|雨量/.test(q)) {
       lastIntent = 'irrigation';
       return weekRainAnswer(result, plot);
+    }
+    if (/(日出|日落|天亮|天黑|日照时长|几点黑)/.test(q)) {
+      lastIntent = 'weather';
+      return sunAnswer(result, plot);
     }
     if (/(几点|什么时候).*(风最小|风最稳)|风最小/.test(q)) {
       lastIntent = 'spray';
@@ -3543,7 +3626,9 @@
       ['气温区间', r.temp_min + ' – ' + r.temp_max + ' ℃', '当前为手动值'],
       ['作业时段', pad2(r.hours[0]) + ':00 – ' + pad2(r.hours[1]) + ':00', '当前为手动值'],
       ['当日降水', '≤ ' + r.rain_day_max + ' mm', '当前为手动值'],
-      ['最短窗口', '≥ ' + r.min_window_hours + ' 小时', '当前为手动值']
+      ['最短窗口', '≥ ' + r.min_window_hours + ' 小时', '当前为手动值'],
+      ['结露门槛', '气温−露点 ≤ ' + r.dew_gap_min + ' ℃ 或湿度 ≥ ' + r.hum_max + '%', '当前为手动值'],
+      ['日落收工', '日落前 ' + r.sunset_margin_h + ' 小时', '当前为手动值']
     ];
     return '<div class="std-grid">' + rows.map(function (x) {
       return '<div class="std-row"><div class="std-k">' + esc(x[0]) + '</div>' +
@@ -3595,6 +3680,8 @@
     html += '<div class="std-src-note">标准只约束气象条件，不替代农药标签与当地农技部门意见。' +
       '县级文件多为转发省级，未逐县收录；市级未检索到公开文件、或仅有非标准技术口径的，按省级执行。' +
       '每行右侧标注该字段最严的来源；气温上下限来自不同文件时，标上限来源（超上限更危险）。' +
+      '作业时段是文件口径的上限，实际每天还会按日落再收紧（例如日落 17:03 → 15 时收工），' +
+      '收工时刻在这两天的卡片与逐时表里都会写出来。' +
       '如你们县有更严要求，可在下方手动校准。</div>';
 
     box.innerHTML = html;
@@ -3937,7 +4024,17 @@
   bindAnswerNotes();     // 回答下方：详情 / 纠错
   bindBasis();           // 「依据」弹层
   setTimeout(function () { moveTabPill(currentView || 'content'); }, 120);
-  window.addEventListener('resize', function () { moveTabPill(currentView || 'content'); });
+  var advWide = null;
+  function syncAdv(force) {
+    var el = $('advPanel');
+    if (!el) return;
+    var wide = window.matchMedia('(min-width:900px)').matches;
+    if (force || wide !== advWide) { el.open = wide; advWide = wide; }
+  }
+  window.addEventListener('resize', function () {
+    moveTabPill(currentView || 'content');
+    syncAdv(false);
+  });
   buildPresets();     // 预设城市按钮已移除，这里只清理旧 DOM
   bindTaskSwitch();   // 未来七天：打药 / 灌溉 / 晾晒 切换
   bindViews();        // 内容 / 对话 / 我的 三个视图
@@ -3951,6 +4048,7 @@
   appendMsg('bot', CONTENT ? CONTENT.chat.welcomeShort
     : '你好。可以问我哪天适合打药、要不要浇水、这几天什么天气。数字都从实时气象数据算出来，不是我编的。');
   renderPlots();
+  syncAdv(true);
   applyWeatherTheme(null);
   load();
 

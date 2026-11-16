@@ -52,6 +52,9 @@
       rain_prev_max: 1,        // 前一天降水超过此值 → 不宜
       prob_block: 50,          // 当天降雨概率达到此值 → 不排窗口（原实现漏了这条）
       rain_hour_max: 0.1,      // 单个小时降水超过此值 → 该小时不可作业
+      dew_gap_min: 1.5,        // 气温 − 露点 ≤ 此值 → 结露 / 近饱和，该小时不可作业 ℃
+      hum_max: 92,             // 相对湿度 ≥ 此值 → 同样视为近饱和（气孔不蒸发、易药害）%
+      sunset_margin_h: 1.5,    // 日落前 N 小时收工：此后地面辐射逆温易形成，雾滴悬空漂移
       min_window_hours: 2      // 最小连续可作业时长
     },
     irrigation: {
@@ -264,16 +267,37 @@
       var t = hourly.time[i];
       var date = t.slice(0, 10);
       if (!map[date]) { map[date] = []; order.push(date); }
+      /* 这里必须把逐时字段全部带上。
+         曾经的坑：只带了 wind/temp/rain/humid 四个字段，
+         于是 hourOk 里读 h.prob、h.dew 永远是 undefined——
+         概率拦截、结露判定看着写了，实际一次都没生效。 */
       map[date].push({
         hour: parseInt(t.slice(11, 13), 10),
         wind: hourly.wind_speed_10m[i],
         temp: hourly.temperature_2m[i],
         rain: hourly.precipitation[i],
-        humid: hourly.relative_humidity_2m ? hourly.relative_humidity_2m[i] : null
+        prob: hourly.precipitation_probability ? hourly.precipitation_probability[i] : null,
+        dir: hourly.wind_direction_10m ? hourly.wind_direction_10m[i] : null,
+        hum: hourly.relative_humidity_2m ? hourly.relative_humidity_2m[i] : null,
+        humid: hourly.relative_humidity_2m ? hourly.relative_humidity_2m[i] : null,
+        dew: hourly.dew_point_2m ? hourly.dew_point_2m[i] : null,
+        press: hourly.surface_pressure ? hourly.surface_pressure[i] : null,
+        cloud: hourly.cloud_cover ? hourly.cloud_cover[i] : null,
+        vis: hourly.visibility ? hourly.visibility[i] : null
       });
     }
     order.sort();
     return { map: map, order: order };
+  }
+
+  /* 结露：气温贴近露点，或相对湿度接近饱和。
+     这时叶面有游离水，药液会被稀释、流失，乳油类还可能产生药害；
+     雾滴也不易蒸发，飘移反而更远。农技口径是"露水干了再打"。 */
+  function isDew(h, r) {
+    if (h.hum !== null && h.hum !== undefined && h.hum >= r.hum_max) return true;
+    if (h.dew === null || h.dew === undefined) return false;
+    if (h.temp === null || h.temp === undefined) return false;
+    return (h.temp - h.dew) <= r.dew_gap_min;
   }
 
   function hourOk(h, r) {
@@ -281,13 +305,18 @@
     if (h.wind > r.wind_max) return false;
     if (h.rain > r.rain_hour_max) return false;
     if (h.prob !== null && h.prob !== undefined && h.prob >= r.prob_block) return false;
+    if (isDew(h, r)) return false;
     return true;
   }
 
   /** 在一天的作业时段内找出连续可作业窗口 */
-  function findSprayWindows(hours, r) {
+  /* cutoff：当日实际截止小时。省站口径是 9–16 时，但冬季日落早，
+     日落后地面迅速辐射冷却、近地层形成逆温，雾滴会悬在冠层上方长时间不落，
+     所以按「日落前 1.5 小时」再收紧一次。夏季日落晚，cutoff 仍等于 16。 */
+  function findSprayWindows(hours, r, cutoff) {
+    var end = cutoff || r.hours[1];
     var work = hours.filter(function (h) {
-      return h.hour >= r.hours[0] && h.hour < r.hours[1];
+      return h.hour >= r.hours[0] && h.hour < end;
     }).sort(function (a, b) { return a.hour - b.hour; });
 
     var windows = [], cur = null;
@@ -321,6 +350,21 @@
 
   function round1(n) { return Math.round(n * 10) / 10; }
 
+  /** "07:01" → 7.016…；解析不出来返回 null */
+  function hhmmToHour(v) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(v || '').trim());
+    if (!m) return null;
+    var h = parseInt(m[1], 10), mi = parseInt(m[2], 10);
+    if (!(h >= 0 && h <= 24) || !(mi >= 0 && mi < 60)) return null;
+    return h + mi / 60;
+  }
+
+  function fmtHour(h) {
+    if (h === null || h === undefined || isNaN(h)) return '—';
+    var t = Math.round(h * 60);
+    return pad2(Math.floor(t / 60) % 24) + ':' + pad2(t % 60);
+  }
+
   /* ===========================================================
      五、主评估函数：天气数据 → 农事判断
      =========================================================== */
@@ -347,13 +391,41 @@
       var windMax = round1(daily.wind_speed_10m_max ? (daily.wind_speed_10m_max[j] || 0) : 0);
       var code = daily.weather_code ? daily.weather_code[j] : null;
 
+      /* ---- 天文量：日出日落决定"几点能开工、几点必须收工" ---- */
+      var sunrise = (daily.sunrise && daily.sunrise[j]) || '';
+      var sunset = (daily.sunset && daily.sunset[j]) || '';
+      var sunriseH = hhmmToHour(sunrise);
+      var sunsetH = hhmmToHour(sunset);
+      var daylightH = (sunriseH !== null && sunsetH !== null && sunsetH > sunriseH)
+        ? round1(sunsetH - sunriseH) : null;
+
+      /* 逆温收紧：日落后地面辐射冷却，近地层形成逆温，雾滴悬空不落。
+         留 1.5 小时余量；夏季日落晚，算出来仍等于 16，不会误伤。 */
+      var cutoff = r.hours[1];
+      if (sunsetH !== null) {
+        var c2 = Math.floor(sunsetH - r.sunset_margin_h);
+        if (c2 >= r.hours[0] + 2) cutoff = Math.min(r.hours[1], c2);
+      }
+
+      /* 日照时数 / 正午云量：晾晒是真需要太阳，光看气温和雨不够 */
+      var sunHours = 0, cloudNoon = null, cloudN = 0, cloudSum = 0;
+      hours.forEach(function (h) {
+        if (h.cloud === null || h.cloud === undefined) return;
+        var isDay = (sunriseH === null || h.hour + 1 > sunriseH) &&
+                    (sunsetH === null || h.hour < sunsetH);
+        if (!isDay) return;
+        if (h.cloud < 60) sunHours++;
+        if (h.hour >= 9 && h.hour < 16) { cloudSum += h.cloud; cloudN++; }
+      });
+      if (cloudN) cloudNoon = Math.round(cloudSum / cloudN);
+
       /* ---- 打药 ---- */
       var prevRain = prev ? round1(prev.reduce(function (a, h) { return a + (h.rain || 0); }, 0)) : 0;
       var rainBlocked = dayRain > r.rain_day_max || prevRain >= r.rain_prev_max;
       var probBlocked = dayProb >= r.prob_block;
       var blocked = rainBlocked || probBlocked;
 
-      var windows = blocked ? [] : findSprayWindows(hours, r);
+      var windows = blocked ? [] : findSprayWindows(hours, r, cutoff);
       var sprayStatus, sprayWhy;
 
       if (rainBlocked) {
@@ -368,13 +440,16 @@
         sprayWhy = '当天已没有可作业时段（逐小时预报从明天开始）';
       } else if (windows.length === 0) {
         sprayStatus = 'bad';
-        var work = hours.filter(function (h) { return h.hour >= r.hours[0] && h.hour < r.hours[1]; });
-        // 逐小时分类：cold / hot / wind / ok（与 findSprayWindows 的判定保持一致）
-        var cnt = { wind: 0, cold: 0, hot: 0, ok: 0 };
+        var work = hours.filter(function (h) { return h.hour >= r.hours[0] && h.hour < cutoff; });
+        // 逐小时分类：cold / hot / wind / dew / rain / ok（与 hourOk 的判定保持一致）
+        var cnt = { wind: 0, cold: 0, hot: 0, dew: 0, rain: 0, ok: 0 };
         work.forEach(function (h) {
           if (h.temp < r.temp_min) cnt.cold++;
           else if (h.temp > r.temp_max) cnt.hot++;
           else if (h.wind > r.wind_max) cnt.wind++;
+          else if (h.rain > r.rain_hour_max) cnt.rain++;
+          else if (h.prob !== null && h.prob !== undefined && h.prob >= r.prob_block) cnt.rain++;
+          else if (isDew(h, r)) cnt.dew++;
           else cnt.ok++;
         });
         var okCnt = cnt.ok;
@@ -384,13 +459,15 @@
         if (cnt.cold > 0) parts.push(cnt.cold + ' 小时气温低于 ' + r.temp_min + '℃');
         if (cnt.wind > 0) parts.push(cnt.wind + ' 小时风速超过 ' + r.wind_max + ' m/s');
         if (cnt.hot > 0) parts.push(cnt.hot + ' 小时气温高于 ' + r.temp_max + '℃');
+        if (cnt.dew > 0) parts.push(cnt.dew + ' 小时叶面结露（气温贴近露点或湿度 ≥ ' + r.hum_max + '%）');
+        if (cnt.rain > 0) parts.push(cnt.rain + ' 小时有降水或降雨概率偏高');
 
         if (okCnt === 0) {
-          sprayWhy = '作业时段（' + r.hours[0] + '–' + r.hours[1] + ' 时）' + parts.join('、') + '，没有可作业时间';
+          sprayWhy = '作业时段（' + r.hours[0] + '–' + cutoff + ' 时）' + parts.join('、') + '，没有可作业时间';
         } else if (okCnt === workLen) {
           sprayWhy = '可作业小时不连续，凑不成 ' + r.min_window_hours + ' 小时以上的连续窗口';
         } else {
-          sprayWhy = '作业时段（' + r.hours[0] + '–' + r.hours[1] + ' 时，共 ' + workLen + ' 小时）内' + parts.join('、') +
+          sprayWhy = '作业时段（' + r.hours[0] + '–' + cutoff + ' 时，共 ' + workLen + ' 小时）内' + parts.join('、') +
                      '，只有 ' + okCnt + ' 小时达标且不连续，凑不成连续窗口';
         }
       } else {
@@ -447,6 +524,10 @@
       } else if (tmax < RULES.harvest.temp_min) {
         harvStatus = 'warn';
         harvWhy = '最高气温仅 ' + tmax + '℃，晾晒效率低';
+      } else if (cloudN > 0 && sunHours < 3) {
+        harvStatus = 'warn';
+        harvWhy = '白昼日照仅 ' + sunHours + ' 小时' +
+          (cloudNoon !== null ? '（9–16 时平均云量 ' + cloudNoon + '%）' : '') + '，晾晒效率低';
       } else {
         harvStatus = 'ok';
         harvWhy = '天气晴好，适合晾晒';
@@ -461,7 +542,17 @@
         weather: code === null ? '' : weatherText(code),
         tmax: tmax, tmin: tmin,
         dayRain: dayRain, dayProb: dayProb, windMax: windMax,
-        spray: { status: sprayStatus, why: sprayWhy, windows: windows, blocked: blocked },
+        sunrise: sunrise, sunset: sunset,
+        sunriseH: sunriseH, sunsetH: sunsetH, daylightH: daylightH,
+        sunHours: cloudN > 0 ? sunHours : null, cloudNoon: cloudNoon,
+        spray: {
+          status: sprayStatus, why: sprayWhy, windows: windows, blocked: blocked,
+          hours: [r.hours[0], cutoff],
+          cutoffShortened: cutoff < r.hours[1],
+          dewHours: hours.filter(function (h) {
+            return h.hour >= r.hours[0] && h.hour < cutoff && isDew(h, r);
+          }).length
+        },
         irrigation: { status: irrStatus, why: irrWhy },
         harvest: { status: harvStatus, why: harvWhy }
       };
@@ -643,6 +734,7 @@
     if (h.wind > r.wind_max) return 'wind';
     if (h.rain !== null && h.rain !== undefined && h.rain > r.rain_hour_max) return 'rain';
     if (h.prob !== null && h.prob !== undefined && h.prob >= r.prob_block) return 'rain';
+    if (isDew(h, r)) return 'dew';
     return 'ok';
   }
 
@@ -915,6 +1007,16 @@
 
     var dayRain = round1(daily.precipitation_sum[j] || 0);
     var prevRain = 0;
+    var dayProb = daily.precipitation_probability_max ? (daily.precipitation_probability_max[j] || 0) : 0;
+
+    /* 今日剩余时段也必须用同一条口径：日落收紧 + 降雨概率。
+       否则会出现"七天卡片说不宜、今日判读说可以作业"的自相矛盾。 */
+    var sunsetH0 = hhmmToHour((daily.sunset && daily.sunset[j]) || '');
+    var cutoff = r.hours[1];
+    if (sunsetH0 !== null) {
+      var c0 = Math.floor(sunsetH0 - r.sunset_margin_h);
+      if (c0 >= r.hours[0] + 2) cutoff = Math.min(r.hours[1], c0);
+    }
 
     // 只看尚未结束的小时
     var future = hours.filter(function (h) { return h.hour >= nowHour; });
@@ -922,30 +1024,36 @@
       return {
         date: todayStr, ended: true, status: 'bad',
         windows: [], futureHours: 0,
-        why: '今日作业时段（' + r.hours[0] + ':00–' + r.hours[1] + ':00）已过'
+        why: '今日作业时段（' + r.hours[0] + ':00–' + cutoff + ':00）已过'
       };
     }
 
     if (ruleKey === 'spray' || !ruleKey) {
-      var blocked = dayRain > r.rain_day_max || prevRain >= r.rain_prev_max;
-      var windows = blocked ? [] : findSprayWindows(future, r);
+      var probBlocked0 = dayProb >= r.prob_block;
+      var blocked = dayRain > r.rain_day_max || prevRain >= r.rain_prev_max || probBlocked0;
+      var windows = blocked ? [] : findSprayWindows(future, r, cutoff);
       var status, why;
       if (blocked) {
         status = 'bad';
-        why = '今日已有降雨 ' + dayRain + ' mm，药液容易被冲刷';
+        why = dayRain > r.rain_day_max
+          ? '今日已有降雨 ' + dayRain + ' mm，药液容易被冲刷'
+          : (probBlocked0 ? '今日降雨概率 ' + dayProb + '%，不排窗口' : '前一日降雨 ' + prevRain + ' mm，田间偏湿');
       } else if (!windows.length) {
         status = 'bad';
         var bad = future.filter(function (h) { return hourVerdict(h) !== 'ok'; });
         var cold = bad.filter(function (h) { return hourVerdict(h) === 'cold'; }).length;
         var wind = bad.filter(function (h) { return hourVerdict(h) === 'wind'; }).length;
         var bits = [];
+        var dewN = bad.filter(function (h) { return hourVerdict(h) === 'dew'; }).length;
         if (cold) bits.push('气温低于 ' + r.temp_min + '℃ 有 ' + cold + ' 小时');
         if (wind) bits.push('风速超 ' + r.wind_max + ' m/s 有 ' + wind + ' 小时');
+        if (dewN) bits.push('叶面结露有 ' + dewN + ' 小时');
         why = '今日剩余时段不可作业：' + (bits.length ? bits.join('，') : '气象条件不满足');
       } else {
         status = 'ok';
         var w = windows.slice().sort(function (a, b) { return b.hours - a.hours; })[0];
-        why = '今日 ' + pad2(w.start) + ':00–' + pad2(w.end) + ':00 可以作业，连续 ' + w.hours + ' 小时';
+        why = '今日 ' + pad2(w.start) + ':00–' + pad2(w.end) + ':00 可以作业，连续 ' + w.hours + ' 小时' +
+          (cutoff < r.hours[1] ? '（日落早，按逆温提前到 ' + cutoff + ':00 收工）' : '');
       }
       return {
         date: todayStr, ended: false, status: status, why: why,
@@ -974,6 +1082,9 @@
     INTENT_QUERY: INTENT_QUERY,
     hoursOf: hoursOf,
     hourVerdict: hourVerdict,
+    isDew: isDew,
+    fmtHour: fmtHour,
+    hhmmToHour: hhmmToHour,
     growthTrend: growthTrend,
     feasibility: feasibility,
     wgs84ToGcj: wgs84ToGcj,

@@ -57,11 +57,11 @@
 | 域名根 | `https://leeforword.github.io/` | HTTP 200，226 B（跳转页 + 微信验证文件） |
 | 最近提交 | `ec0a269 内容设计大改：新建内容层…` | `git log -1` |
 | Actions | `completed / success`，与 `ec0a269` 对应 | GitHub API |
-| 规则引擎测试 | 通过 242 / 失败 0（条数随实时数据波动） | `node web/test-logic.mjs` |
+| 规则引擎测试 | 通过 272 / 失败 0（含露点/湿度/日落 8 条回归） | `node web/test-logic.mjs` |
 | 标准库 / 本地库测试 | 通过 164 / 失败 0（离线） | `node web/test-standards.mjs` |
-| 端到端测试 | 通过 77 / 失败 2 | `node web/e2e.mjs`（需先起本地服务器） |
+| 端到端测试 | 通过 96 / 失败 2 | `node web/e2e.mjs`（需先起本地服务器） |
 | 构建 | 复制 26 个文件，产物 29 个 / 2606 KB，自检全过 | `node scripts/build-site.mjs` |
-| 页面版本号 | v4.6（「我的 → 关于」） | `web/index.html` |
+| 页面版本号 | v4.7（「我的 → 关于」） | `web/index.html` |
 | 规则引擎版本 | 3.1（`RULES.meta.version`） | `web/logic.js` |
 | 安卓壳 | versionCode 3 / versionName 1.2，包名 `io.github.leeforword.twa` | `android-webview/AndroidManifest.xml` |
 | 本地 Node | v22.22.2；CI 用 Node 20 | `node -v`、`deploy.yml` |
@@ -195,7 +195,7 @@ node web/e2e.mjs                     # 默认 http://127.0.0.1:8931/，截图输
 node web/e2e.mjs https://leeforword.github.io/zhishi-zhinong/ ../screenshots   # 测线上
 ```
 
-预期：`test-standards` 输出 `通过 164 / 失败 0`；`test-logic` 输出 `通过 242 / 失败 0`（数字随实时数据条数浮动，失败必须为 0）；`e2e` 输出 `pass 77 / fail 2`，2 个失败是已知的高德白名单问题（§11.1）。
+预期：`test-standards` 输出 `通过 164 / 失败 0`；`test-logic` 输出 `通过 272 / 失败 0`（数字随实时数据条数浮动，失败必须为 0）；`e2e` 输出 `pass 96 / fail 2`，2 个失败是已知的高德白名单问题（§11.1）。
 
 ### 5.3 构建
 
@@ -501,7 +501,15 @@ git push origin main
 
 ## 11. 已知问题与坑
 
-### 11.0 v4.6 修掉的几个严重问题（别再改回去）
+### 11.0 v4.7 修掉的问题（别再改回去）
+
+- **`groupByDay` 只搬了 4 个字段**：wind/temp/rain/humid。于是 `hourOk` 里读的 `h.prob`、`h.dew` 恒为 `undefined`——降雨概率拦截和结露判定写了却从未生效，`window.avgProb` 也永远是 null。v4.7 补齐 prob/dir/hum/dew/press/cloud/vis。**加任何"逐时判定"前先确认 `groupByDay` 有那个字段。**
+- **界面风向用记录式写法**：16 方位在《地面气象观测规范》里写作「西西南 / 西西北 / 北东北」，念不出来。界面改用同义「偏」式（西南偏西 / 西北偏西），并补角度（252°）与下风向（雾滴飘向东北偏东）。标准号 GB/T 37302-2019 表 A.1 可核。
+- **图表参差**：四张图各自有独立 `sec-h` 标题、`padding`、`H`，并排两张底边永远对不齐。v4.7 统一成 `.chart-card` 骨架（卡内标题+图例 / 图 / 一行注脚），并排两张统一 `H=238`，e2e 断言 `Δheight ≤ 1px`。
+- **`#windTitle` 被删导致整页报错**：`$('windTitle').textContent` 未做空判断，删 DOM 后 `load()` 抛 "Cannot set properties of null"。改图表结构时先跑 e2e。
+- **`mm` 轴标压在第一根雨柱上**、**风速上限标签压在曲线上**：已改为右上角统一单位 + 左端带白色描边的标签。
+
+### 11.0.1 v4.6 修掉的问题（别再改回去）
 
 - **降雨概率漏判**：原实现只看当日/前日雨量，70% 概率仍会给"可作业窗口"。现在逐小时概率 ≥50%、单小时降水 >0.1 mm 都不排窗口，`test-logic.mjs` 有回归用例。
 - **夜间风速图像坏掉**：晚上 10 点打开时今天只剩 1 小时数据，图被压成一条竖线；现在 X 轴固定 0–24，且当天剩余作业时段不足 2 小时时自动切到明天。
@@ -530,6 +538,19 @@ git push origin main
 ### 11.4 文档滞后
 
 `README.md` 的目录树是 11-13 写的，**没有 `content.js`**；`docs/运行说明.md` 里还在描述「多气象模式一致性检查」这一节（对应 DOM `consensusBox`，已在改版中删除，`e2e` 有断言 `!document.getElementById('consensusBox')`），界面细节也与当前版本有出入。以代码和 `content.js` 为准；`docs/AI交接文档.md`（本文）是当前最新。
+
+### 11.4.1 精细判定（v4.7）
+
+| 判据 | 阈值 | 作用 | 依据 |
+|---|---|---|---|
+| 结露 | 气温 − 露点 ≤ 1.5℃ 或 湿度 ≥ 92% | 该小时不排窗口，热力图标「露水」 | 叶面有游离水时药液被稀释、流失；乳油类易药害 |
+| 日落收工 | 日落前 1.5 小时 | 当日截止小时取 `min(16, floor(日落−1.5))` | 日落后地面辐射冷却形成逆温，雾滴悬空不落地 |
+| 日照时数 | 白昼逐时云量 < 60% 的小时数 | 晾晒：< 3 小时降级为「勉强可晒」 | 晾晒靠日照，不只看气温 |
+| 风向 | 16 方位 + 角度 | 首屏给「雾滴飘向 X」，表里给原值 | 飘移方向决定邻地药害风险 |
+
+这些参数在 `logic.js` 的 `RULES.spray`（`dew_gap_min` / `hum_max` / `sunset_margin_h`），「我的 → 作业标准」会读实时值显示，改一处界面自动跟。
+
+**行为变化**：冬季（日落 17:00 前后）可作业时段从 9–16 收紧到 9–15，窗口少 1 小时。这是按逆温常识收紧，不是回归。
 
 ### 11.5 标准覆盖的边界（不是 bug，但要说清）
 

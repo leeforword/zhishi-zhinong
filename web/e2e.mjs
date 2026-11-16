@@ -198,6 +198,40 @@ async function waitData(timeoutMs) {
     check(await ev("document.querySelectorAll('#gaugeBars .grow').length") === 3, 'three checkable metrics');
     check(await ev("!!document.querySelector('#growthChart svg')"), 'growth chart svg');
 
+    /* v4.7：四张图统一骨架，并排两张必须等高——之前底边参差就是没对齐 */
+    const pair = await ev(`(() => {
+      const cards = [...document.querySelectorAll('.chart-card')].filter(c => !c.classList.contains('wide'));
+      if (cards.length !== 2) return { n: cards.length };
+      const a = cards[0].getBoundingClientRect(), b = cards[1].getBoundingClientRect();
+      const sa = cards[0].querySelector('svg'), sb = cards[1].querySelector('svg');
+      return {
+        n: 2,
+        dh: Math.abs(a.height - b.height), dy: Math.abs(a.top - b.top),
+        sw: Math.abs(sa.getBoundingClientRect().width - sb.getBoundingClientRect().width),
+        sh: Math.abs(sa.getBoundingClientRect().height - sb.getBoundingClientRect().height)
+      };
+    })()`);
+    check(pair.n === 2, 'two side-by-side chart cards');
+    check(pair.dh <= 1, 'chart cards equal height: Δ' + pair.dh.toFixed(1) + 'px');
+    check(pair.dy <= 1, 'chart cards aligned top: Δ' + pair.dy.toFixed(1) + 'px');
+    check(pair.sh <= 1, 'chart svg equal height: Δ' + pair.sh.toFixed(1) + 'px');
+    check(await ev("document.querySelectorAll('#heatChart text').length") > 8, 'heatmap axis labels');
+
+    /* 风向不该再出现「西西南 / 西西北」这种记录式写法 */
+    const dirTxt = await ev("[...document.querySelectorAll('#proTable td')].map(td=>td.textContent).join(' ')");
+    check(dirTxt.length > 0 && !/西西南|西西北|北东北|东东南|南东南/.test(dirTxt),
+      'wind direction readable (no 西西南 style)');
+    check(/°/.test(dirTxt), 'wind direction carries degrees');
+
+    /* 详细数据：桌面默认展开，实况 11 项，逐时表 24 行 */
+    check(await ev("document.getElementById('advPanel').open === true"), 'adv panel open on desktop');
+    check(await ev("document.querySelectorAll('#nowStrip .ns').length") === 11, 'eleven live cells');
+    /* 逐时数据从当前小时往后数，跨零点那天可能只有 23 行，不能写死 24 */
+    const proRows = await ev("document.querySelectorAll('#proTable tbody tr').length");
+    check(proRows >= 20 && proRows <= 24, 'hourly rows: ' + proRows);
+    check(await ev("[...document.querySelectorAll('#nowStrip .ns span')].some(e=>e.textContent==='露点差')"), 'dew-point gap shown');
+    check(await ev("[...document.querySelectorAll('#nowStrip .ns span')].some(e=>e.textContent==='日照')"), 'daylight shown');
+
     await shotFit('02-charts.png');
 
     /* ---------- 4 ---------- */
@@ -219,7 +253,8 @@ async function waitData(timeoutMs) {
     await ev("document.querySelector('#taskSwitch [data-task=\"harvest\"]').click();");
     await sleep(400);
     const harvTxt = await ev("document.querySelectorAll('#days .day .day-state')[1].textContent");
-    check(/晾晒/.test(harvTxt), 'harvest verdict shown: ' + harvTxt);
+    // 文案随天气变（适宜晾晒 / 勉强可晒 / 不宜晾晒），断言只认"晒"这个词根
+    check(/晒/.test(harvTxt), 'harvest verdict shown: ' + harvTxt);
 
     // 切回打药，避免影响后续截图
     await ev("document.querySelector('#taskSwitch [data-task=\"spray\"]').click();");
@@ -427,6 +462,16 @@ async function waitData(timeoutMs) {
     check(cols.trim().split(/\s+/).length === 1, 'single column on mobile: ' + cols);
     const overflow = await ev("document.documentElement.scrollWidth - window.innerWidth");
     check(overflow <= 2, 'no horizontal overflow: ' + overflow + 'px');
+    /* 高级数据在手机上默认收起，点开才看，避免首屏堆信息 */
+    check(await ev("document.getElementById('advPanel').open === false"), 'adv panel collapsed on mobile');
+    await ev("document.getElementById('advPanel').querySelector('summary').click()");
+    await sleep(250);
+    check(await ev("document.getElementById('advPanel').open === true"), 'adv panel opens on tap');
+    check(await ev("document.querySelectorAll('#nowStrip .ns').length") === 11, 'eleven live cells on mobile');
+    const mobOverflow = await ev("document.documentElement.scrollWidth - window.innerWidth");
+    check(mobOverflow <= 2, 'no overflow with adv panel open: ' + mobOverflow + 'px');
+    await ev("document.getElementById('advPanel').querySelector('summary').click()");
+    await sleep(150);
     await shotFull('05-mobile.png');
 
     /* ---------- 12 ---------- */
@@ -439,7 +484,10 @@ async function waitData(timeoutMs) {
     await sleep(1800);
     check(await ev("!!window.TianZhiContent"), 'content.js loaded');
     check(await ev("!!window.TianZhiStandards"), 'standards.js loaded');
-    check(await ev("document.querySelectorAll('#stdBox .std-row').length") === 5, 'standard card: five limits');
+    // v4.7 起多了「结露门槛」「日落收工」两行，共 7 条
+    check(await ev("document.querySelectorAll('#stdBox .std-row').length") === 7, 'standard card: seven limits');
+    check(await ev("document.getElementById('stdBox').textContent.indexOf('露点') >= 0"), 'standard card mentions dew point');
+    check(await ev("document.getElementById('stdBox').textContent.indexOf('日落') >= 0"), 'standard card mentions sunset');
     check(await ev("document.querySelectorAll('#stdBox .std-file').length") >= 2, 'standard card: source files listed');
     check(await ev("document.querySelectorAll('#stdBox .std-cov-row').length") === 11, 'standard coverage: 11 cities');
     check(await ev("!document.getElementById('kbBox') && !document.getElementById('srcBox')"), 'long basis blocks removed from home');
@@ -477,6 +525,11 @@ async function waitData(timeoutMs) {
     await ev("document.getElementById('qaInput').value='明天和后天哪天更好？';document.getElementById('qaSend').click();");
     await sleep(450);
     check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return /优先选|两天都不合适/.test(x.textContent)})"), 'day comparison answered');
+
+    /* v4.7：日出日落问答——数据来自逐日 sunrise/sunset，不是编的 */
+    await ev("document.getElementById('qaInput').value='日出日落几点？';document.getElementById('qaSend').click();");
+    await sleep(500);
+    check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return x.textContent.indexOf('日落')>=0 && /[0-9][0-9]:[0-9][0-9]/.test(x.textContent)})"), 'sunrise/sunset answered with clock times');
     await ev("document.getElementById('qaInput').value='为什么这么判断？';document.getElementById('qaSend').click();");
     await sleep(350);
     check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return x.textContent.indexOf('我把')>=0})"), 'method question answered');
