@@ -528,6 +528,10 @@ git push origin main
 - 邢台金银花标准已于 2025-06-01 废止；沧州是林业、张家口是露地蔬菜，均不适用于小麦 / 玉米。
 - 标准会更新。`standards.js` 的 `CHECKED` 是查证日期，更新条目时一起改；`test-standards.mjs` 会校验每条有没有编号与链接。
 
+### 11.5.1 首页删减后留下的死代码
+
+v4.5 把「详细依据」压成一行置信度后，`app.js` 里仍有 `renderDelayCost / renderCloseCondition / startCountdown / renderLimits / renderSprayRow` 等函数定义（约 200 行）不再被调用；`bindSprayButtons()` 仍在 `load()` 里调用，但对应 DOM 已不渲染。不影响运行，属可清理项。清理时注意 `renderHero()` 里不再引用它们。
+
 ### 11.6 `scripts/` 里大量历史脚本
 
 `scripts/` 下有 20+ 个 `test-*.mjs / audit-*.mjs / shot-*.mjs`，是 11-12 至 11-13 开发期的验证工具，**未逐一复测**，其中 `run-all.mjs` 里的断言数量说明（246 条等）已过时。当前可信的只有：`build-site.mjs`、`doctor.mjs`、`web/test-logic.mjs`、`web/test-standards.mjs`、`web/e2e.mjs`。其余按 **需确认** 处理，别把它们当 CI。
