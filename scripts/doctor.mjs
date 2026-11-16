@@ -28,6 +28,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -234,8 +235,30 @@ if (!exists(OUT)) {
     ? ok('安卓安装包已随构建发布') : wr('site/download/ 下没有 APK');
 }
 
-/* ---------- 7. git ---------- */
-head('== 7. 版本状态 ==');
+/* ---------- 7. 作业标准库 ---------- */
+head('== 7. 作业标准库（属地阈值来源）==');
+try {
+  const require2 = createRequire(import.meta.url);
+  require2(path.join(WEB, 'standards.js'));
+  const STD = globalThis.TianZhiStandards;
+  if (!STD) throw new Error('standards.js 未导出 TianZhiStandards');
+  ok('标准库已加载：' + STD.LIST.length + ' 份文件，查证 ' + STD.CHECKED);
+  const cov = STD.coverage();
+  cov.length === 11 ? ok('覆盖河北 11 个地级市') : bad('覆盖城市数异常', String(cov.length));
+  const sjz = STD.effective('石家庄市').patch.wind_max;
+  sjz === 3 ? ok('石家庄取市级更严值 3.0 m/s') : bad('石家庄风速合并异常', String(sjz));
+  const hd = STD.effective('邯郸市').patch;
+  hd.wind_max === 3.4 && hd.temp_max === 30 && hd.hours_start === 9 && hd.hours_end === 16
+    ? ok('无市级文件的市回落省级：3.4 m/s · 5–30℃ · 9–16 时')
+    : bad('省级回落值异常', JSON.stringify(hd));
+  const txt = STD.answer('保定市', '自检地块');
+  !/undefined|NaN/.test(txt) ? ok('问答文本无 undefined / NaN') : bad('问答文本含 undefined/NaN');
+} catch (e) {
+  bad('标准库加载或合并失败', e.message);
+}
+
+/* ---------- 8. git ---------- */
+head('== 8. 版本状态 ==');
 const git = (args) => {
   try {
     return execFileSync('git', args, { cwd: ROOT, stdio: 'pipe' }).toString().trim();

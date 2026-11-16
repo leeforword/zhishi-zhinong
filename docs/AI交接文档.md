@@ -12,7 +12,8 @@
 - 代码在哪：`D:\zhishi-zhinong`，源码在 `web/`，发布产物在 `site/`，远端 `github.com/leeforword/zhishi-zhinong`（公开仓库）。
 - 怎么跑：`node web/server.mjs 8931` → `http://127.0.0.1:8931/`。零依赖，不需要 `npm install`。
 - 怎么发：`node scripts/build-site.mjs` → `git push origin main` → GitHub Actions 自动发布 Pages。
-- 先自检：`node scripts/doctor.mjs`（只读，实测 通过 54 / 警告 2 / 失败 0）。
+- 先自检：`node scripts/doctor.mjs`（只读，实测 通过 59 / 警告 2 / 失败 0）。
+- 阈值从哪来：`web/standards.js` 收录 13 份河北省 / 国家公开文件，按地块所属市自动取严；用户不用自己调风速。
 - 最大坑：**新增一个 JS 文件要同时改三处**（`index.html` 的 script、`sw.js` 的 SHELL、`scripts/build-site.mjs` 的 JS_FILES），漏一处线上就白屏或断网白屏。`doctor.mjs` 会抓这个。
 
 ---
@@ -36,7 +37,7 @@
 
 | 任务 | 判据（默认阈值） |
 |---|---|
-| 打药 | 作业时段内逐小时风速 ≤3.4 m/s、气温 5–32℃、当日降水 ≤0.5 mm、前一日降水 <1.0 mm，连续满足 ≥2 小时才成一个窗口 |
+| 打药 | 作业时段 9:00–16:00 内逐小时风速 ≤3.4 m/s（石家庄 3.0）、气温 5–30℃、当日降水 ≤0.5 mm、前一日 <1.0 mm，连续满足 ≥2 小时才成一个窗口；阈值按属地文件自动取严 |
 | 灌溉 | 当日降水 ≥5 mm 或降雨概率 ≥70% 不建议；未来 7 天累计 ≥15 mm 视为墒情尚可 |
 | 晾晒 | 当日降水 ≤1 mm、降雨概率 ≤50%、气温 ≥5℃ |
 
@@ -56,10 +57,11 @@
 | 域名根 | `https://leeforword.github.io/` | HTTP 200，226 B（跳转页 + 微信验证文件） |
 | 最近提交 | `ec0a269 内容设计大改：新建内容层…` | `git log -1` |
 | Actions | `completed / success`，与 `ec0a269` 对应 | GitHub API |
-| 规则引擎测试 | 通过 240 / 失败 0（条数随实时数据波动） | `node web/test-logic.mjs` |
-| 端到端测试 | 通过 65 / 失败 2 | `node web/e2e.mjs`（需先起本地服务器） |
-| 构建 | 复制 24 个文件，产物 27 个 / 2566 KB，自检全过 | `node scripts/build-site.mjs` |
-| 页面版本号 | v4.3（「我的 → 关于」） | `web/index.html` |
+| 规则引擎测试 | 通过 238 / 失败 0（条数随实时数据波动） | `node web/test-logic.mjs` |
+| 标准库测试 | 通过 156 / 失败 0（离线） | `node web/test-standards.mjs` |
+| 端到端测试 | 通过 70 / 失败 2 | `node web/e2e.mjs`（需先起本地服务器） |
+| 构建 | 复制 25 个文件，产物 28 个 / 2602 KB，自检全过 | `node scripts/build-site.mjs` |
+| 页面版本号 | v4.4（「我的 → 关于」） | `web/index.html` |
 | 规则引擎版本 | 3.1（`RULES.meta.version`） | `web/logic.js` |
 | 安卓壳 | versionCode 3 / versionName 1.2，包名 `io.github.leeforword.twa` | `android-webview/AndroidManifest.xml` |
 | 本地 Node | v22.22.2；CI 用 Node 20 | `node -v`、`deploy.yml` |
@@ -80,6 +82,7 @@ D:\zhishi-zhinong\
 │   ├── place.js                 498 行：坐标 → 地名（多源）
 │   ├── ensemble.js              490 行：集合预报 / 多模型分歧
 │   ├── content.js               436 行：文案与知识口径内容层（v4.3 新增）
+│   ├── standards.js             608 行：河北省 / 国家作业标准库，按属地取严（v4.4 新增）
 │   ├── pwa.js                   482 行：安装引导、SW 更新、断网提示
 │   ├── llm.js                   282 行：大模型意图 / 润色 / 数字校验
 │   ├── settings.js              162 行：本地设置（阈值、AI 配置）
@@ -90,6 +93,7 @@ D:\zhishi-zhinong\
 │   ├── server.mjs               216 行：零依赖本地静态服务器（含 /qr 扫码页）
 │   ├── qr.mjs                   486 行：手写二维码编码/渲染，只被 server.mjs 用
 │   ├── test-logic.mjs           158 行：规则引擎测试（纯 Node）
+│   ├── test-standards.mjs       127 行：标准库完整性 / 合并方向 / 问答文本（离线）
 │   ├── e2e.mjs                  494 行：Chrome Headless + CDP 端到端（零依赖）
 │   ├── manifest.webmanifest     PWA 清单
 │   ├── icons\                   192 / 512 / maskable / apple-touch / svg
@@ -177,6 +181,7 @@ Windows 双击 `start.bat` 等价于 `--lan`（端口占用会自动改 8932）�
 
 ```bash
 node scripts/doctor.mjs              # 只读自检，先跑这个
+node web/test-standards.mjs          # 标准库：条目完整、取严方向、问答文本（离线，最快）
 node web/test-logic.mjs              # 规则引擎，需联网取实时天气
 node web/test-logic.mjs --source=open-meteo   # 强制走 Open-Meteo
 ```
@@ -188,7 +193,7 @@ node web/e2e.mjs                     # 默认 http://127.0.0.1:8931/，截图输
 node web/e2e.mjs https://leeforword.github.io/zhishi-zhinong/ ../screenshots   # 测线上
 ```
 
-预期：`test-logic` 输出 `结果: 通过 240 / 失败 0`（数字随实时数据条数浮动，失败必须为 0）；`e2e` 输出 `pass 65 / fail 2`，2 个失败是已知的高德白名单问题（§11.1）。
+预期：`test-standards` 输出 `通过 156 / 失败 0`；`test-logic` 输出 `通过 238 / 失败 0`（数字随实时数据条数浮动，失败必须为 0）；`e2e` 输出 `pass 70 / fail 2`，2 个失败是已知的高德白名单问题（§11.1）。
 
 ### 5.3 构建
 
@@ -208,7 +213,7 @@ git commit -m "…"
 git push origin main
 ```
 
-`.github/workflows/deploy.yml` 会：`checkout` → Node 20 → `node web/test-logic.mjs`（不过就不发）→ `node scripts/build-site.mjs` → 上传 `site/` → 部署 Pages。也可以在 Actions 页面手动 `workflow_dispatch`。
+`.github/workflows/deploy.yml` 会：`checkout` → Node 20 → `node web/test-standards.mjs` → `node web/test-logic.mjs`（任一不过就不发）→ `node scripts/build-site.mjs` → 上传 `site/` → 部署 Pages。也可以在 Actions 页面手动 `workflow_dispatch`。
 
 推送踩过的坑（本机网络）：
 
@@ -252,6 +257,8 @@ bash android-webview/build.sh
 | `server.mjs` | CLI | 本地静态服务 + `/qr` 扫码页 + 目录穿越防护 | `qr.mjs` |
 | `e2e.mjs` | CLI | CDP 驱动 Chrome，65 项断言 + 截图 | Chrome/Edge |
 | `test-logic.mjs` | CLI | 用真实天气跑规则引擎与问答分支 | 网络 |
+| `standards.js` | `window.TianZhiStandards` = `{LIST, CITIES, effective, forCity, coverage, answer, limitsHtml, sourcesHtml, quotesHtml, …}` | 河北省 / 国家作业标准库：条目、属地合并（取严）、界面与问答文本 | 无 |
+| `test-standards.mjs` | CLI | 标准库完整性、取严方向、问答无 undefined（离线） | 无 |
 
 `app.js` 内部关键函数（改 UI 时按名字搜）：
 
@@ -315,12 +322,14 @@ bash android-webview/build.sh
 | `zz.pwa.installDismissed` | 安装条的「不再提示」 | `pwa.js` |
 | `tianzhi.corrections.v1` | 用户纠错记录（最多 50 条） | `app.js openCorrectionForm()` |
 
-### 7.5 两处默认阈值不一致（真实坑）
+### 7.5 阈值现在由标准库决定（v4.4 变更）
 
-- `logic.js` 的 `RULES.spray.hours = [6, 17]`
-- `settings.js` 的 `defaultRules().hours_end = 18`
+- 默认 `standard.mode = 'auto'`：`settings.applyRules(city)` 调 `standards.effective(city)`，把合并后的 patch 写进 `RULES`，同时把出处写进 `RULES.meta.source`。
+- `logic.js` 与 `settings.js` 的默认值已统一为 `3.4 m/s · 5–30℃ · 9–16 时`，只作为「标准库缺失」时的兜底。
+- 手动模式（`standard.mode='manual'`）才使用 `settings.rules`；保存滑轴会自动切到 manual，避免被下次自动重算覆盖。
+- 换地块时 `load()` 会比较 `plot.city` 与 `standard.city`，不同则重套标准——石家庄（3.0 m/s）与邯郸（3.4 m/s）在同一页面里会给出不同窗口。
 
-页面启动时 `if (S) S.applyRules()` 会把 settings 的默认值灌进 `RULES`，所以**线上实际作业时段是 6–18 点**；而 `test-logic.mjs` 不加载 settings，测的是 6–17。改阈值时必须同时看这两处，否则「测试通过但线上行为不同」。见 §11.5。
+**但这仍是两处状态**：标准库给的是 `patch`，用户覆盖存的是 `rules`。排查「数字和界面不一致」时，先看 `settings.get('standard').mode`。
 
 ---
 
@@ -403,14 +412,23 @@ openModal()
 
 坐标约定：存储与天气请求用 WGS-84；高德地图用 GCJ-02；转换函数 `T.wgs84ToGcj / T.gcjToWgs84`。
 
-### 8.5 阈值链
+### 8.5 阈值链（标准自动套用）
 
 ```
-我的 → 滑轴 input → syncRuleLabels()
-保存并重算 → settings.save('rules', patch) → S.applyRules()
-  → TianZhi.applyRuleOverrides(rules)
-      → 直接改 RULES.spray（只接受白名单字段与合法范围）
-  → load() 重新取数并重算全部窗口
+启动 / 换地块
+  → S.applyRules(city)
+      → TianZhiStandards.effective(city)
+          适用 = 全国 + 河北省 + 本市（排除已废止、非大田对象）
+          合并 = 风速取最小、温度上限取最小、下限取最大、时段取交集
+          每字段记录来源 id（by）
+      → TianZhi.applyRuleOverrides(patch)   // 只接受白名单字段与合法范围
+      → TianZhi.setRuleSource(label)        // 写进 RULES.meta.source
+  → load() 取数并重算全部窗口
+
+手动覆盖
+  → 滑轴 → settings.save('rules') + save('standard',{mode:'manual'})
+  → applyRules 走 manual 分支，用 settings.rules
+  → 「恢复按标准」= reset('rules') + mode:'auto' + applyRules(city)
 ```
 
 ### 8.6 发布链
@@ -454,7 +472,8 @@ git push origin main
 |---|---|---|
 | 页面文案 / 判定口径 / 资料来源 / 作品说明 | `web/content.js` | 改完刷新即可；HTML 片段里必须用 `C.esc()` 转义 |
 | 问答预设问题、欢迎语、依据提示 | `web/content.js` 的 `C.chat` | 预设改了会自动重渲染，事件委托在 `#qaChips` 上 |
-| 阈值默认值 | `web/settings.js` 的 `defaultRules()` + `web/logic.js` 的 `RULES` | **两处都要改**，见 §7.5 |
+| 阈值 / 作业标准 | `web/standards.js` 的 `LIST`（新增文件就加一条，必须带 code / url / checked） | 只收有原文或官方著录的；没全文的 `limits` 必须 `null`，不许猜数值 |
+| 阈值兜底 | `web/settings.js` 的 `defaultRules()` + `web/logic.js` 的 `RULES` | 只在标准库缺失时生效；改标准优先改 standards.js |
 | 打药/灌溉/晾晒判定逻辑 | `web/logic.js`：`hourVerdict()`、`findSprayWindows()`、`evaluateWeather()` | 改完必须跑 `test-logic.mjs`，有热力图一致性断言 |
 | 首页布局 / 新卡片 | `web/index.html`（结构 + CSS）+ `web/app.js` 对应 `render*()` | 样式与结构都在同一个 120 KB 文件里，改动要小步 |
 | 图表尺寸 / 截断 | `web/app.js` 的 `chartW()` 与各 `*Svg()` | 宽度必须按容器实测，别写死 560/620 |
@@ -499,13 +518,17 @@ git push origin main
 
 `README.md` 的目录树是 11-13 写的，**没有 `content.js`**；`docs/运行说明.md` 里还在描述「多气象模式一致性检查」这一节（对应 DOM `consensusBox`，已在改版中删除，`e2e` 有断言 `!document.getElementById('consensusBox')`），界面细节也与当前版本有出入。以代码和 `content.js` 为准；`docs/AI交接文档.md`（本文）是当前最新。
 
-### 11.5 默认阈值两处不一致
+### 11.5 标准覆盖的边界（不是 bug，但要说清）
 
-见 §7.5。`logic.js` 是 `[6,17]`，`settings.js` 是 `6–18`，线上实际用 18。测试测的是 17。改阈值/改测试时要意识到这点。
+- 县级文件绝大多数是转发省级，本库**不逐县收录**，统一按所属地级市处理。
+- 石家庄、唐山有可执行的市级标准；廊坊有市级文件但未获全文，**不按标题猜数值**，回落省级。
+- 保定只有市植保站现场会口径（3.3 m/s），属技术口径不是标准，`binding:false`，只展示不参与取严。
+- 邢台金银花标准已于 2025-06-01 废止；沧州是林业、张家口是露地蔬菜，均不适用于小麦 / 玉米。
+- 标准会更新。`standards.js` 的 `CHECKED` 是查证日期，更新条目时一起改；`test-standards.mjs` 会校验每条有没有编号与链接。
 
 ### 11.6 `scripts/` 里大量历史脚本
 
-`scripts/` 下有 20+ 个 `test-*.mjs / audit-*.mjs / shot-*.mjs`，是 11-12 至 11-13 开发期的验证工具，**未逐一复测**，其中 `run-all.mjs` 里的断言数量说明（246 条等）已过时。当前可信的只有：`build-site.mjs`、`doctor.mjs`、`web/test-logic.mjs`、`web/e2e.mjs`。其余按 **需确认** 处理，别把它们当 CI。
+`scripts/` 下有 20+ 个 `test-*.mjs / audit-*.mjs / shot-*.mjs`，是 11-12 至 11-13 开发期的验证工具，**未逐一复测**，其中 `run-all.mjs` 里的断言数量说明（246 条等）已过时。当前可信的只有：`build-site.mjs`、`doctor.mjs`、`web/test-logic.mjs`、`web/test-standards.mjs`、`web/e2e.mjs`。其余按 **需确认** 处理，别把它们当 CI。
 
 ### 11.7 `dist/` 是旧产物且有乱码目录
 
@@ -542,7 +565,7 @@ git push origin main
 按 `docs/大赛通知.txt`，A 赛道智能体方向还需：
 
 1. **演示录屏 ≤3 分钟**（16:9 或 9:16，字幕完整）。
-2. **关键界面截图 3–5 张**（首页判读、问答依据、地图选点、我的-阈值、作品说明）。
+2. **关键界面截图 3–5 张**（首页判读、问答依据、地图选点、我的-作业标准、作品说明）。
 3. **运行说明**（`docs/运行说明.md` 已有，但需按当前界面更新）。
 4. 通过学院统一提交作品与全部材料。
 
@@ -557,8 +580,8 @@ git push origin main
 1. 给 `localhost` 加高德白名单，让本地地图与 2 个 e2e 断言恢复。
 2. 接入真实遥感 NDVI，替换长势占位图（当前明确标注「不输出结论」）。
 3. 部署 Cloudflare Worker（`llmProxyUrl` + `openMeteoProxy`），解决集合预报超时、让 AI 润色可用且不暴露 key。
-4. 统一 `logic.js` 与 `settings.js` 的默认阈值，或让测试也加载 settings。
-5. 把 `content.js` 的关键数字与 `logic.js` 的阈值做一致性断言，防止文案与代码漂移。
+4. 补齐未获全文的市级标准（廊坊 DB1310/T 320-2023、石家庄 DB1301/T 518-2024），并逐年复核省站新文件。
+5. 把 `content.js` 里的数字与 `standards.js` / `logic.js` 做一致性断言，防止文案与代码漂移。
 6. 清理 `dist/`、`_archive/`、TWA 残留；给 `scripts/` 做一次取舍，把不用的移进 `_archive/`。
 7. 更新 `README.md` 目录树与 `docs/运行说明.md` 的界面描述。
 
@@ -617,6 +640,7 @@ cd /d/zhishi-zhinong
 node scripts/doctor.mjs
 
 # 2. 规则引擎（需联网）
+node web/test-standards.mjs
 node web/test-logic.mjs
 
 # 3. 端到端（另开终端起服务；本机预期 65/2）

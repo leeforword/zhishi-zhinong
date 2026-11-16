@@ -29,6 +29,7 @@ const SHELL = [
   './',
   './index.html',
   './config.js',
+  './standards.js',
   './settings.js',
   './llm.js',
   './weather.js',

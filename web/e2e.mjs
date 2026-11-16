@@ -437,6 +437,10 @@ async function waitData(timeoutMs) {
     await send('Page.navigate', { url: PAGE_URL });
     await sleep(1800);
     check(await ev("!!window.TianZhiContent"), 'content.js loaded');
+    check(await ev("!!window.TianZhiStandards"), 'standards.js loaded');
+    check(await ev("document.querySelectorAll('#stdBox .std-row').length") === 5, 'standard card: five limits');
+    check(await ev("document.querySelectorAll('#stdBox .std-file').length") >= 2, 'standard card: source files listed');
+    check(await ev("document.querySelectorAll('#stdBox .std-cov-row').length") === 11, 'standard coverage: 11 cities');
     check(await ev("document.querySelectorAll('#kbBox .kb-item').length") === 6, 'six rule / basis cards');
     check(await ev("document.querySelectorAll('#srcBox .src-item').length") >= 6, 'source list rendered');
     check(await ev("document.querySelectorAll('#projBox .proj-item').length") === 13, 'project brief: 13 sections');
@@ -459,6 +463,9 @@ async function waitData(timeoutMs) {
     await ev("document.getElementById('qaInput').value='为什么这么判断？';document.getElementById('qaSend').click();");
     await sleep(350);
     check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return x.textContent.indexOf('我把')>=0})"), 'method question answered');
+    await ev("document.getElementById('qaInput').value='我这里按什么标准打药？';document.getElementById('qaSend').click();");
+    await sleep(500);
+    check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return x.textContent.indexOf('查证日期')>=0&&x.textContent.indexOf('3.4')>=0})"), 'standard question answered with citation');
     await ev("document.getElementById('qaInput').value='这个结论准不准？';document.getElementById('qaSend').click();");
     await sleep(350);
     check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return x.textContent.indexOf('老实说')>=0})"), 'reliability question answered');

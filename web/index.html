@@ -1794,6 +1794,61 @@ html.zz-chat #zzBar{display:none!important}
 .chat-scope summary::-webkit-details-marker{display:none}
 .chat-scope summary.cs-h:after{content:"⌄";margin-left:auto;color:var(--text-3);font-size:14px}
 .chat-scope[open] summary.cs-h:after{content:"⌃"}
+
+/* ---------- 作业标准卡（我的 → 作业标准） ----------
+   设计目标：一眼看出「这块地按什么标准、每个数是哪份文件定的」。
+   所以每行都是 值 + 出处徽标，不把文件堆在角落。 */
+.std-head{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.std-head-l{flex:1 1 200px;min-width:0}
+.std-head-l b{display:block;font-size:13px;color:var(--text);line-height:1.5}
+.std-head-l span{display:block;font-size:11px;color:var(--text-3);margin-top:3px;line-height:1.55}
+.std-mode{display:flex;gap:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:3px;flex:0 0 auto}
+.std-mode button{border:0;background:transparent;font:inherit;font-size:11px;color:var(--text-2);padding:5px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.std-mode button.on{background:var(--surface-solid);color:var(--brand);font-weight:600;box-shadow:0 1px 3px rgba(20,30,24,.08)}
+.std-grid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.std-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:2px 8px;align-items:center;background:var(--surface-solid);padding:9px 11px}
+.std-k{grid-row:1;grid-column:1;font-size:11.5px;color:var(--text-2)}
+.std-v{grid-row:1;grid-column:2;font-size:13px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.std-h{grid-row:2;grid-column:1 / -1;font-size:10.5px;color:var(--text-3);line-height:1.45;margin-top:1px}
+.std-badge{grid-row:1;grid-column:3;justify-self:end;max-width:118px;overflow:hidden;text-overflow:ellipsis;
+  font-size:9.5px;line-height:1;padding:4px 6px;border-radius:6px;white-space:nowrap}
+.std-badge.nat{background:#EEF2FA;color:#2F5E8F}
+.std-badge.prov{background:var(--brand-weak);color:var(--brand-d)}
+.std-badge.city{background:#FBF3E2;color:#8A6220}
+.std-badge.tool{background:#F1F2EF;color:var(--text-3)}
+.std-files{display:grid;gap:7px;margin-top:12px}
+.std-file{display:block;text-decoration:none;border:1px solid var(--border);border-radius:11px;padding:9px 11px;background:var(--surface-2);transition:border-color .18s,background .18s}
+.std-file:active{background:var(--brand-weak)}
+.std-file-top{display:flex;align-items:center;gap:6px}
+.std-file-top b{font-size:11.5px;color:var(--brand-d)}
+.std-tag{font-size:9.5px;color:var(--text-3);border:1px solid var(--border);border-radius:5px;padding:2px 4px}
+.std-file-t{display:block;font-size:12px;color:var(--text);margin-top:3px;line-height:1.45}
+.std-file-m{display:block;font-size:10.5px;color:var(--text-3);margin-top:3px;line-height:1.4}
+.std-adv{margin-top:14px;border-top:1px dashed var(--border);padding-top:12px}
+.std-adv summary{list-style:none;cursor:pointer;font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px}
+.std-adv summary::-webkit-details-marker{display:none}
+.std-adv summary:after{content:"⌄";margin-left:auto;color:var(--text-3)}
+.std-adv[open] summary:after{content:"⌃"}
+.std-adv-body{padding-top:12px}
+.std-cov{display:grid;gap:0}
+.std-cov-row{display:grid;grid-template-columns:64px 1fr;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.std-cov-row:last-child{border-bottom:0}
+.std-cov-row b{font-size:11.5px;color:var(--text)}
+.std-cov-s{font-size:10.5px;color:var(--brand-d);font-weight:600}
+.std-cov-n{grid-column:2;font-size:10.5px;color:var(--text-3);line-height:1.5}
+.std-quote{border-left:2px solid var(--brand-weak);padding:2px 0 2px 10px;margin-bottom:12px}
+.std-quote b{font-size:11px;color:var(--text-2)}
+.std-quote p{font-size:11px;color:var(--text-3);line-height:1.65;margin:5px 0 0}
+.std-quote p i{font-style:normal;color:var(--brand-d);margin-right:4px}
+.std-quote a{display:inline-block;font-size:10.5px;color:var(--brand);margin-top:5px;text-decoration:none}
+.std-src-note{font-size:10.5px;color:var(--text-3);line-height:1.6;margin-top:10px}
+@media (min-width:760px){
+  .std-files{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:640px){
+  .std-row{grid-template-columns:64px 1fr auto;padding:8px 10px}
+  .std-head-l b{font-size:12.5px}
+}
 </style>
 </head>
 <body>
@@ -2139,36 +2194,41 @@ html.zz-chat #zzBar{display:none!important}
           </div>
         </div>
 
-        <div class="sec-h"><h2>农事阈值</h2><span class="hint">判定规则的唯一可调入口 · 改完保存立即重算</span></div>
+        <div class="sec-h"><h2>作业标准</h2><span class="hint">按地块属地自动套用河北省现行文件 · 不用自己调</span></div>
         <div class="card pad">
-          <div class="th-row">
-            <div class="th-top"><b>风速上限</b><span class="hint">超过即判定不宜喷施</span><span class="num" id="thWindV">3.4 m/s</span></div>
-            <input class="slider" type="range" id="setWind" min="0.5" max="8" step="0.1">
-          </div>
-          <div class="th-row" style="margin-top:14px">
-            <div class="th-top"><b>气温区间</b><span class="hint">低于下限药效差，高于上限易药害</span><span class="num" id="thTempV">5 — 32 ℃</span></div>
-            <input class="slider" type="range" id="setTempMin" min="-10" max="20" step="1">
-            <input class="slider" type="range" id="setTempMax" min="15" max="40" step="1" style="margin-top:-6px">
-          </div>
-          <div class="th-row" style="margin-top:14px">
-            <div class="th-top"><b>作业时段</b><span class="hint">避开逆温与露水时段</span><span class="num" id="thHourV">6 — 18 时</span></div>
-            <input class="slider" type="range" id="setHourStart" min="0" max="14" step="1">
-            <input class="slider" type="range" id="setHourEnd" min="8" max="24" step="1" style="margin-top:-6px">
-          </div>
-          <div class="th-row" style="margin-top:14px">
-            <div class="th-top"><b>当日降水上限</b><span class="hint">预计雨量超过即关闭窗口</span><span class="num" id="thRainV">0.5 mm</span></div>
-            <input class="slider" type="range" id="setRainDay" min="0" max="10" step="0.1">
-          </div>
-          <div class="note" style="margin-top:16px">
-            <b>为什么是这几个数：</b>风速上限默认 3.4 m/s（约 3 级风，药液开始明显漂移）；气温区间避开低温药效差与高温药害；
-            作业时段避开清晨露水 / 逆温与傍晚；当日降水上限用于避免雨前作业被冲刷。<br>
-            默认值来自<b>公开农技常识与农药标签通用要求</b>，<b>未经当地农技部门核定</b>。
-            如果你们县有明确标准，以当地为准，拖动滑轴即可，不用改代码。所有窗口、热力图、问答结论都会按新阈值重算。
-          </div>
-          <div class="btn-row" style="margin-top:14px">
-            <button class="btn" id="setSaveRules">保存并重算</button>
-            <button class="btn gh" id="setResetRules">恢复默认</button>
-          </div>
+          <div id="stdBox"><div class="skel" style="height:150px"></div></div>
+
+          <details class="std-adv" id="stdAdv">
+            <summary>高级：手动校准（确有必要再改）</summary>
+            <div class="std-adv-body">
+              <div class="th-row">
+                <div class="th-top"><b>风速上限</b><span class="hint">超过即判定不宜喷施</span><span class="num" id="thWindV">3.4 m/s</span></div>
+                <input class="slider" type="range" id="setWind" min="0.5" max="8" step="0.1">
+              </div>
+              <div class="th-row" style="margin-top:14px">
+                <div class="th-top"><b>气温区间</b><span class="hint">低于下限药效差，高于上限易药害</span><span class="num" id="thTempV">5 — 30 ℃</span></div>
+                <input class="slider" type="range" id="setTempMin" min="-10" max="20" step="1">
+                <input class="slider" type="range" id="setTempMax" min="15" max="40" step="1" style="margin-top:-6px">
+              </div>
+              <div class="th-row" style="margin-top:14px">
+                <div class="th-top"><b>作业时段</b><span class="hint">避开逆温、露水与中午高温</span><span class="num" id="thHourV">9 — 16 时</span></div>
+                <input class="slider" type="range" id="setHourStart" min="0" max="14" step="1">
+                <input class="slider" type="range" id="setHourEnd" min="8" max="24" step="1" style="margin-top:-6px">
+              </div>
+              <div class="th-row" style="margin-top:14px">
+                <div class="th-top"><b>当日降水上限</b><span class="hint">预计雨量超过即关闭窗口</span><span class="num" id="thRainV">0.5 mm</span></div>
+                <input class="slider" type="range" id="setRainDay" min="0" max="10" step="0.1">
+              </div>
+              <div class="note" style="margin-top:16px">
+                这些滑轴只在<b>自动标准不好用</b>时才动：比如你们县有更严的地方要求，或合作社统一规定。
+                保存后会自动切到「手动」模式，并在页面顶部标明「自定义阈值」，避免和标准混淆。
+              </div>
+              <div class="btn-row" style="margin-top:14px">
+                <button class="btn" id="setSaveRules">保存并重算</button>
+                <button class="btn gh" id="setResetRules">恢复按标准</button>
+              </div>
+            </div>
+          </details>
         </div>
 
         <div class="sec-h"><h2>安装与访问</h2><span class="hint">手机上不用记网址，也不需要浏览器地址栏</span></div>
@@ -2220,7 +2280,7 @@ html.zz-chat #zzBar{display:none!important}
           评审可直接按「三分钟演示提纲」一节走一遍。
         </div>
 
-        <div class="sec-h"><h2>关于与合规声明</h2><span class="hint">v4.3 · 内容版</span></div>
+        <div class="sec-h"><h2>关于与合规声明</h2><span class="hint">v4.4 · 标准版</span></div>
         <div class="disc">
           <b>知时智农 · 面向华北平原冬小麦 / 夏玉米的农事时机问答智能体</b>
           <p>气象 <span id="aboutWeather">和风天气（主预报）+ Open-Meteo（集合预报，用于置信度）</span></p>
@@ -2347,6 +2407,7 @@ html.zz-chat #zzBar{display:none!important}
 <script src="config.js"></script>
 <!-- 本地私有配置（.gitignore 忽略；公网构建时这一行会被移除，文件也不会上传） -->
 <script src="config.local.js"></script>
+<script src="standards.js"></script>
 <script src="settings.js"></script>
 <script src="llm.js"></script>
 <script src="weather.js"></script>

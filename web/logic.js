@@ -38,16 +38,16 @@
      =========================================================== */
   var RULES = {
     meta: {
-      version: '3.1',
-      source: '公开农技常识（待核实，正式使用须以当地农技部门指导意见为准）',
-      windBasis: '3 级风下限 3.4 m/s（飘移控制经验界线）'
+      version: '3.2',
+      source: '河北省植保植检总站 2026 科学用药注意事项 + DB13/T 5517-2022 + NY/T 1276-2025（取严，详见 standards.js）',
+      windBasis: '无人机施药 ≤3.4 m/s（<3 级风）；地面喷雾允许到 5.4 m/s，本工具取更严口径'
     },
     spray: {
       name: '打药',
-      hours: [6, 17],          // 建议作业时段 6:00–17:00
-      wind_max: 3.4,           // 作业时段逐小时风速上限 m/s（≈3 级风）
-      temp_min: 5,             // 最低气温 ℃
-      temp_max: 32,            // 最高气温 ℃
+      hours: [9, 16],          // 省站建议：晴天上午 9 点至下午 4 点
+      wind_max: 3.4,           // 作业时段逐小时风速上限 m/s（<3 级风）
+      temp_min: 5,             // 最低气温 ℃（麦田除草下限）
+      temp_max: 30,            // 最高气温 ℃（NY/T 1276-2025）
       rain_day_max: 0.5,       // 当天降水超过此值 → 不宜
       rain_prev_max: 1,        // 前一天降水超过此值 → 不宜
       min_window_hours: 2      // 最小连续可作业时长
@@ -123,6 +123,12 @@
     if (s.hours[1] <= s.hours[0]) s.hours[1] = Math.min(24, s.hours[0] + 1);
 
     return changed;
+  }
+
+  /** 记录当前阈值来自哪份文件（界面与问答里显示，避免「数字来路不明」） */
+  function setRuleSource(label) {
+    if (typeof label === 'string' && label) RULES.meta.source = label;
+    return RULES.meta.source;
   }
 
   var CROP_NAME = { wheat: '冬小麦', maize: '夏玉米' };
@@ -489,6 +495,13 @@
     var tag = '【' + plot.name + '】';
     var best;
 
+    /* ---- 作业标准 / 依据文件（不需要天气，也不该由大模型自由发挥） ---- */
+    if (/标准|规范|红头文件|农技|政策|哪个文件|什么文件|按什么|谁定的|哪个部门/.test(q)) {
+      var ST = (typeof window !== 'undefined' ? window : globalThis).TianZhiStandards;
+      if (!ST || !ST.answer) return tag + '标准库没有加载，暂时查不到依据文件。';
+      return ST.answer(plot && plot.city, plot && plot.name);
+    }
+
     /* ---- 打药 ---- */
     if (/打药|喷药|施药|农药|喷雾|喷洒|除草剂/.test(q)) {
       var ok = result.days.filter(function (d) {
@@ -517,7 +530,8 @@
       return tag + '未来一周有 ' + ok.length + ' 天可以打药：\n\n' + lines +
         '\n\n最合适的是 ' + fmtDate(best.date, result) + ' ' + pad2(bw.start) + ':00–' + pad2(bw.end) + ':00，' +
         '连续 ' + bw.hours + ' 小时，平均风速只有 ' + bw.avgWind + ' m/s。\n\n' +
-        '判断依据：在 6:00–17:00 作业时段内，逐小时风速不超过 ' + RULES.spray.wind_max +
+        '判断依据：在 ' + pad2(RULES.spray.hours[0]) + ':00–' + pad2(RULES.spray.hours[1]) +
+        ':00 作业时段内，逐小时风速不超过 ' + RULES.spray.wind_max +
         ' m/s、气温在 ' + RULES.spray.temp_min + '–' + RULES.spray.temp_max + '℃ 之间，且前后没有降雨。';
     }
 
@@ -663,6 +677,9 @@
    * 未命中返回 null（null 表示"规则看不懂，可以交给大模型试试"）
    */
   function ruleIntent(q) {
+    /* 标准 / 文件类问题优先：「打药按什么标准」应该答标准，
+       而不是答一遍窗口——这是 A 赛道「知识依据可查」的直接考点。 */
+    if (/标准|规范|红头文件|农技|政策|哪个文件|什么文件|按什么|谁定的|哪个部门/.test(q)) return 'standard';
     if (/打药|喷药|施药|农药|喷雾|喷洒|除草剂/.test(q)) return 'spray';
     if (/浇|灌水|灌溉|墒|水肥|补水|旱|缺水/.test(q)) return 'irrigation';
     if (/晾晒|收获|收粮|晒|收割|入库/.test(q)) return 'harvest';
@@ -674,6 +691,7 @@
 
   /** 意图 → 标准问法，保证答案里的数字一律由规则引擎产生 */
   var INTENT_QUERY = {
+    standard: '我这里按什么标准打药',
     spray: '哪天能打药',
     irrigation: '这几天要不要浇水',
     harvest: '可以晾晒吗',
@@ -917,6 +935,7 @@
   return {
     RULES: RULES,
     applyRuleOverrides: applyRuleOverrides,
+    setRuleSource: setRuleSource,
     CROP_NAME: CROP_NAME,
     DOW: DOW,
     CITIES: CITIES,

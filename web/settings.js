@@ -41,18 +41,28 @@
 
   function defaultRules() {
     return {
-      wind_max: 3.4,        // m/s，逐小时风速上限
+      wind_max: 3.4,        // m/s，逐小时风速上限（<3 级风）
       temp_min: 5,          // ℃，作业气温下限
-      temp_max: 32,         // ℃，作业气温上限
-      hours_start: 6,       // 作业时段起（含）
-      hours_end: 18,        // 作业时段止（不含）
+      temp_max: 30,         // ℃，作业气温上限（NY/T 1276-2025）
+      hours_start: 9,       // 省站建议：上午 9 点起
+      hours_end: 16,        // 下午 4 点止
       rain_day_max: 0.5,    // mm，当日降水超过即不建议作业
       rain_prev_max: 1.0    // mm，前一日降水超过即拦截
     };
   }
 
+  /* 「按属地标准」是默认，手动滑轴只是后备。
+     农户手里没有农技文件，让他自己填风速上限等于把责任推给用户；
+     这里改成默认自动套用 standards.js 里的公开文件，用户只在确有必要时覆盖。 */
+  function defaultStandard() {
+    return {
+      mode: 'auto',      // auto = 按地块属地自动取严；manual = 用下面的 rules
+      city: ''           // 跟随当前地块的市，由 app.js 写入
+    };
+  }
+
   function defaults() {
-    return { v: 1, ai: defaultAI(), rules: defaultRules() };
+    return { v: 1, ai: defaultAI(), rules: defaultRules(), standard: defaultStandard() };
   }
 
   /* ---------------- 读写 ---------------- */
@@ -73,7 +83,8 @@
           cache = {
             v: 1,
             ai: Object.assign(d.ai, o.ai || {}),
-            rules: Object.assign(d.rules, o.rules || {})
+            rules: Object.assign(d.rules, o.rules || {}),
+            standard: Object.assign(d.standard, o.standard || {})
           };
           return cache;
         }
@@ -124,13 +135,51 @@
 
   /**
    * 把阈值写进规则引擎（logic.js 里的 RULES）
+   *
+   * auto 模式：从 standards.js 取属地文件，按「取严」合并后写入，
+   *            同时把出处记到 RULES.meta.source，界面上能显示凭什么是这个数。
+   * manual 模式：用用户在滑轴里保存的 rules。
+   *
    * RULES 是全局共享对象，改了就立刻生效；调用方负责之后重新取一次天气/重算。
    */
-  function applyRules() {
-    var r = read().rules;
+  function applyRules(city) {
     var T = root.TianZhi;
     if (!T || !T.applyRuleOverrides) return false;
-    return T.applyRuleOverrides(r);
+
+    var st = read().standard;
+    var useCity = city || st.city || '';
+
+    if (st.mode === 'auto') {
+      var S = root.TianZhiStandards;
+      if (!S) return false;
+      var e = S.effective(useCity);
+      var ok = T.applyRuleOverrides(e.patch);
+      if (T.setRuleSource) T.setRuleSource(e.label + ' · 查证 ' + S.CHECKED);
+      return ok;
+    }
+
+    var r = read().rules;
+    var ok2 = T.applyRuleOverrides(r);
+    if (T.setRuleSource) T.setRuleSource('手动校准（自定义阈值）');
+    return ok2;
+  }
+
+  /** 当前生效的标准摘要，给界面和问答显示 */
+  function standardSummary(city) {
+    var S = root.TianZhiStandards;
+    if (!S) return null;
+    var st = read().standard;
+    var e = S.effective(city || st.city || '');
+    return {
+      mode: st.mode,
+      city: e.cityName,
+      patch: e.patch,
+      by: e.by,
+      sources: e.sources,
+      label: e.label,
+      stricter: e.stricter,
+      checked: S.CHECKED
+    };
   }
 
   /** 判断 AI 当前是否可用（给「我的」页和问答卡片显示状态用） */
@@ -155,8 +204,9 @@
     save: save,
     reset: reset,
     applyRules: applyRules,
+    standardSummary: standardSummary,
     aiStatus: aiStatus,
     subscribe: function (fn) { listeners.push(fn); },
-    defaultsOf: { ai: defaultAI, rules: defaultRules }
+    defaultsOf: { ai: defaultAI, rules: defaultRules, standard: defaultStandard }
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

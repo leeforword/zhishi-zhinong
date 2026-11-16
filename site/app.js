@@ -14,6 +14,9 @@
   // 集合预报层（可选）：取不到时为 undefined，界面自动退回确定性窗口
   var E = window.TianZhiEnsemble || null;
 
+  // 作业标准库：河北省 / 市级公开文件的阈值来源（standards.js）
+  var STD = window.TianZhiStandards || null;
+
   /** 日期短格式：2026-11-13 → 11/13 */
   function fmtDate(s) {
     if (!s) return '';
@@ -1721,6 +1724,18 @@
   function load() {
     var plot = activePlot();
     if (!plot) return;
+
+    /* 换地块 = 换属地：自动模式必须跟着地块的市重套标准，
+       否则在石家庄看到的窗口，搬到邯郸还是同一套阈值。 */
+    if (S) {
+      var std = S.get('standard');
+      if (std.mode !== 'manual' && (plot.city || '') !== (std.city || '')) {
+        S.save('standard', { city: plot.city || '' });
+        S.applyRules(plot.city || '');
+        if (currentView === 'mine') renderStandard();
+      }
+    }
+
     state.loading = true;
     state.result = null;
     $('tbTitle').textContent = plot.name + ' · ' + CROP_NAME[plot.crop];
@@ -2763,7 +2778,7 @@
    * 评审里「知识准确性」「对话体验」「AI 伦理与合规」都要求回答能被核对、
    * 能被指出错误，而不是一句来路不明的结论。
    */
-  function appendMsg(role, text, withNote) {
+  function appendMsg(role, text, withNote, notes) {
     var log = $('qaLog');
     var d = document.createElement('div');
     d.className = 'msg ' + role;
@@ -2778,10 +2793,15 @@
     if (role === 'bot' && withNote && CONTENT) {
       var note = document.createElement('div');
       note.className = 'an-note';
+      var set = notes || {
+        source: CONTENT.chat.frame.source,
+        caveat: CONTENT.chat.frame.caveat,
+        verify: CONTENT.chat.frame.verify
+      };
       [
-        ['依据', CONTENT.chat.frame.source],
-        ['边界', CONTENT.chat.frame.caveat],
-        ['核实', CONTENT.chat.frame.verify]
+        ['依据', set.source],
+        ['边界', set.caveat],
+        ['核实', set.verify]
       ].forEach(function (pair) {
         var r = document.createElement('div');
         r.className = 'an-row';
@@ -2949,12 +2969,30 @@
     appendMsg('me', q);
     input.value = '';
 
+    var plot = activePlot();
+
+    /* 作业标准是静态文件，不依赖天气。天气还没回来时也应该能答，
+       否则用户一问「按什么标准」就被「稍等」挡回去，体验很差。 */
+    var ST0 = window.TianZhiStandards;
+    if (ST0 && T.ruleIntent(q) === 'standard') {
+      var eff0 = ST0.effective(plot && plot.city);
+      var codes = (eff0.sources || []).map(function (id) {
+        var it = ST0.byId(id);
+        return it ? it.code : '';
+      }).filter(Boolean).join('、');
+      appendMsg('bot', ST0.answer(plot && plot.city, plot && plot.name), true, {
+        source: (codes || '河北省现行文件') + '；原文摘录与 11 市收录范围见「我的 → 作业标准」',
+        caveat: '标准只约束气象条件，不替代农药标签与当地农技部门意见',
+        verify: '按编号到全国标准信息公共服务平台或政府网站查原文；本库查证日期 ' + ST0.CHECKED
+      });
+      return;
+    }
+
     if (!state.result) {
       appendMsg('bot', CONTENT ? CONTENT.chat.loading : '天气数据还没加载好，稍等一下再问。');
       return;
     }
 
-    var plot = activePlot();
     var result = state.result;
     // 拒答话术里报给用户的「能力清单」，与范围卡保持同一套口径
     var capabilities = CONTENT
@@ -3184,6 +3222,10 @@
     if (name === 'content' && state.result) {
       setTimeout(function () { renderCharts(); }, 80);
     }
+    if (name === 'mine') {
+      renderStandard();
+      fillRuleInputs();
+    }
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* file:// 下可能不允许 */ }
   }
 
@@ -3202,15 +3244,105 @@
   var S = window.TianZhiSettings;
 
   /* ---------- 农事阈值 ---------- */
+  /* =========================================================
+     「我的」页：作业标准（属地自动套用）
+     ========================================================= */
+
+  function stdCity() {
+    var p = activePlot();
+    return p && p.city ? p.city : '';
+  }
+
+  function manualLimitsHtml() {
+    var r = T.RULES.spray;
+    var rows = [
+      ['风速上限', '≤ ' + r.wind_max + ' m/s', '当前为手动值'],
+      ['气温区间', r.temp_min + ' – ' + r.temp_max + ' ℃', '当前为手动值'],
+      ['作业时段', pad2(r.hours[0]) + ':00 – ' + pad2(r.hours[1]) + ':00', '当前为手动值'],
+      ['当日降水', '≤ ' + r.rain_day_max + ' mm', '当前为手动值'],
+      ['最短窗口', '≥ ' + r.min_window_hours + ' 小时', '当前为手动值']
+    ];
+    return '<div class="std-grid">' + rows.map(function (x) {
+      return '<div class="std-row"><div class="std-k">' + esc(x[0]) + '</div>' +
+        '<div class="std-v">' + esc(x[1]) + '</div>' +
+        '<div class="std-h">' + esc(x[2]) + '</div>' +
+        '<span class="std-badge tool">手动</span></div>';
+    }).join('') + '</div>';
+  }
+
+  function renderStandard() {
+    var box = $('stdBox');
+    if (!box) return;
+
+    if (!STD) {
+      box.innerHTML = '<div class="note">标准库未加载（standards.js 缺失）。当前仍可用下方手动阈值，但无法显示属地依据。</div>';
+      return;
+    }
+
+    var city = stdCity();
+    var st = S ? S.get('standard') : { mode: 'auto' };
+    var auto = st.mode !== 'manual';
+    var e = STD.effective(city);
+
+    var title = auto
+      ? '按' + (e.cityName || '河北省') + '现行文件执行'
+      : '手动阈值（已脱离属地标准）';
+    var sub = auto
+      ? (e.label + ' · 文件查证 ' + STD.CHECKED + (e.stricter ? ' · ' + e.stricter : ''))
+      : '滑轴里的数字优先。建议先切回「按标准」看一遍，再决定是否真的需要更严或更宽。';
+
+    var html = '<div class="std-head">' +
+      '<div class="std-head-l"><b>' + esc(title) + '</b><span>' + esc(sub) + '</span></div>' +
+      '<div class="std-mode">' +
+      '<button data-std-mode="auto" class="' + (auto ? 'on' : '') + '">按标准</button>' +
+      '<button data-std-mode="manual" class="' + (auto ? '' : 'on') + '">手动</button>' +
+      '</div></div>';
+
+    html += auto ? STD.limitsHtml(city) : manualLimitsHtml();
+    html += STD.sourcesHtml(city);
+
+    html += '<details class="std-adv" style="margin-top:12px">' +
+      '<summary>河北省 11 市收录情况（含未检索到的市）</summary>' +
+      '<div class="std-adv-body">' + STD.coverageHtml() + '</div></details>';
+
+    html += '<details class="std-adv">' +
+      '<summary>原文摘录（可逐条核对）</summary>' +
+      '<div class="std-adv-body">' + STD.quotesHtml(city) + '</div></details>';
+
+    html += '<div class="std-src-note">标准只约束气象条件，不替代农药标签与当地农技部门意见。' +
+      '县级文件多为转发省级，未逐县收录；市级未检索到公开文件、或仅有非标准技术口径的，按省级执行。' +
+      '每行右侧标注该字段最严的来源；气温上下限来自不同文件时，标上限来源（超上限更危险）。' +
+      '如你们县有更严要求，可在下方手动校准。</div>';
+
+    box.innerHTML = html;
+  }
+
+  function setStdMode(mode) {
+    if (!S || !STD) return;
+    S.save('standard', { mode: mode === 'manual' ? 'manual' : 'auto', city: stdCity() });
+    S.applyRules(stdCity());
+    fillRuleInputs();
+    renderStandard();
+    toast(mode === 'manual' ? '已切到手动阈值' : '已恢复按属地标准');
+    load();
+  }
+
   function fillRuleInputs() {
     if (!S) return;
-    var r = S.get('rules');
+    var r;
+    var st = S.get('standard');
+    if (st.mode !== 'manual' && STD) {
+      // 自动模式：滑轴显示当前属地标准的实际数值，而不是旧的本地存储
+      r = STD.effective(stdCity()).patch;
+    } else {
+      r = S.get('rules');
+    }
     if ($('setWind')) $('setWind').value = r.wind_max;
     if ($('setTempMin')) $('setTempMin').value = Math.round(r.temp_min);
     if ($('setTempMax')) $('setTempMax').value = Math.round(r.temp_max);
     if ($('setHourStart')) $('setHourStart').value = r.hours_start;
     if ($('setHourEnd')) $('setHourEnd').value = r.hours_end;
-    if ($('setRainDay')) $('setRainDay').value = r.rain_day_max;
+    if ($('setRainDay')) $('setRainDay').value = (r.rain_day_max !== undefined ? r.rain_day_max : 0.5);
     syncRuleLabels();
   }
 
@@ -3268,9 +3400,13 @@
       hours_end: end,
       rain_day_max: Number($('setRainDay').value)
     });
-    S.applyRules();
+    // 手动改了就切到手动模式，否则下一次按属地标准重算会把用户的值覆盖掉，
+    // 用户会以为「保存没生效」。
+    S.save('standard', { mode: 'manual' });
+    S.applyRules(stdCity());
     fillRuleInputs();          // 回填：逻辑层纠正过的值（比如时段写反）要能看出来
-    toast('阈值已保存，正在按新阈值重算');
+    renderStandard();
+    toast('已保存为手动阈值，正在重算');
     load();
   }
 
@@ -3344,11 +3480,20 @@
     if ($('setResetRules')) {
       $('setResetRules').onclick = function () {
         S.reset('rules');
-        S.applyRules();
+        S.save('standard', { mode: 'auto', city: stdCity() });
+        S.applyRules(stdCity());
         fillRuleInputs();
-        toast('阈值已恢复默认');
+        renderStandard();
+        toast('已恢复按属地标准');
         load();
       };
+    }
+    if ($('stdBox') && !$('stdBox')._stdBound) {
+      $('stdBox')._stdBound = true;
+      $('stdBox').addEventListener('click', function (e) {
+        var b = e.target && e.target.closest ? e.target.closest('[data-std-mode]') : null;
+        if (b) setStdMode(b.getAttribute('data-std-mode'));
+      });
     }
     if ($('aiModeTabs')) {
       Array.prototype.forEach.call($('aiModeTabs').querySelectorAll('button'), function (b) {
@@ -3385,6 +3530,7 @@
       };
     }
     fillRuleInputs();
+    renderStandard();
     fillAiInputs();
     renderAiStatus();
   }
