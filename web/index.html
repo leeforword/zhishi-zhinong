@@ -1639,26 +1639,6 @@ html.zz-chat #zzBar{display:none!important}
   background:var(--youth-weak);border-radius:0 12px 12px 0;
   font-size:13px;color:var(--text);line-height:1.7;
 }
-/* ---- 首屏定位条：把「谁用 / 解决什么 / 主题」压成两行 ---- */
-.pos-strip{
-  position:relative;margin:2px 0 12px;padding:13px 16px 13px 18px;
-  background:linear-gradient(100deg,rgba(255,255,255,.94),rgba(231,239,233,.72));
-  border:1px solid var(--border);border-radius:18px;
-  box-shadow:var(--shadow);overflow:hidden;
-}
-.pos-strip:before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;
-  border-radius:9px;background:linear-gradient(180deg,var(--brand),var(--harvest))}
-.pos-strip .pos-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
-.pos-kicker{
-  font-size:10.5px;font-weight:600;letter-spacing:.06em;color:#fff;
-  background:var(--brand);border-radius:99px;padding:3px 9px;
-}
-.pos-kicker.youth{background:var(--youth)}
-.pos-strip h2{font-size:14.5px;font-weight:600;color:var(--text);letter-spacing:-.01em}
-.pos-strip p{font-size:12px;line-height:1.7;color:var(--text-2)}
-.pos-strip .pos-meta{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
-.pos-meta span{font-size:10.5px;color:var(--text-2);background:rgba(255,255,255,.8);
-  border:1px solid var(--border);border-radius:99px;padding:3px 9px}
 /* ---- 节气农事提示 ---- */
 .jq-farm{
   margin:8px 0 2px;padding:9px 12px;border-radius:12px;
@@ -1770,9 +1750,6 @@ html.zz-chat #zzBar{display:none!important}
 @media (max-width:640px){
   .kb-grid,.src-list,.kb-gloss dl,.scope-mini,.scope-cols,.palette-row{grid-template-columns:1fr}
   .palette-row{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .pos-strip{padding:13px 14px 13px 16px;border-radius:18px}
-  .pos-strip h2{font-size:14px}
-  .pos-strip p{font-size:12px}
   .proj-body{font-size:12.5px}
   .proj-body .src-table,.proj-body .src-table tbody,.proj-body .src-table tr,
   .proj-body .src-table td{display:block;width:100%;box-sizing:border-box}
@@ -1849,6 +1826,57 @@ html.zz-chat #zzBar{display:none!important}
   .std-row{grid-template-columns:64px 1fr auto;padding:8px 10px}
   .std-head-l b{font-size:12.5px}
 }
+
+.hero-conf{font-size:11.5px;color:var(--text-2);display:flex;align-items:center;gap:6px;line-height:1.5}
+.hero-conf:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--brand);flex:none}
+/* ---------- 依据入口 / 弹层 / 单行依据条（v4.5 精简） ---------- */
+.basis-entry{
+  width:100%;display:flex;align-items:center;gap:10px;margin:12px 0 4px;
+  padding:11px 13px;border:1px solid var(--border);border-radius:14px;
+  background:var(--surface-solid);font:inherit;text-align:left;cursor:pointer;
+  transition:border-color .18s,background .18s;
+}
+.basis-entry:active{background:var(--surface-2)}
+.basis-entry .be-l{flex:1;min-width:0}
+.basis-entry .be-l b{display:block;font-size:12.5px;color:var(--text);line-height:1.4}
+.basis-entry .be-l span{display:block;font-size:10.5px;color:var(--text-3);margin-top:2px}
+.basis-entry .be-arrow{color:var(--text-3);font-size:16px;flex:none}
+.chat-line{
+  flex:none;
+  display:flex;align-items:center;gap:8px;padding:7px 14px 8px;
+  font-size:10.5px;color:var(--text-3);line-height:1.5;
+}
+.chat-line span{flex:1;min-width:0}
+.link-btn{
+  border:0;background:transparent;padding:2px 4px;font:inherit;font-size:10.5px;
+  color:var(--brand);cursor:pointer;flex:none;
+}
+.basis-modal{max-width:460px}
+.basis-sec{padding:10px 0 12px;border-bottom:1px solid var(--border)}
+.basis-sec:last-of-type{border-bottom:0}
+.basis-sec > b{display:block;font-size:12px;color:var(--text);margin-bottom:7px}
+.basis-rules{display:grid;gap:8px}
+.basis-rule{padding:8px 10px;background:var(--surface-2);border-radius:10px}
+.basis-rule b{display:block;font-size:11.5px;color:var(--text)}
+.basis-rule p{font-size:11px;color:var(--text-2);line-height:1.6;margin-top:3px}
+.basis-rule span{display:block;font-size:10px;color:var(--text-3);line-height:1.5;margin-top:4px}
+.basis-src{display:grid;gap:6px}
+.basis-src div{display:flex;gap:8px;font-size:10.5px;color:var(--text-2);line-height:1.5}
+.basis-src i{font-style:normal;color:var(--text-3);flex:none;width:52px}
+.basis-note{font-size:11px;color:var(--text-3);line-height:1.65}
+.an-line{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px;
+  padding-top:7px;border-top:1px dashed var(--border);
+  font-size:10px;color:var(--text-3);line-height:1.5;
+}
+.an-line span{flex:1;min-width:120px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.an-line button{
+  border:0;background:transparent;font:inherit;font-size:10px;color:var(--brand);
+  padding:1px 3px;cursor:pointer;
+}
+@media (max-width:640px){
+  .basis-modal{max-width:none}
+}
 </style>
 </head>
 <body>
@@ -1919,10 +1947,8 @@ html.zz-chat #zzBar{display:none!important}
     </div>
 
     <div class="side-foot">
-      <span id="footWeather">气象 和风天气（主预报）+ Open-Meteo（集合）</span><br>
-      地图 高德 · 边界 DataV GeoAtlas<br>
-      结论由本地规则引擎算出，AI 不产生数字<br>
-      建议仅供参考 · 以当地农技部门与农药标签为准
+      <span id="footWeather">和风天气 + Open-Meteo</span> · 高德地图<br>
+      建议仅供参考，以当地农技部门与农药标签为准
     </div>
   </aside>
 
@@ -1958,21 +1984,6 @@ html.zz-chat #zzBar{display:none!important}
     <!-- ============ 视图一：内容（长滚动，不拆） ============ -->
     <section class="view on" id="viewContent">
     <div class="content">
-
-      <!-- ---------- 作品定位：谁用、解决什么、主题 ---------- -->
-      <div class="pos-strip">
-        <div class="pos-top">
-          <span class="pos-kicker">交互智能体</span>
-          <span class="pos-kicker youth">青春中国 · 把 AI 用到田埂上</span>
-          <h2>把天气预报，翻译成此刻能不能下地</h2>
-        </div>
-        <p>预报只说「多云、3 级风」，可站在地头要决定的是：今天几点风最小、雨前够不够打完一遍药。这里给的不是天气，是一个能说清依据的时间点。</p>
-        <div class="pos-meta">
-          <span>服务对象：华北平原种植户 / 下地实践的同学</span>
-          <span>知识范围：农事时机，不答病虫害与药名</span>
-          <span>数字来源：实时气象 + 本地规则引擎</span>
-        </div>
-      </div>
 
       <!-- ---------- 告警 ---------- -->
       <div class="alerts" id="alerts"></div>
@@ -2122,25 +2133,16 @@ html.zz-chat #zzBar{display:none!important}
           </div>
         </div>
         <div class="chart-scroll"><div id="growthChart"><div class="skel" style="height:150px"></div></div></div>
-        <div class="chart-note" style="margin-top:10px">
-          <b style="color:#8C3025">这不是实测数据。</b>曲线仅用于说明「接入遥感后该怎么画」，不代表任何地块的真实苗情，也不参与本作品的决策。
-          真实 NDVI 需要卫星影像与地物反演，属于后续版本工作，已在「作品说明 → 不足与改进」中如实列出。
-        </div>
+        <div class="chart-note" style="margin-top:10px">未接入遥感，曲线仅示意方法，不代表实际苗情。</div>
       </div>
       </div>
       </div>
 
-      <!-- ---------- 判定口径与知识范围 ---------- -->
-      <div class="sec-h"><h2>判定口径与知识范围</h2><span class="hint">每个结论都能追到阈值与数据源 · 也可以直接在「问答」里问「为什么这么判断」</span></div>
-      <div class="card pad" id="kbBox"></div>
-
-      <!-- ---------- 资料来源 ---------- -->
-      <div class="sec-h"><h2>资料来源与使用说明</h2><span class="hint">公开数据 + 本地规则，不使用未公开数据，不编造用户反馈</span></div>
-      <div class="card pad" id="srcBox"></div>
-      <div class="src-note" style="margin:10px 2px 0">
-        本页所有气象数字均为打开页面时实时请求；结论由本地规则引擎计算，AI 只做意图分类与口语化改写，不产生数字。
-        阈值可在「我的 → 农事阈值」按当地标准校准。建议仅供参考，实际决策以当地农技部门意见与农药标签为准。
-      </div>
+      <!-- ---------- 依据入口：口径与来源收进弹层，首页只留一个按钮 ---------- -->
+      <button class="basis-entry" id="basisOpen" type="button">
+        <span class="be-l"><b>判定依据</b><span>口径 · 数据来源 · 作业标准</span></span>
+        <span class="be-arrow">›</span>
+      </button>
 
     </div>
 
@@ -2159,12 +2161,10 @@ html.zz-chat #zzBar{display:none!important}
             <button class="ai-toggle" id="aiToggle" title="切换大模型润色">开</button>
           </span>
         </div>
-        <details class="chat-scope" id="chatScope">
-          <summary class="cs-h"><b>我能答什么 · 依据从哪来</b><span>知识范围 / 资料来源 / 边界</span></summary>
-          <p id="chatScopeText"></p>
-          <div id="chatScopeMini"></div>
-          <p class="src-note" id="chatScopeBoundary"></p>
-        </details>
+        <div class="chat-line">
+          <span>只答农事时机：打药 / 浇水 / 晾晒 · 不答病虫害与药名</span>
+          <button class="link-btn" id="basisOpenChat" type="button">依据 ›</button>
+        </div>
         <div class="qa-log" id="qaLog"></div>
         <div class="qa-foot">
           <div class="chips-row" id="qaChips"></div>
@@ -2172,7 +2172,6 @@ html.zz-chat #zzBar{display:none!important}
             <input class="field" id="qaInput" placeholder="比如：这周哪天适合打药？为什么这么判？" autocomplete="off">
             <button class="btn btn-primary" id="qaSend">发送</button>
           </div>
-          <div class="src-note" style="margin-top:8px">超出知识范围会明确说「不会」并告诉你该找谁；每条回答下方都附依据、边界与纠错入口。</div>
         </div>
       </div>
     </section>
@@ -2231,66 +2230,59 @@ html.zz-chat #zzBar{display:none!important}
           </details>
         </div>
 
-        <div class="sec-h"><h2>安装与访问</h2><span class="hint">手机上不用记网址，也不需要浏览器地址栏</span></div>
-        <div class="mine-list">
-          <a class="mrow apk-row" id="apkRow" href="download/zhishi-zhinong.apk" download="知时智农.apk">
-            <span class="mic">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 10h12v7a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-7Z"/><path d="M8 10 6.5 6.5M16 10l1.5-3.5"/><path d="M9.5 14h.01M14.5 14h.01"/>
-              </svg>
-            </span>
-            <span class="mtx"><b>下载安卓安装包</b><span>独立 WebView 壳 · 无地址栏 · 页面内容随线上更新</span></span>
-            <span class="mval">下载 ›</span>
-          </a>
+        <div class="sec-h"><h2>关于</h2><span class="hint">v4.5</span></div>
+        <div class="disc">
+          <b>知时智农 · 华北平原冬小麦 / 夏玉米农事时机助手</b>
+          <p>气象 和风天气 + Open-Meteo · 地图 高德 · 标准 河北省 / 市级公开文件</p>
+          <p>建议仅供参考，以当地农技部门意见与农药标签为准。地块、阈值与纠错记录只存本机，不上传。</p>
         </div>
 
-        <div class="sec-h"><h2>AI 对话</h2><span class="hint" id="aiState"></span></div>
-        <div class="card pad">
-          <div class="m-field">
-            <label>模式</label>
-            <div class="seg" id="aiModeTabs">
-              <button data-mode="proxy">中转（推荐）</button>
-              <button data-mode="direct">直连</button>
-              <button data-mode="off">关闭</button>
+        <details class="std-adv" id="aboutAdv">
+          <summary>高级：安装与模型设置</summary>
+          <div class="std-adv-body">
+            <div class="mine-list">
+              <a class="mrow apk-row" id="apkRow" href="download/zhishi-zhinong.apk" download="知时智农.apk">
+                <span class="mic">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 10h12v7a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-7Z"/><path d="M8 10 6.5 6.5M16 10l1.5-3.5"/><path d="M9.5 14h.01M14.5 14h.01"/>
+                  </svg>
+                </span>
+                <span class="mtx"><b>下载安卓安装包</b><span>独立 WebView 壳 · 无地址栏</span></span>
+                <span class="mval">下载 ›</span>
+              </a>
+            </div>
+
+            <div class="m-field" style="margin-top:14px">
+              <label>模型状态</label>
+              <div class="hint" id="aiState"></div>
+            </div>
+            <div class="m-field">
+              <label>模式</label>
+              <div class="seg" id="aiModeTabs">
+                <button data-mode="proxy">中转</button>
+                <button data-mode="direct">直连</button>
+                <button data-mode="off">关闭</button>
+              </div>
+            </div>
+            <div class="m-field" id="aiRowProxy">
+              <label>中转地址</label>
+              <div class="m-inp"><input id="aiProxyUrl" placeholder="https://your-worker.xxx.workers.dev" autocomplete="off"><span class="unit">HTTPS</span></div>
+            </div>
+            <div class="m-field" id="aiRowKey">
+              <label>API Key</label>
+              <div class="m-inp"><input id="aiKey" type="password" placeholder="sk-…（仅存本机）" autocomplete="off"></div>
+            </div>
+            <div class="m-field" id="aiRowModel">
+              <label>接口地址</label>
+              <div class="m-inp"><input id="aiEndpoint" placeholder="https://api.deepseek.com/chat/completions" autocomplete="off"></div>
+            </div>
+            <div class="notice" id="aiHintBox"></div>
+            <div class="btn-row">
+              <button class="btn" id="aiSave">保存</button>
+              <button class="btn gh" id="aiTest">测试连接</button>
             </div>
           </div>
-          <div class="m-field" id="aiRowProxy">
-            <label>中转地址</label>
-            <div class="m-inp"><input id="aiProxyUrl" placeholder="https://your-worker.xxx.workers.dev" autocomplete="off"><span class="unit">HTTPS</span></div>
-          </div>
-          <div class="m-field" id="aiRowKey">
-            <label>API Key</label>
-            <div class="m-inp"><input id="aiKey" type="password" placeholder="sk-…（仅存本机浏览器）" autocomplete="off"></div>
-          </div>
-          <div class="m-field" id="aiRowModel">
-            <label>接口地址</label>
-            <div class="m-inp"><input id="aiEndpoint" placeholder="https://api.deepseek.com/chat/completions" autocomplete="off"></div>
-          </div>
-          <div class="notice" id="aiHintBox"></div>
-          <div class="btn-row">
-            <button class="btn" id="aiSave">保存</button>
-            <button class="btn gh" id="aiTest">测试连接</button>
-          </div>
-        </div>
-
-        <div class="sec-h"><h2>作品说明 · 参赛材料</h2><span class="hint">背景 / 需求 / 方案 / 实现 / 测试 / 不足与改进 · 共 13 节，点标题展开</span></div>
-        <div id="projBox"></div>
-        <div class="src-note" style="margin:10px 2px 0">
-          本说明里所有「未接入」「未开展」均为如实标注；没有用户满意度、增产或准确率提升等未经核实的数据。
-          评审可直接按「三分钟演示提纲」一节走一遍。
-        </div>
-
-        <div class="sec-h"><h2>关于与合规声明</h2><span class="hint">v4.4 · 标准版</span></div>
-        <div class="disc">
-          <b>知时智农 · 面向华北平原冬小麦 / 夏玉米的农事时机问答智能体</b>
-          <p>气象 <span id="aboutWeather">和风天气（主预报）+ Open-Meteo（集合预报，用于置信度）</span></p>
-          <p>地图 高德 JS API / Web 服务 · 地名 高德逆地理编码 + BigDataCloud</p>
-          <p>行政区划 阿里 DataV GeoAtlas（离线内置）· 阈值 公开农技常识（可自行校准）</p>
-          <p style="margin-top:10px"><b>AI 使用声明：</b>AI 仅用于意图分类、答案口语化改写、拒答措辞与开发辅助；规则引擎、阈值口径、数据处理、界面与测试由人工编写并复核。改写一旦出现新数字即被拦截回退。声明与实际使用一致。</p>
-          <p><b>素材与许可：</b>图标、背景、插画均为项目内程序化生成 / 手绘 SVG，未使用第三方图片、字体、音乐、真实人物肖像或声音；使用公开气象与地图服务，遵循其公开接口使用方式。</p>
-          <p style="color:#8C3025"><b style="color:#8C3025;display:inline">免责声明：</b>本工具输出的一切建议仅供参考。农事操作受土壤、品种、苗情、历史管理等多重因素影响，实际决策请以当地农技部门指导意见和农药标签说明为准。</p>
-          <p style="color:#215C39"><b style="color:#215C39;display:inline">隐私：</b>不收集任何个人信息；地块、阈值、AI 配置与纠错记录仅存于本机浏览器；定位坐标只用于请求天气与地图选点，不上传本项目服务器。</p>
-        </div>
+        </details>
         <div id="aboutBox" style="display:none"></div>
 
       </div>
@@ -2403,6 +2395,31 @@ html.zz-chat #zzBar{display:none!important}
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- ================= 依据弹层：口径 / 来源 / 边界 ================= -->
+<div class="mask" id="basisMask">
+  <div class="modal basis-modal">
+    <div class="modal-head">
+      <h3>判定依据</h3>
+      <button class="pm-tx" id="basisClose" type="button">关闭</button>
+    </div>
+    <div class="modal-body">
+      <div class="basis-sec">
+        <b>怎么判</b>
+        <div class="basis-rules" id="basisRules"></div>
+      </div>
+      <div class="basis-sec">
+        <b>数据从哪来</b>
+        <div class="basis-src" id="basisSources"></div>
+      </div>
+      <div class="basis-sec">
+        <b>边界</b>
+        <p class="basis-note" id="basisBoundary"></p>
+      </div>
+      <button class="btn" id="basisToStd" type="button" style="width:100%;margin:2px 0 14px">查看作业标准</button>
+    </div>
+  </div>
+</div>
 
 <script src="config.js"></script>
 <!-- 本地私有配置（.gitignore 忽略；公网构建时这一行会被移除，文件也不会上传） -->

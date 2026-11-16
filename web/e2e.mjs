@@ -441,13 +441,21 @@ async function waitData(timeoutMs) {
     check(await ev("document.querySelectorAll('#stdBox .std-row').length") === 5, 'standard card: five limits');
     check(await ev("document.querySelectorAll('#stdBox .std-file').length") >= 2, 'standard card: source files listed');
     check(await ev("document.querySelectorAll('#stdBox .std-cov-row').length") === 11, 'standard coverage: 11 cities');
-    check(await ev("document.querySelectorAll('#kbBox .kb-item').length") === 6, 'six rule / basis cards');
-    check(await ev("document.querySelectorAll('#srcBox .src-item').length") >= 6, 'source list rendered');
-    check(await ev("document.querySelectorAll('#projBox .proj-item').length") === 13, 'project brief: 13 sections');
-    check(await ev("document.querySelectorAll('#qaChips .chip-btn').length") >= 8, 'chat presets rendered');
+    check(await ev("!document.getElementById('kbBox') && !document.getElementById('srcBox')"), 'long basis blocks removed from home');
+    check(await ev("!document.getElementById('projBox')"), 'competition brief removed from app');
+    check(await ev("document.querySelectorAll('#qaChips .chip-btn').length") >= 6, 'chat presets rendered');
     check(await ev("document.getElementById('jqFarm').textContent.length") > 12, 'solar-term farming tip');
-    check(await ev("document.querySelectorAll('.pos-strip .pos-kicker').length") >= 2, 'positioning strip');
-    check(await ev("document.getElementById('chatScopeText').textContent.indexOf('服务对象') >= 0"), 'scope card text');
+    check(await ev("!document.querySelector('.pos-strip')"), 'marketing strip removed from home');
+    check(await ev("!!document.querySelector('.chat-line')"), 'chat shows one-line boundary');
+
+    /* 依据弹层：口径与来源收到一个入口里，首页不再平铺 */
+    await ev("document.getElementById('basisOpen').click();");
+    await sleep(250);
+    check(await ev("document.getElementById('basisMask').classList.contains('on')"), 'basis sheet opens');
+    check(await ev("document.querySelectorAll('#basisRules .basis-rule').length") === 4, 'basis sheet: four core rules');
+    check(await ev("document.querySelectorAll('#basisSources > div').length") === 4, 'basis sheet: four source groups');
+    await ev("document.getElementById('basisClose').click();");
+    await sleep(150);
 
     await waitData();
     /* 本地若配了大模型，refine / refuse 是异步的，会让「最后一条消息」的断言
@@ -457,7 +465,7 @@ async function waitData(timeoutMs) {
     let noteReady = false;
     for (let i = 0; i < 12; i++) {
       await sleep(250);
-      if (await ev("!!document.querySelector('#qaLog .msg.bot .an-note')")) { noteReady = true; break; }
+      if (await ev("!!document.querySelector('#qaLog .msg.bot .an-line')")) { noteReady = true; break; }
     }
     check(noteReady, 'answer has basis / boundary note');
     await ev("document.getElementById('qaInput').value='为什么这么判断？';document.getElementById('qaSend').click();");
@@ -472,7 +480,7 @@ async function waitData(timeoutMs) {
     await ev("document.getElementById('qaInput').value='我家小麦该打什么药？';document.getElementById('qaSend').click();");
     await sleep(350);
     check(await ev("[...document.querySelectorAll('#qaLog .msg.bot')].some(function(x){return /能力范围|处理范围|不在我的/.test(x.textContent)})"), 'out-of-scope refused honestly');
-    await ev("document.querySelector('.an-btns button[data-act=fix]').click();");
+    await ev("document.querySelector('.an-line button[data-act=fix]').click();");
     await sleep(150);
     check(await ev("!!document.querySelector('.an-form')"), 'correction form opens');
     await ev("document.querySelector('.an-form textarea').value='test feedback';document.querySelector('.an-form>div button').click();");

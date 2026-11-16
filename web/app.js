@@ -815,7 +815,7 @@
       }
       if (kpiBox) kpiBox.innerHTML = '';
       if ($('gaugeCard')) $('gaugeCard').style.display = 'none';
-      if (detail) detail.innerHTML = renderLimits(result) + renderSprayRow(null);
+      if (detail) detail.innerHTML = '';
       return;
     }
 
@@ -873,48 +873,20 @@
       }
     }
 
-    /* ---- 详细依据 ---- */
-    var confHtml = '';
+    /* ---- 置信度：只留一行，细节收进「依据」弹层 ---- */
+    var confTx;
     if (ensBest) {
-      var memberWord = ens.kind === 'ensemble' ? '集合成员' : '模型';
-      confHtml =
-        '<div class="conf-row">' +
-          confBadge(ensBest.level, ensBest.weakest.prob) +
-          '<span class="conf-src">' + ens.data.precip.count + ' 个' + memberWord + '中，' +
-            Math.round(ensBest.weakest.prob * 100) + '% 支持最薄弱时段</span>' +
-        '</div>' +
-        confStrip(ensBest.strip, ensBest.level) +
-        (ens.caveat
-          ? '<div class="conf-caveat">' + esc(ens.caveat) + '</div>'
-          : '<div class="conf-caveat ok">' + esc(ens.label) + '</div>');
+      var memberWord2 = ens.kind === 'ensemble' ? '集合成员' : '模型';
+      confTx = '置信度 ' + Math.round(ensBest.weakest.prob * 100) + '% · ' +
+        ens.data.precip.count + ' 个' + memberWord2 + '中支持最薄弱时段';
     } else if (ens) {
-      confHtml = '<div class="conf-row"><span class="conf-none">该日没有支持率过半的窗口</span></div>' +
-        '<div class="conf-caveat' + (ens.caveat ? '' : ' ok') + '">' + esc(ens.caveat || ens.label) + '</div>';
+      confTx = '置信度不足 · ' + (ens.caveat || ens.label);
     } else {
-      confHtml =
-        '<div class="conf-row">' +
-          '<span class="conf-badge" style="background:' + mg.level.color + '1a;color:' + mg.level.color +
-            ';border-color:' + mg.level.color + '40">' +
-            '<i style="background:' + mg.level.color + '"></i>余量 ' + mg.level.label + '</span>' +
-          '<span class="conf-src">窗口风速峰值 ' + mg.peak + ' m/s，上限 ' + mg.limit +
-            ' m/s；当日降雨概率 ' + mg.prob + '%</span>' +
-        '</div>' +
-        '<div class="conf-caveat">未取到集合预报，按<b>主预报余量</b>估算，非成员支持率</div>';
+      confTx = '未取到集合预报 · 按主预报余量估算（' + mg.level.label + '）';
     }
+    if (detail) detail.innerHTML = '<div class="hero-conf">' + esc(confTx) + '</div>';
 
-    if (detail) {
-      detail.innerHTML =
-        confHtml +
-        '<div class="countdown" id="countdownRow">' +
-          '<span class="cd-l" id="cdLabel">—</span>' +
-          '<span class="cd-time" id="cdTime">—</span>' +
-        '</div>' +
-        renderDelayCost(ens, best.date) +
-        renderCloseCondition(ensBest) +
-        renderSprayRow(best, w);
-    }
 
-    startCountdown(best, w);
     paintSky(best.code);
   }
 
@@ -1717,8 +1689,7 @@
     if (s.indexOf('ensemble') >= 0) extra.push('集合预报');
     if (s.indexOf('multi-model') >= 0) extra.push('多模式');
     if (s.indexOf('qweather-minutely') >= 0) extra.push('分钟级降水');
-    el.textContent = '气象 ' + main + '（主预报）' +
-      (extra.length ? ' + ' + extra.join(' / ') : '');
+    el.textContent = main + (extra.length ? ' + ' + extra.join('/') : '');
   }
 
   function load() {
@@ -2790,36 +2761,18 @@
     body.textContent = text;
     d.appendChild(who); d.appendChild(body);
 
-    if (role === 'bot' && withNote && CONTENT) {
-      var note = document.createElement('div');
-      note.className = 'an-note';
-      var set = notes || {
-        source: CONTENT.chat.frame.source,
-        caveat: CONTENT.chat.frame.caveat,
-        verify: CONTENT.chat.frame.verify
-      };
-      [
-        ['依据', set.source],
-        ['边界', set.caveat],
-        ['核实', set.verify]
-      ].forEach(function (pair) {
-        var r = document.createElement('div');
-        r.className = 'an-row';
-        var b = document.createElement('b');
-        b.textContent = pair[0] + ' · ';
-        r.appendChild(b);
-        r.appendChild(document.createTextNode(pair[1]));
-        note.appendChild(r);
-      });
-      var btns = document.createElement('div');
-      btns.className = 'an-btns';
-      var kbBtn = document.createElement('button');
-      kbBtn.type = 'button'; kbBtn.textContent = '查看判定口径'; kbBtn.setAttribute('data-act', 'kb');
-      var fixBtn = document.createElement('button');
-      fixBtn.type = 'button'; fixBtn.textContent = '记一条纠错'; fixBtn.setAttribute('data-act', 'fix');
-      btns.appendChild(kbBtn); btns.appendChild(fixBtn);
-      note.appendChild(btns);
-      body.appendChild(note);
+    if (role === 'bot' && withNote) {
+      var line = document.createElement('div');
+      line.className = 'an-line';
+      var txt = document.createElement('span');
+      txt.textContent = '依据：' + ((notes && notes.source) ? notes.source : '实时天气 + 本地规则引擎');
+      line.appendChild(txt);
+      var b1 = document.createElement('button');
+      b1.type = 'button'; b1.textContent = '详情'; b1.setAttribute('data-act', 'basis');
+      var b2 = document.createElement('button');
+      b2.type = 'button'; b2.textContent = '纠错'; b2.setAttribute('data-act', 'fix');
+      line.appendChild(b1); line.appendChild(b2);
+      body.appendChild(line);
     }
 
     log.appendChild(d);
@@ -2832,14 +2785,6 @@
      ========================================================= */
   function renderContentLayer() {
     if (!CONTENT) return;
-    if ($('kbBox')) $('kbBox').innerHTML = CONTENT.knowledgeHtml();
-    if ($('srcBox')) $('srcBox').innerHTML = CONTENT.sourcesHtml();
-    if ($('projBox')) $('projBox').innerHTML = CONTENT.projectHtml();
-    if ($('chatScopeText')) $('chatScopeText').textContent = CONTENT.chat.welcome;
-    if ($('chatScopeMini')) $('chatScopeMini').innerHTML = CONTENT.scopeCardHtml();
-    if ($('chatScopeBoundary')) $('chatScopeBoundary').textContent =
-      CONTENT.scope.boundaryNote + ' ' + CONTENT.chat.frame.correction;
-
     var chips = $('qaChips');
     if (chips) {
       chips.innerHTML = CONTENT.chat.presets.map(function (p) {
@@ -2854,27 +2799,78 @@
     }
   }
 
-  /* 回答下方两个按钮：跳到判定口径 / 记一条本机纠错 */
+  /* =========================================================
+     判定依据弹层：口径 / 来源 / 边界
+     ---------------------------------------------------------
+     以前这些内容直接摊在首页，农户要滚很久。
+     现在首页只留一个入口，评委想核对时点开即可。
+     ========================================================= */
+  var BASIS_SOURCES = [
+    ['气象', '和风天气主预报 + Open-Meteo 集合 / 多模型'],
+    ['地图', '高德 JS API / Web 服务；地名兜底 BigDataCloud'],
+    ['标准', '河北省植保植检总站 2026 意见 + DB13/T 5517-2022 + 市级标准（见「我的 → 作业标准」）'],
+    ['计算', '本地规则引擎；AI 只做意图分类与口语改写，不产生数字']
+  ];
+
+  function renderBasis() {
+    if ($('basisRules') && CONTENT && CONTENT.rules) {
+      // 只列四条主干规则，口径细节留在参赛说明书里
+      var keep = ['打药窗口', '灌溉建议', '晾晒 / 入库', '结论置信度'];
+      var list = CONTENT.rules.filter(function (r) { return keep.indexOf(r.title) >= 0; });
+      $('basisRules').innerHTML = list.map(function (r) {
+        return '<div class="basis-rule"><b>' + esc(r.title) + '</b>' +
+          '<p>' + esc(r.expr) + '</p><span>' + esc(r.src) + '</span></div>';
+      }).join('');
+    }
+    if ($('basisSources')) {
+      $('basisSources').innerHTML = BASIS_SOURCES.map(function (x) {
+        return '<div><i>' + esc(x[0]) + '</i><span>' + esc(x[1]) + '</span></div>';
+      }).join('');
+    }
+    if ($('basisBoundary') && CONTENT) {
+      $('basisBoundary').textContent =
+        CONTENT.scope.boundaryNote + ' 结论只用于安排作业时间，不替代农药标签、剂量与安全间隔期要求。';
+    }
+  }
+
+  function openBasis() {
+    renderBasis();
+    if ($('basisMask')) $('basisMask').classList.add('on');
+    lockBody(true);
+  }
+  function closeBasis() {
+    if ($('basisMask')) $('basisMask').classList.remove('on');
+    lockBody(false);
+  }
+  function bindBasis() {
+    if ($('basisOpen')) $('basisOpen').onclick = openBasis;
+    if ($('basisOpenChat')) $('basisOpenChat').onclick = openBasis;
+    if ($('basisClose')) $('basisClose').onclick = closeBasis;
+    if ($('basisMask')) {
+      $('basisMask').addEventListener('click', function (e) {
+        if (e.target === $('basisMask')) closeBasis();
+      });
+    }
+    if ($('basisToStd')) {
+      $('basisToStd').onclick = function () { closeBasis(); setView('mine'); };
+    }
+  }
+
+  /* 回答下方：一行依据 + 详情 / 纠错 */
   function bindAnswerNotes() {
     var log = $('qaLog');
     if (!log) return;
     log.addEventListener('click', function (e) {
-      var b = e.target && e.target.closest ? e.target.closest('.an-btns button') : null;
+      var b = e.target && e.target.closest ? e.target.closest('.an-line button') : null;
       if (!b) return;
-      if (b.getAttribute('data-act') === 'kb') {
-        setView('content');
-        setTimeout(function () {
-          var el = $('kbBox');
-          if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 140);
-        return;
-      }
+      if (b.getAttribute('data-act') === 'basis') { openBasis(); return; }
       if (b.getAttribute('data-act') === 'fix') openCorrectionForm(b);
     });
   }
 
   function openCorrectionForm(btn) {
-    var note = btn.parentNode;
+    var line = btn.closest ? btn.closest('.an-line') : null;
+    var note = line ? line.parentNode : btn.parentNode;
     if (!note || note.querySelector('.an-form')) return;
     var form = document.createElement('div');
     form.className = 'an-form';
@@ -2975,13 +2971,8 @@
        否则用户一问「按什么标准」就被「稍等」挡回去，体验很差。 */
     var ST0 = window.TianZhiStandards;
     if (ST0 && T.ruleIntent(q) === 'standard') {
-      var eff0 = ST0.effective(plot && plot.city);
-      var codes = (eff0.sources || []).map(function (id) {
-        var it = ST0.byId(id);
-        return it ? it.code : '';
-      }).filter(Boolean).join('、');
       appendMsg('bot', ST0.answer(plot && plot.city, plot && plot.name), true, {
-        source: (codes || '河北省现行文件') + '；原文摘录与 11 市收录范围见「我的 → 作业标准」',
+        source: '标准文件原文',
         caveat: '标准只约束气象条件，不替代农药标签与当地农技部门意见',
         verify: '按编号到全国标准信息公共服务平台或政府网站查原文；本库查证日期 ' + ST0.CHECKED
       });
@@ -3651,7 +3642,8 @@
   bindDrawer();       // 手机端侧栏抽屉
   renderSolarTerm();     // 节气条 + 节气农事提醒
   renderContentLayer();  // 知识依据 / 资料来源 / 作品说明 / 范围卡 / 示例问题
-  bindAnswerNotes();     // 回答下方的「查看判定口径」「记一条纠错」
+  bindAnswerNotes();     // 回答下方：详情 / 纠错
+  bindBasis();           // 「依据」弹层
   setTimeout(function () { moveTabPill(currentView || 'content'); }, 120);
   window.addEventListener('resize', function () { moveTabPill(currentView || 'content'); });
   buildPresets();     // 预设城市按钮已移除，这里只清理旧 DOM

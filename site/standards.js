@@ -555,32 +555,27 @@
     var e = effective(city);
     var p = e.patch;
     var cityTxt = e.cityName || '属地未知';
-    var lines = [
-      '· 风速：≤ ' + n1(p.wind_max) + ' m/s（' + fieldSource(e.by.wind_max) + '）',
-      '· 气温：' + p.temp_min + '–' + p.temp_max + ' ℃（' + fieldSource(e.by.temp_max) + '）',
-      '· 时段：' + p.hours_start + ':00–' + p.hours_end + ':00（' + fieldSource(e.by.hours_start) + '）',
-      '· 当日降水：≤ ' + p.rain_day_max + ' mm，前一日 < ' + p.rain_prev_max + ' mm（' + TOOL_LABEL + '）'
-    ];
 
-    var files = forCity(city).filter(function (s) { return s.binding; }).map(function (s) {
-      return '· ' + s.code + '《' + s.title + '》' + s.issuer;
-    });
+    var files = forCity(city).filter(function (s) { return s.binding; })
+      .map(function (s) { return s.code; }).join('、');
 
-    var extra = '';
+    var local = '';
     if (e.cityName) {
       var cov = coverage().filter(function (c) { return c.city === e.cityName; })[0];
-      if (cov) extra = '\n\n属地收录情况：' + cov.status + '。' + cov.note + '。';
-    }
-    if (p.temp_min < 10) {
-      extra += '\n\n提示：省站对麦田除草给的下限是 5 ℃；病虫害飞防建议 10 ℃ 以上更稳。5–10 ℃ 时药效偏慢，能等就等中午。';
+      if (cov) {
+        if (/可执行/.test(cov.status)) local = '属地：' + cov.note + '。';
+        else if (/技术口径/.test(cov.status)) local = '属地：只有非标准技术口径，按省级执行。';
+        else if (/未获全文/.test(cov.status)) local = '属地：市级文件未获全文，按省级执行。';
+        else local = '属地：未检索到公开市级文件，按省级执行。';
+      }
     }
 
-    return (plotName ? '【' + plotName + '】' : '') +
-      '这块地（' + cityTxt + '）按河北省现行公开文件，打药的门槛是：\n\n' +
-      lines.join('\n') + '\n\n依据文件（取最严）：\n' + files.join('\n') +
-      extra +
-      '\n\n说明：县级一般转发省级文件，未逐县收录；市级未检索到公开标准、或仅有非标准技术口径的，按省级执行。' +
-      '文件查证日期 ' + CHECKED + '。最终以农药标签和当地农技部门意见为准。';
+    return (plotName ? '【' + plotName + '】' : '') + cityTxt + '打药门槛：\n' +
+      '· 风速 ≤ ' + n1(p.wind_max) + ' m/s ｜ 气温 ' + p.temp_min + '–' + p.temp_max +
+      '℃ ｜ 时段 ' + p.hours_start + ':00–' + p.hours_end + ':00\n' +
+      '依据：' + files + '\n' +
+      (local ? local + '\n' : '') +
+      '细则与原文见「我的 → 作业标准」·查证日期 ' + CHECKED + '。';
   }
 
   /* ============================================================

@@ -59,9 +59,9 @@
 | Actions | `completed / success`，与 `ec0a269` 对应 | GitHub API |
 | 规则引擎测试 | 通过 238 / 失败 0（条数随实时数据波动） | `node web/test-logic.mjs` |
 | 标准库测试 | 通过 156 / 失败 0（离线） | `node web/test-standards.mjs` |
-| 端到端测试 | 通过 70 / 失败 2 | `node web/e2e.mjs`（需先起本地服务器） |
+| 端到端测试 | 通过 72 / 失败 2 | `node web/e2e.mjs`（需先起本地服务器） |
 | 构建 | 复制 25 个文件，产物 28 个 / 2602 KB，自检全过 | `node scripts/build-site.mjs` |
-| 页面版本号 | v4.4（「我的 → 关于」） | `web/index.html` |
+| 页面版本号 | v4.5（「我的 → 关于」） | `web/index.html` |
 | 规则引擎版本 | 3.1（`RULES.meta.version`） | `web/logic.js` |
 | 安卓壳 | versionCode 3 / versionName 1.2，包名 `io.github.leeforword.twa` | `android-webview/AndroidManifest.xml` |
 | 本地 Node | v22.22.2；CI 用 Node 20 | `node -v`、`deploy.yml` |
@@ -81,7 +81,7 @@ D:\zhishi-zhinong\
 │   ├── weather.js               539 行：和风 / Open-Meteo 适配与兜底
 │   ├── place.js                 498 行：坐标 → 地名（多源）
 │   ├── ensemble.js              490 行：集合预报 / 多模型分歧
-│   ├── content.js               436 行：文案与知识口径内容层（v4.3 新增）
+│   ├── content.js               182 行：界面文案与口径（v4.5 精简到 12 KB；13 节作品说明已移出）
 │   ├── standards.js             608 行：河北省 / 国家作业标准库，按属地取严（v4.4 新增）
 │   ├── pwa.js                   482 行：安装引导、SW 更新、断网提示
 │   ├── llm.js                   282 行：大模型意图 / 润色 / 数字校验
@@ -119,6 +119,7 @@ D:\zhishi-zhinong\
 │   ├── build.sh                 aapt2 → javac → d8 → zipalign → apksigner
 │   └── build\                   构建产物（已 gitignore）
 ├── docs\                        运行说明 / 部署安装 / AI 使用声明 / 演示脚本 / 大赛通知
+│   └── 作品说明（参赛材料）.md   13 节正文（v4.5 从 App 移出，改这里再转 PDF）
 ├── screenshots\                 e2e 与人工截图（build 会取其中 2 张进 site）
 ├── dist\                        11-13 的旧交付物，已 gitignore；含乱码目录名，可删
 ├── _archive\                    早期版本备份，不参与构建
@@ -193,7 +194,7 @@ node web/e2e.mjs                     # 默认 http://127.0.0.1:8931/，截图输
 node web/e2e.mjs https://leeforword.github.io/zhishi-zhinong/ ../screenshots   # 测线上
 ```
 
-预期：`test-standards` 输出 `通过 156 / 失败 0`；`test-logic` 输出 `通过 238 / 失败 0`（数字随实时数据条数浮动，失败必须为 0）；`e2e` 输出 `pass 70 / fail 2`，2 个失败是已知的高德白名单问题（§11.1）。
+预期：`test-standards` 输出 `通过 156 / 失败 0`；`test-logic` 输出 `通过 238 / 失败 0`（数字随实时数据条数浮动，失败必须为 0）；`e2e` 输出 `pass 72 / fail 2`，2 个失败是已知的高德白名单问题（§11.1）。
 
 ### 5.3 构建
 
@@ -250,7 +251,7 @@ bash android-webview/build.sh
 | `ensemble.js` | `window.TianZhiEnsemble` = `{parseMembers, hourlyProbability, extractWindows, evaluateDay, levelOf, riskOnDay, delayCost, assemble, assembleBest, …}` | 集合成员解析、置信度、多模型分歧 | 无 |
 | `place.js` | `window.TianZhiPlace` = `{resolve, around, searchPoi, cached, precisionText, _pickPlace, _placeKindOf, …}` | 坐标→地名（高德 REST + BigDataCloud + 本地县界），带内存缓存 | `config.js` |
 | `llm.js` | `window.TianZhiLLM` = `{isEnabled, classify, refine, refuse, numbersConsistent, …}` | 意图分类、口语化改写、数字一致性校验、超范围拒答 | `settings.js` |
-| `content.js` | `window.TianZhiContent` = `{meta, palette, scope, rules, glossary, terms, chat, project, scopeCardHtml, knowledgeHtml, sourcesHtml, projectHtml, termNote, esc}` | **全部文案与知识口径**：定位、判定口径、术语、资料来源、13 节作品说明、问答预设 | 无 |
+| `content.js` | `window.TianZhiContent` = `{meta, scope, rules, terms, chat, termNote, esc}` | 界面文案：边界、6 条口径、24 节气、问答预设。**13 节作品说明已移出到 `docs/作品说明（参赛材料）.md`** | 无 |
 | `app.js` | 无全局导出（IIFE） | 状态、渲染、图表、地图、模块弹窗、问答交互、视图切换 | 上面全部 |
 | `pwa.js` | 无全局导出（IIFE） | 安装引导（安卓/iOS/微信分支）、SW 注册与更新、断网提示 | `sw.js` |
 | `sw.js` | Service Worker | 外壳预缓存、导航请求网络优先、静态资源网络优先、**跨域接口完全不碰** | — |
@@ -322,7 +323,7 @@ bash android-webview/build.sh
 | `zz.pwa.installDismissed` | 安装条的「不再提示」 | `pwa.js` |
 | `tianzhi.corrections.v1` | 用户纠错记录（最多 50 条） | `app.js openCorrectionForm()` |
 
-### 7.5 阈值现在由标准库决定（v4.4 变更）
+### 7.5 阈值现在由标准库决定（v4.4 起）
 
 - 默认 `standard.mode = 'auto'`：`settings.applyRules(city)` 调 `standards.effective(city)`，把合并后的 patch 写进 `RULES`，同时把出处写进 `RULES.meta.source`。
 - `logic.js` 与 `settings.js` 的默认值已统一为 `3.4 m/s · 5–30℃ · 9–16 时`，只作为「标准库缺失」时的兜底。
@@ -470,7 +471,8 @@ git push origin main
 
 | 想改什么 | 改哪里 | 注意 |
 |---|---|---|
-| 页面文案 / 判定口径 / 资料来源 / 作品说明 | `web/content.js` | 改完刷新即可；HTML 片段里必须用 `C.esc()` 转义 |
+| 页面文案 / 判定口径 | `web/content.js` | 改完刷新即可；依据弹层只取前 4 条规则 |
+| 参赛作品说明（13 节） | `docs/作品说明（参赛材料）.md` | 已从 App 移出，改这里再转 PDF/Word，别再往界面里塞 |
 | 问答预设问题、欢迎语、依据提示 | `web/content.js` 的 `C.chat` | 预设改了会自动重渲染，事件委托在 `#qaChips` 上 |
 | 阈值 / 作业标准 | `web/standards.js` 的 `LIST`（新增文件就加一条，必须带 code / url / checked） | 只收有原文或官方著录的；没全文的 `limits` 必须 `null`，不许猜数值 |
 | 阈值兜底 | `web/settings.js` 的 `defaultRules()` + `web/logic.js` 的 `RULES` | 只在标准库缺失时生效；改标准优先改 standards.js |
@@ -565,7 +567,7 @@ git push origin main
 按 `docs/大赛通知.txt`，A 赛道智能体方向还需：
 
 1. **演示录屏 ≤3 分钟**（16:9 或 9:16，字幕完整）。
-2. **关键界面截图 3–5 张**（首页判读、问答依据、地图选点、我的-作业标准、作品说明）。
+2. **关键界面截图 3–5 张**（首页判读、问答依据、地图选点、我的-作业标准、依据弹层）。
 3. **运行说明**（`docs/运行说明.md` 已有，但需按当前界面更新）。
 4. 通过学院统一提交作品与全部材料。
 
@@ -573,7 +575,7 @@ git push origin main
 
 1. **真实用户试用** 3–5 人（种植户 / 农技专业同学），记录原话与据此做的修改。**不要编数据**——这是评审红线。
 2. 单独的《AI 使用声明》文件（页面和 `docs/AI使用声明.md` 已有内容，需导出成交付格式）。
-3. 《作品说明书》PDF / Word（页面「我的 → 作品说明」13 节已是目录，可直接导出）。
+3. 《作品说明书》PDF / Word（正文已在 `docs/作品说明（参赛材料）.md`，转格式即可）。
 
 ### 12.3 技术层（按性价比排序）
 
