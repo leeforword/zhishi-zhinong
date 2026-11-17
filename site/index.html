@@ -1622,6 +1622,50 @@ html.zz-chat #zzBar{display:none!important}
 .plot-save-row{padding:14px 0 2px}
 .plot-save-row .btn{width:100%}
 
+/* ---------- 新增地块（v5.6）：全屏地图 + 位置摘要 + 分组表单 ---------- */
+.map-full-btn{
+  position:absolute;right:8px;bottom:40px;z-index:6;
+  border:1px solid var(--border);background:rgba(255,255,255,.96);color:var(--text-2);
+  font:inherit;font-size:11.5px;font-weight:500;padding:6px 11px;border-radius:9px;
+  box-shadow:var(--shadow);cursor:pointer;
+}
+.map-full-btn:active{background:var(--surface-2)}
+
+.fmini{display:flex;align-items:center;gap:9px;padding:9px 11px;margin:0 0 14px;
+  background:var(--brand-weak);border:1px solid var(--border);border-radius:12px}
+.fmini-pin{width:26px;height:26px;border-radius:50%;background:var(--surface-solid);color:var(--brand-d);
+  display:grid;place-items:center;flex:none}
+.fmini-t{flex:1;min-width:0;display:block}
+.fmini-t b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  margin:0;font-size:12.5px;font-weight:600;color:var(--text);line-height:1.45}
+.fmini-t i{display:block;font-style:normal;font-size:10.5px;color:var(--text-3);margin-top:2px}
+.fmini .btn{flex:none;height:30px;padding:0 11px;font-size:12px}
+
+.fgroup{margin-bottom:12px}
+.fgroup-h{font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--text-3);margin:0 0 7px}
+.fgroup .frow{margin-bottom:10px}
+.fgroup .frow:last-child{margin-bottom:0}
+
+.loc-row{display:flex;gap:7px}
+.loc-row .field{flex:1;min-width:0}
+.loc-row .btn{flex:none;padding:0 14px}
+
+.nearby{margin-top:6px;border-top:1px dashed var(--border);padding-top:2px}
+.nearby > summary{list-style:none;cursor:pointer;font-size:11.5px;color:var(--brand-d);
+  display:flex;align-items:center;gap:6px;padding:9px 0;font-weight:500}
+.nearby > summary::-webkit-details-marker{display:none}
+.nearby > summary:after{content:"⌄";margin-left:auto;color:var(--text-3)}
+.nearby[open] > summary:after{content:"⌃"}
+.nearby .nearby-search{margin-top:2px}
+
+.plot-modal.map-full{height:100dvh;max-height:100dvh}
+.plot-modal.map-full .plot-map{height:calc(100dvh - 52px)}
+.plot-modal.map-full .modal-body{display:none}
+@media (min-width:641px){
+  .plot-modal.map-full{height:92vh;max-height:92vh}
+  .plot-modal.map-full .plot-map{height:calc(92vh - 52px)}
+}
+
 /* ============================================================
    地块弹窗：iOS 底部抽屉（手机）/ 放大卡片（桌面）
    ============================================================ */
@@ -2837,55 +2881,63 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
         <span id="mapRead">点击地图选点</span>
         <span id="mapCoord" style="color:var(--text-3)">—</span>
       </div>
+      <button class="map-full-btn" id="mapFull" type="button" aria-label="全屏看地图">全屏</button>
     </div>
 
     <div class="modal-body">
-      <div class="frow">
-        <label>地块名称</label>
-        <input class="field" id="fName" placeholder="比如 东洼地">
-      </div>
-      <div class="frow-2">
-        <div class="frow">
-          <label>面积（亩）</label>
-          <input class="field" id="fArea" type="number" min="0.1" step="0.5" value="10">
-        </div>
-        <div class="frow">
-          <label>作物</label>
-          <select class="field" id="fCrop">
-            <option value="wheat">冬小麦</option>
-            <option value="maize">夏玉米</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="frow">
-        <label>地点</label>
-        <div style="display:flex;gap:7px">
-          <input class="field" id="fLoc" placeholder="输入县市名检索">
-          <button class="btn" id="fSearchBtn">检索</button>
-        </div>
-        <div class="preset-chips" id="presetChips"></div>
-        <div id="fResults"></div>
-        <button class="linkish" id="fGeoBtn">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+      <!-- 已选位置常驻在表单顶部：滚到哪都知道现在选的是哪儿 -->
+      <div class="fmini">
+        <span class="fmini-pin" aria-hidden="true">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/>
           </svg>
-          用我的位置
-        </button>
-        <div class="hint" id="fHint">已选地点：—</div>
+        </span>
+        <span class="fmini-t"><b class="hint" id="fHint">已选地点：—</b><i id="fSource">点地图可以改</i></span>
+        <button class="btn btn-sm" id="fGeoBtn" type="button">用我的位置</button>
+      </div>
 
-        <div class="nearby">
-          <div class="nearby-h">
-            <b>附近地点</b>
-            <span id="nearbyHint">按距离排序 · 点一条即可选中</span>
+      <div class="fgroup">
+        <div class="fgroup-h">地块</div>
+        <div class="frow">
+          <label for="fName">名称</label>
+          <input class="field" id="fName" placeholder="比如 东洼地">
+        </div>
+        <div class="frow-2">
+          <div class="frow">
+            <label for="fArea">面积（亩）</label>
+            <input class="field" id="fArea" type="number" inputmode="decimal" min="0.1" step="0.5" value="10">
           </div>
+          <div class="frow">
+            <label for="fCrop">作物</label>
+            <select class="field" id="fCrop">
+              <option value="wheat">冬小麦</option>
+              <option value="maize">夏玉米</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="fgroup">
+        <div class="fgroup-h">位置</div>
+        <div class="frow">
+          <div class="loc-row">
+            <input class="field" id="fLoc" placeholder="不知道在哪？输入县市名检索">
+            <button class="btn" id="fSearchBtn" type="button">检索</button>
+          </div>
+          <div class="preset-chips" id="presetChips"></div>
+          <div id="fResults"></div>
+        </div>
+
+        <!-- 附近地点默认收起：地图点选是主路径，POI 列表是兜底 -->
+        <details class="nearby" id="nearbyBox">
+          <summary>附近地点（按距离排序，点一条即可选中）</summary>
           <div class="nearby-search">
             <input class="field" id="nearbyKw" placeholder="搜地点：村委会 / 农资店 / 学校…" autocomplete="off">
           </div>
           <div class="nearby-list" id="nearbyList">
             <div class="nearby-empty">选好位置后，这里会列出周边 1 公里内的地点</div>
           </div>
-        </div>
+        </details>
       </div>
 
       <!-- 手机端表单在弹窗下半屏滚动，填到最后不用再滑回顶部找「保存」 -->

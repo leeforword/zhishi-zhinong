@@ -323,6 +323,18 @@ async function waitData(timeoutMs) {
       return (r.top - s.top) < 60 && (s.right - r.right) < 60;
     })()`), 'layer switch sits top-right (or hidden on fallback map)');
 
+    /* 地图全屏：选地块时要能铺满屏，退出后表单回来 */
+    await ev("document.getElementById('mapFull').click();");
+    await sleep(500);
+    check(await ev("document.querySelector('.plot-modal').classList.contains('map-full')"),
+      'map can expand to fullscreen');
+    check(await ev("getComputedStyle(document.querySelector('.plot-modal .modal-body')).display === 'none'"),
+      'form hides while map is fullscreen');
+    await ev("document.getElementById('mapFull').click();");
+    await sleep(450);
+    check(!(await ev("document.querySelector('.plot-modal').classList.contains('map-full')")),
+      'map returns from fullscreen');
+
     check(await ev("window.__tzPickCenter && window.__tzPickCenter()") === true,
       'map pick triggered in either mode');
     await sleep(900);

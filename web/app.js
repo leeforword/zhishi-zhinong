@@ -2205,6 +2205,15 @@
       window.__tzMap = MAP.instance;
       setMapLayer('road');   // 默认路网：先看清村道、地块边界与周边参照，再切卫星
 
+      /* 弹窗先开、地图后到时，把之前记下的中心点补上 */
+      if (MAP.pending) {
+        var pd = MAP.pending; MAP.pending = null;
+        setTimeout(function () {
+          mapCenterOn(pd.lon, pd.lat, pd.zoom, pd.dur);
+          drawMarker(pd.lat, pd.lon);
+        }, 60);
+      }
+
       // 叠加河北省/市边界（本地 GeoJSON，离线可用）
       setTimeout(function () { addBoundaries(); }, 100);
 
@@ -2319,90 +2328,64 @@
   */
   var boundaryAdded = false;
 
+  function drawLineSet(rings, kind) {
+    if (!MAP.instance || !window.AMap || !MAP._lines) return;
+    var AMap = window.AMap;
+    var ST = {
+      prov: { c: '#41694f', w: 1.8, o: 0.55, z: 90 },
+      city: { c: '#5d7b63', w: 1.0, o: 0.38, z: 85 },
+      county: { c: '#94a3b8', w: 0.8, o: 0.32, z: 80 }
+    }[kind];
+    rings.forEach(function (ring) {
+      if (!ring || ring.length < 3) return;
+      var path = [];
+      /* DataV 的边界坐标本身就是 GCJ-02（与高德底图同源：省界 bbox 与高德
+         District API 差 < 0.0001°）。以前在这又转了一次 WGS→GCJ，
+         整条边界会整体偏移约 500 m——「边缘线不对」就是它。直接用原坐标。 */
+      for (var i = 0; i < ring.length; i++) path.push(new AMap.LngLat(ring[i][0], ring[i][1]));
+      var pl = new AMap.Polyline({
+        path: path,
+        strokeColor: ST.c,
+        strokeWeight: ST.w,
+        strokeOpacity: ST.o,
+        lineJoin: 'round',
+        zIndex: ST.z,
+        bubble: true
+      });
+      MAP.instance.add(pl);
+      MAP._lines[kind].push(pl);
+    });
+  }
+
+  /** 边界按缩放分层：省级一直有、市级 ≥9、县级 ≥12，避免一层网格糊在图上 */
+  function syncBoundaryZoom() {
+    if (!MAP.instance || !MAP._lines || !GEO) return;
+    var z = MAP.instance.getZoom();
+    if (z >= 9 && !MAP._lines.city.length) {
+      GEO.cities.forEach(function (ct) { drawLineSet(ct.rings, 'city'); });
+    }
+    if (z >= 12 && !MAP._lines.county.length) {
+      GEO.counties.forEach(function (c) { drawLineSet(c.rings, 'county'); });
+    }
+    var vis = { prov: z < 10, city: z >= 9 && z < 12, county: z >= 12 };
+    Object.keys(vis).forEach(function (k) {
+      MAP._lines[k].forEach(function (p) {
+        try { vis[k] ? p.show() : p.hide(); } catch (e) { /* 忽略 */ }
+      });
+    });
+  }
+
   function addBoundaries() {
     if (boundaryAdded || !MAP.instance) return;
     boundaryAdded = true;
-
-    // 先用本地数据（快、稳、离线可用）
+    MAP._lines = { prov: [], city: [], county: [] };
     try {
-      addLocalBoundaries();
+      drawLineSet(GEO.province, 'prov');
+      syncBoundaryZoom();
+      MAP.instance.on('zoomend', syncBoundaryZoom);
     } catch (e) {
       console.warn('[知时智农] 本地边界绘制失败：', e.message);
     }
-  }
-
-  /** 用内置 GeoJSON 画省界 + 市界（WGS-84 → GCJ-02） */
-  function addLocalBoundaries() {
-    if (!GEO || !MAP.instance) return false;
-    var AMap = window.AMap;
-    var lines = 0;
-
-    function drawRings(rings, color, weight, opacity) {
-      rings.forEach(function (ring) {
-        if (!ring || ring.length < 3) return;
-        var path = [];
-        // 稠密点下逐点转换成本高，先抽稀再转换
-        var step = ring.length > 220 ? Math.ceil(ring.length / 220) : 1;
-        for (var i = 0; i < ring.length; i += step) {
-          var g = T.wgs84ToGcj(ring[i][0], ring[i][1]);
-          path.push(new AMap.LngLat(g[0], g[1]));
-        }
-        // 闭合
-        if (path.length > 2) {
-          var g0 = T.wgs84ToGcj(ring[0][0], ring[0][1]);
-          path.push(new AMap.LngLat(g0[0], g0[1]));
-        }
-        MAP.instance.add(new AMap.Polyline({
-          path: path,
-          strokeColor: color,
-          strokeWeight: weight,
-          strokeOpacity: opacity,
-          lineJoin: 'round',
-          zIndex: 90,
-          bubble: true
-        }));
-        lines++;
-      });
-    }
-
-    drawRings(GEO.province, '#3d6247', 2.2, 0.85);
-    GEO.cities.forEach(function (ct) {
-      drawRings(ct.rings, '#7a8f6a', 1.1, 0.7);
-    });
-
-    // 县界在 zoom>=9 时再叠加，避免过密
-    MAP.instance.on('zoomend', function () {
-      var z = MAP.instance.getZoom();
-      if (z >= 9 && !MAP._countyLines) {
-        MAP._countyLines = [];
-        GEO.counties.forEach(function (c) {
-          c.rings.forEach(function (ring) {
-            if (ring.length < 3) return;
-            var step = ring.length > 120 ? Math.ceil(ring.length / 120) : 1;
-            var path = [];
-            for (var i = 0; i < ring.length; i += step) {
-              var g = T.wgs84ToGcj(ring[i][0], ring[i][1]);
-              path.push(new AMap.LngLat(g[0], g[1]));
-            }
-            var pl = new AMap.Polyline({
-              path: path,
-              strokeColor: '#94a3b8',
-              strokeWeight: 0.9,
-              strokeOpacity: 0.55,
-              zIndex: 80,
-              bubble: true
-            });
-            MAP.instance.add(pl);
-            MAP._countyLines.push(pl);
-          });
-        });
-      } else if (z < 9 && MAP._countyLines) {
-        MAP.instance.remove(MAP._countyLines);
-        MAP._countyLines = null;
-      }
-    });
-
-    return lines > 0;
   }
 
   /* ---------- 图层切换 ---------- */
@@ -2506,14 +2489,14 @@
     if (MAP.failed) { updateMapMode(); renderFallbackMap(sel); return; }
 
     var center = sel ? [sel.lon, sel.lat] : [116.30, 39.05];
-    initAMap(center, sel ? 10 : 8).then(function () {
+    initAMap(center, sel ? 12 : 9).then(function () {
       updateMapMode();
       if (sel) {
         drawMarker(sel.lat, sel.lon);
-        // 视野移到该点；zoom 8 既能看清县域范围又不至于太空
+        // 直接落到「已选点」上；12 级能看清村道与地块轮廓，又不会糊成一片
         MAP.instance.setCenter(T.wgs84ToGcj(sel.lon, sel.lat));
         var z = MAP.instance.getZoom();
-        if (z < 8 || z > 12) MAP.instance.setZoom(8);
+        if (z < 10 || z > 15) MAP.instance.setZoom(12);
       }
       // 选点落在地图范围外时，把中心拉回合法区域
       if (MAP.instance.getCenter) {
@@ -2539,6 +2522,11 @@
 
     $('layerRoad').onclick = function () { setMapLayer('road'); };
     $('layerSat').onclick = function () { setMapLayer('sat'); };
+    if ($('mapFull')) {
+      $('mapFull').onclick = function () {
+        setMapFull(!document.querySelector('.plot-modal').classList.contains('map-full'));
+      };
+    }
 
     // 预加载 SDK：打开弹窗时就后台开始拉取，
     // 这样用户点"展开地图"时基本已经就绪（避免首屏多等 1-2 秒）
@@ -2563,7 +2551,12 @@
    *                     immediately=false + duration），不给就是瞬移
    */
   function mapCenterOn(lon, lat, zoom, dur) {
-    if (!MAP.instance || !T || !T.wgs84ToGcj) return;
+    /* 打开弹窗时高德可能还没加载完：先记下来，等实例就绪再落点，
+       否则「已选点」在衡水、地图却停在北京附近。 */
+    if (!MAP.instance || !T || !T.wgs84ToGcj) {
+      MAP.pending = { lon: lon, lat: lat, zoom: zoom, dur: dur };
+      return;
+    }
     try {
       var m = MAP.instance;
       var gc = T.wgs84ToGcj(lon, lat);
@@ -2769,6 +2762,9 @@
     $('fCrop').value = plot ? plot.crop : 'wheat';
     $('fLoc').value = '';
     $('fResults').innerHTML = '';
+    var body0 = document.querySelector('.plot-modal .modal-body');
+    if (body0) body0.scrollTop = 0;
+    setMapFull(false);
 
     var base = plot || activePlot();
     form = { lat: base.lat, lon: base.lon, place: base.place, results: [] };
@@ -2787,7 +2783,7 @@
        这个工具的核心动作就是在地图上点自己的地，藏起来等于让人多按一次。
        表单放在地图下方独立滚动，键盘弹起时只压缩表单区，地图不会被挡。 */
     bindMapStage();
-    mapCenterOn(base.lon, base.lat, plot ? 9 : 8);
+    mapCenterOn(base.lon, base.lat, plot ? 13 : 12);
     lockBody(true);
     $('plotMask').classList.add('on');
     // 展开后需要重绘地图（此时容器才有真实尺寸）
@@ -2804,8 +2800,32 @@
 
   function closeModal() {
     $('plotMask').classList.remove('on');
+    setMapFull(false);
     lockBody(false);
     state.editing = null;
+  }
+
+  /**
+   * 地图全屏：选地块时把地图铺满屏，能看清田块与道路；
+   * 退出后表单回到原位。进入时顺手放大到村组级（≥14 级）。
+   */
+  function setMapFull(on) {
+    var modal = document.querySelector('.plot-modal');
+    if (!modal) return;
+    modal.classList.toggle('map-full', !!on);
+    var btn = $('mapFull');
+    if (btn) btn.textContent = on ? '收起' : '全屏';
+    if (!MAP.instance) return;
+    setTimeout(function () {
+      try {
+        MAP.instance.resize();
+        if (on && form.lon) {
+          var z = MAP.instance.getZoom ? MAP.instance.getZoom() : 14;
+          mapCenterOn(form.lon, form.lat, Math.max(z || 0, 14));
+        }
+        if (on && form.lat) drawMarker(form.lat, form.lon);
+      } catch (e) { /* 地图未就绪时忽略 */ }
+    }, 160);
   }
 
   function showFormResults(list) {
