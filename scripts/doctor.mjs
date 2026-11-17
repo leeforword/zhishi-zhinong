@@ -69,7 +69,7 @@ const REQUIRED = [
   'web/index.html', 'web/app.js', 'web/content.js', 'web/logic.js', 'web/weather.js',
   'web/place.js', 'web/ensemble.js', 'web/llm.js', 'web/settings.js', 'web/pwa.js',
   'web/sw.js', 'web/config.js', 'web/config.local.js', 'web/manifest.webmanifest',
-  'web/hebei-geo.js', 'scripts/build-site.mjs', '.github/workflows/deploy.yml',
+  'web/hebei-geo.js', 'web/chem.js', 'scripts/build-site.mjs', '.github/workflows/deploy.yml',
   'worker/ai-proxy.js', 'android-webview/build.sh', 'android-webview/AndroidManifest.xml'
 ];
 for (const f of REQUIRED) {
@@ -81,7 +81,7 @@ for (const f of REQUIRED) {
 /* ---------- 2. 语法 ---------- */
 head('== 2. 语法检查 ==');
 const RUNTIME_JS = ['config.js', 'settings.js', 'llm.js', 'weather.js', 'hebei-geo.js',
-  'place.js', 'logic.js', 'content.js', 'ensemble.js', 'app.js', 'pwa.js', 'sw.js'];
+  'place.js', 'logic.js', 'chem.js', 'content.js', 'ensemble.js', 'app.js', 'pwa.js', 'sw.js'];
 for (const f of RUNTIME_JS) {
   const p = path.join(WEB, f);
   if (!exists(p)) continue;

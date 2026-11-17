@@ -461,6 +461,45 @@ async function waitData(timeoutMs) {
     check(ans.length > 0, 'QA answer received');
     check(ans.indexOf('NaN') < 0 && ans.indexOf('undefined') < 0, 'answer has no NaN');
 
+    /* v5.2：药已定 → 首答两行结论，展开层给逐项判定与依据，追问可换药种/日期 */
+    const chemFirst = await ev(`(() => {
+      const b = [...document.querySelectorAll('#qaLog .msg.bot')].pop();
+      const det = b.querySelector('.qa-more');
+      return { brief: b.querySelector('.body').childNodes[0].textContent,
+               hasMore: !!det, open: det ? det.open : null };
+    })()`);
+    check(/除草剂/.test(chemFirst.brief) && /现在.*(能|可以)打/.test(chemFirst.brief),
+      'chosen pesticide: verdict first: ' + chemFirst.brief.slice(0, 40));
+    check(chemFirst.brief.split('\n').length === 2 && chemFirst.brief.length <= 170,
+      'first answer is two short lines: ' + chemFirst.brief.length + ' chars');
+    check(chemFirst.hasMore && chemFirst.open === false, 'full analysis collapsed by default');
+    await ev("[...document.querySelectorAll('#qaLog .qa-more')].pop().querySelector('summary').click()");
+    await sleep(180);
+    const chemDetail = await ev("[...document.querySelectorAll('#qaLog .qa-more-body')].pop().textContent");
+    check(/依据文件/.test(chemDetail) && /NY\/T 1276/.test(chemDetail), 'expanded analysis cites authoritative files');
+    check(/https?:\/\//.test(chemDetail), 'expanded analysis has verifiable source URLs');
+    check(/不推荐药剂/.test(chemDetail), 'expanded analysis states capability boundary');
+
+    async function sendQA(q) {
+      await ev(`(function(){var i=document.getElementById('qaInput');i.value=${JSON.stringify(q)};document.getElementById('qaSend').click();})()`);
+      for (let i = 0; i < 20; i++) {
+        await sleep(300);
+        if (await ev("!document.querySelector('#qaLog .typing')")) break;
+      }
+      return await ev("[...document.querySelectorAll('#qaLog .msg.bot:not(.typing-wrap)')].pop().querySelector('.body').childNodes[0].textContent");
+    }
+    const sw = await sendQA('换成杀虫剂呢？');
+    check(/杀虫剂/.test(sw), 'follow-up switches pesticide type: ' + sw.slice(0, 32));
+    const dy = await sendQA('那明天呢？');
+    check(/明天/.test(dy) && /杀虫剂/.test(dy), 'follow-up keeps type and switches day: ' + dy.slice(0, 32));
+    const dw = await sendQA('哪天能打药？');
+    check(dw.length > 4 && !/^除草剂 ·/.test(dw), 'date-window question still goes to rule engine');
+
+    /* 聊天页视觉快照：收起所有展开层，首屏只留结论与推荐追问 */
+    await ev("(function(){document.querySelectorAll('#qaLog .qa-more').forEach(function(d){d.open=false});var b=document.querySelector('button[data-view=\"chat\"]');if(b)b.click();})()");
+    await sleep(400);
+    await shotViewport('06-chat-spray.png');
+
     check(await ev("window.TianZhiLLM && window.TianZhiLLM.hasKey()"), 'LLM config loaded');
     const c1 = JSON.parse(await ev("JSON.stringify(window.TianZhiLLM.numbersConsistent('10:00-14:00 风速1.9','10:00-14:00 风速 1.9'))"));
     check(c1.ok === true, 'number guard: identical numbers pass');
@@ -539,6 +578,9 @@ async function waitData(timeoutMs) {
     await ev("(function(){var i=document.getElementById('kbSearch');i.value='霜降';i.dispatchEvent(new Event('input',{bubbles:true}));})()");
     await sleep(200);
     check(await ev("document.querySelectorAll('#kbHits .kb-hit').length") >= 1, 'local KB search returns hits');
+    await ev("(function(){var i=document.getElementById('kbSearch');i.value='逆温';i.dispatchEvent(new Event('input',{bubbles:true}));})()");
+    await sleep(200);
+    check(await ev("document.querySelectorAll('#kbHits .kb-hit').length") >= 1, 'local KB: spraying-weather sources indexed');
     await ev("document.getElementById('basisClose').click();");
     await sleep(150);
 

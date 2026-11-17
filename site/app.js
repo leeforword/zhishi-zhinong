@@ -2913,7 +2913,26 @@
     who.textContent = (role === 'me') ? '我' : '知时智农';
     var body = document.createElement('div');
     body.className = 'body';
-    body.textContent = text;
+    /* 首答分层：第一段是结论，其余整段折进「展开完整分析」。
+       textContent 全程走文本节点，折叠后的内容对脚本仍完整可查。 */
+    var brief = text, rest = '';
+    var pIdx = text.indexOf('\n\n');
+    if (pIdx > 0 && ((notes && notes.fold) || text.length > 180)) {
+      brief = text.slice(0, pIdx);
+      rest = text.slice(pIdx + 2);
+    }
+    body.textContent = brief;
+    if (rest) {
+      var det = document.createElement('details');
+      det.className = 'qa-more';
+      var sum = document.createElement('summary');
+      sum.textContent = '展开完整分析';
+      var dv = document.createElement('div');
+      dv.className = 'qa-more-body';
+      dv.textContent = rest;
+      det.appendChild(sum); det.appendChild(dv);
+      body.appendChild(det);
+    }
     d.appendChild(who); d.appendChild(body);
 
     if (role === 'bot' && withNote) {
@@ -2929,6 +2948,15 @@
       line.appendChild(b1); line.appendChild(b2);
       body.appendChild(line);
       var sugs = SUG[lastIntent];
+      /* 药剂追问按当前药种动态生成：不要出现「换成除草剂呢」这种
+         当前已经就是除草剂的无效按钮。 */
+      if (lastIntent === 'chem' && qaContext.chem && qaContext.chem.type !== 'banned') {
+        var CHEM_LBL = { herbicide: '除草剂', insecticide: '杀虫剂', fungicide: '杀菌剂' };
+        var curChem = qaContext.chem.type;
+        var otherChem = ['herbicide', 'insecticide', 'fungicide'].filter(function (k) { return k !== curChem; });
+        sugs = ['换成' + CHEM_LBL[otherChem[0]] + '呢？', '换成' + CHEM_LBL[otherChem[1]] + '呢？',
+          '那明天呢？', '有露水能打吗？'];
+      }
       if (sugs && sugs.length) {
         var row = document.createElement('div');
         row.className = 'sug-row';
@@ -3101,7 +3129,7 @@
   }
 
   /* 评审要求：能解释依据、能承认不确定、能理解追问、超范围诚实 */
-  var qaContext = { intent: null };
+  var qaContext = { intent: null, chem: null };
   var lastIntent = '';
   var SUG = {
     spray: ['明天和后天哪天更好？', '几点风最小？', '我这里按什么标准打药？'],
@@ -3109,7 +3137,8 @@
     harvest: ['未来七天雨量多少？', '几点风最小？'],
     standard: ['为什么是这个时段？', '这个结论准不准？'],
     weather: ['日出日落几点？', '几点风最小？', '未来七天雨量多少？'],
-    kb: ['按什么标准打药？']
+    kb: ['按什么标准打药？'],
+    chem: ['换成除草剂呢？', '换成杀虫剂呢？', '那明天呢？', '有露水能打吗？']
   };
 
   /** 两天的窗口对比：回答"明天和后天哪天更好" */
@@ -3294,6 +3323,34 @@
     // 是交互智能体区别于「天气查询框」的关键。
     var pre = preAnswer(q, result, plot);
     if (pre) { appendMsg('bot', pre, true); return; }
+
+    // --- 第 0.5 步：药剂已定，判断「此时此地能不能施」---
+    // 农户不问选药，只问选定的药在当前天气下能不能用。
+    // 通用问答 AI 只能复述条文；这里把每条判据落到这块地的逐时数值上。
+    // 「哪天能打药」这类日期窗口问题仍交给规则层，不要抢。
+    var CH = window.TianZhiChem;
+    if (CH) {
+      var chemM = CH.match(q, qaContext.chem);
+      var chemNow = /现在|今天|这会儿|此刻|能不能打|能打吗|可以打|想打|要打|准备打|能不能用/.test(q);
+      var chemDate = /哪天|未来|这周|一周|对比|更好/.test(q);
+      var chemFollow = qaContext.intent === 'chem' && /^(那|接着|再|然后|换|如果|要是)/.test(q);
+      var shouldChem = chemM.kind === 'banned' || chemM.type !== 'generic' ||
+        chemM.topic !== null || chemFollow ||
+        (chemNow && !chemDate && /打药|喷药|施药|药/.test(q));
+      if (shouldChem) {
+        qaContext.intent = 'chem';
+        lastIntent = 'chem';
+        var chemAns = CH.answer(chemM, {
+          result: result, raw: state.raw, rules: RULES, plot: plot, now: new Date()
+        });
+        qaContext.chem = { type: chemAns.type, dayIdx: chemAns.dayIdx || 0 };
+        /* 首屏恒为两行结论；逐项判定、依据文件与边界整段折进「展开完整分析」 */
+        appendMsg('bot', chemAns.brief + '\n\n' + chemAns.detail, true, {
+          source: chemAns.source, fold: true
+        });
+        return;
+      }
+    }
 
     // --- 第一步：规则层意图 ---
     var intent = T.ruleIntent(q);

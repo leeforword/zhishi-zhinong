@@ -622,6 +622,14 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 .msg{max-width:86%;font-size:12.5px;line-height:1.65}
 .msg .who{font-size:10.5px;color:var(--text-3);margin-bottom:2px;font-weight:500}
 .msg .body{white-space:pre-wrap}
+/* 首答分层：结论段直接显示，完整分析折进可展开块 */
+.qa-more{margin-top:8px;border-top:1px dashed var(--border);padding-top:6px}
+.qa-more summary{cursor:pointer;color:var(--brand);font-size:11.5px;font-weight:600;
+  list-style:none;display:flex;align-items:center;gap:4px;user-select:none}
+.qa-more summary::-webkit-details-marker{display:none}
+.qa-more summary:before{content:"›";transition:transform .15s}
+.qa-more[open] summary:before{transform:rotate(90deg)}
+.qa-more-body{margin-top:6px;font-size:11.5px;color:var(--text-2);line-height:1.75}
 .msg.bot{align-self:flex-start;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:8px 11px;color:var(--text)}
 .msg.me{align-self:flex-end;background:var(--brand);color:#fff;border-radius:var(--r-md);padding:8px 11px}
 .msg.me .who{color:rgba(255,255,255,.7)}
@@ -2640,7 +2648,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           </details>
         </div>
 
-        <div class="sec-h"><h2>关于</h2><span class="hint">v5.1</span></div>
+        <div class="sec-h"><h2>关于</h2><span class="hint">v5.2</span></div>
         <div class="disc">
           <b>知时智农 · 华北平原冬小麦 / 夏玉米农事时机助手</b>
           <p>气象 和风天气 + Open-Meteo · 地图 高德 · 标准 河北省 / 市级公开文件</p>
@@ -2847,6 +2855,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 <script src="hebei-geo.js"></script>
 <script src="place.js"></script>
 <script src="logic.js"></script>
+<script src="chem.js"></script>
 <script src="content.js"></script>
 <script src="kb.js"></script>
 <script src="ensemble.js"></script>

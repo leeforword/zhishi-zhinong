@@ -8,6 +8,7 @@
      · 24 个节气农事提示（content.js）
      · 6 条判定口径（content.js）
      · 167 个河北县级行政区（hebei-geo.js，阿里 DataV GeoAtlas 离线内置）
+     · 15 份施药气象依据 + 3 类药剂口径 + 6 个专项话题（chem.js，含原文链接）
 
    用途：
      1. 「依据」弹层里显示"本地知识库 N 条"，并可搜索；
@@ -95,6 +96,57 @@
           tags: '行政区 县 地名 ' + c.name + ' ' + (c.city || '') + ' ' + (c.adcode || ''),
           source: '',
           sourceLabel: '阿里 DataV GeoAtlas（离线）'
+        });
+      });
+    }
+
+    /* ---- 5. 施药气象依据（chem.js）：文件原文、药剂口径、专项话题 ----
+       这些是「药已定，判此刻能不能施」的可追溯出处，离线可检索。
+       只索引 chem.js 里已有的数据，不新增任何结论。 */
+    var CH = root.TianZhiChem;
+    if (CH && CH.SOURCES) {
+      CH.SOURCES.forEach(function (s) {
+        push(list, {
+          id: 'chem-s:' + s.id,
+          type: '施药依据',
+          title: s.code,
+          text: s.issuer + ' · ' + s.clause + '：' + s.point,
+          tags: '施药 打药 农药 天气 风速 温度 露水 结露 逆温 降雨 药效 飘移 ' +
+            s.code + ' ' + s.level + ' ' + s.clause,
+          source: s.url,
+          sourceLabel: s.level + ' · 查证 ' + CH.CHECKED
+        });
+      });
+      Object.keys(CH.TYPES || {}).forEach(function (k) {
+        var t = CH.TYPES[k];
+        if (k === 'generic') return;
+        push(list, {
+          id: 'chem-t:' + k,
+          type: '药剂口径',
+          title: t.label + ' · 施药气象条件',
+          text: '风速上限 ' + t.wind_stop + ' m/s；' +
+            (t.temp_min_hard !== null && t.temp_min_hard !== undefined ? '硬下限 ' + t.temp_min_hard + '℃；' : '') +
+            (t.temp_min_ideal ? '适温下限 ' + t.temp_min_ideal + '℃；' : '') +
+            '上限 ' + t.temp_max + '℃；喷后无雨参考 ' + t.rain_free_h + ' h。' +
+            t.notes.join(' '),
+          tags: '药剂 施药 天气 ' + t.short + ' ' + t.tags,
+          source: '',
+          sourceLabel: 'chem.js · 施药天气判定（查证 ' + CH.CHECKED + '）'
+        });
+      });
+      Object.keys(CH.TOPICS || {}).forEach(function (k) {
+        var t = CH.TOPICS[k];
+        var refs = t.ids.map(function (i) {
+          return CH.SOURCES.filter(function (s) { return s.id === i; })[0];
+        }).filter(Boolean).map(function (s) { return '[' + s.code + '] ' + s.point; }).join('\n');
+        push(list, {
+          id: 'chem-p:' + k,
+          type: '施药话题',
+          title: t.name + ' · 判定口径',
+          text: refs,
+          tags: '施药 天气 判定 ' + t.name + ' ' + k,
+          source: '',
+          sourceLabel: 'chem.js · 离线依据'
         });
       });
     }
