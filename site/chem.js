@@ -532,10 +532,12 @@
     /* 换类别没提药名时，上一轮的具体药名必须丢掉，否则会拿草甘膦去算杀虫剂 */
     if (prod === null && switchWord) m.product = null;
 
-    /* 3) 话题（可与类型并存） */
+    /* 3) 话题（可与类型并存）。省略追问沿用上一轮话题：
+       问过「有露水能打吗」，再说「那明天呢」，问的还是露水。 */
     Object.keys(TOPICS).forEach(function (k) {
       if (TOPICS[k].re.test(s) && !m.topic) m.topic = k;
     });
+    if (!m.topic && isFollow && prev && prev.topic) m.topic = prev.topic;
 
     /* 4) 合规拦截：仅在明确提及时 */
     for (var i = 0; i < BANNED.length; i++) {
@@ -1261,14 +1263,31 @@
           (top.length ? top.join('；') + '。' : '逐时条件都不达标。');
         evD = evaluate(type, Object.assign({}, baseCtx, { dayIdx: 0 }));
       } else {
-        var first = days[0];
-        var w0 = first.windows.slice().sort(function (a, b) { return b.hours - a.hours; })[0];
-        var others = days.slice(1).map(function (d) { return mmdd(d.date); }).slice(0, 3);
-        brief = label + ' · 未来 7 天有 ' + days.length + ' 天能打。\n' +
-          '最早 ' + mmdd(first.date) + ' ' + first.day.dow + ' ' + fmtWin(w0) +
-          '（' + w0.hours + ' 小时，均风 ' + w0.avgWind + ' m/s）' +
-          (others.length ? '；还有 ' + others.join('、') : '') + '。';
-        evD = evaluate(type, Object.assign({}, baseCtx, { dayIdx: first.idx }));
+        /* 主内容必须直接给出「哪几天、几点」：以前把日期藏在展开层里，
+           用户看到的第一行只有「有 2 天可以打药」，等于没说。 */
+        var picks = days.slice(0, 3).map(function (d) {
+          var w = d.windows.slice().sort(function (a, b) { return b.hours - a.hours; })[0];
+          return mmdd(d.date) + ' ' + fmtWin(w) + '（' + w.hours + ' 小时）';
+        });
+        var ranked = days.map(function (d) {
+          return {
+            d: d,
+            w: d.windows.slice().sort(function (a, b) { return b.hours - a.hours; })[0]
+          };
+        }).sort(function (a, b) { return b.w.hours - a.w.hours; });
+        var best = ranked[0];
+        var line2;
+        if (days.length === 1) {
+          var dm = Math.round((best.d.day.tmax + best.d.day.tmin) / 2);
+          line2 = '这天均风 ' + best.w.avgWind + ' m/s、气温约 ' + dm +
+            '℃；错过就要等下一轮天气过程。';
+        } else {
+          line2 = '最合适 ' + mmdd(best.d.date) + ' ' + fmtWin(best.w) +
+            '，连续 ' + best.w.hours + ' 小时，均风 ' + best.w.avgWind + ' m/s。';
+        }
+        brief = label + ' · 未来 7 天有 ' + days.length + ' 天能打：' +
+          picks.join('、') + (days.length > picks.length ? ' 等' : '') + '。\n' + line2;
+        evD = evaluate(type, Object.assign({}, baseCtx, { dayIdx: best.d.idx }));
       }
       if (!evD) return null;
       evD.plotName = (ctx.plot && ctx.plot.name) || '';

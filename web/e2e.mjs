@@ -465,12 +465,18 @@ async function waitData(timeoutMs) {
     const chemFirst = await ev(`(() => {
       const b = [...document.querySelectorAll('#qaLog .msg.bot')].pop();
       const det = b.querySelector('.qa-more');
-      return { brief: b.querySelector('.body').childNodes[0].textContent,
+      return { brief: b.querySelector('.body').getAttribute('data-brief'),
                hasMore: !!det, open: det ? det.open : null,
-               subs: det ? det.querySelectorAll('.qa-sub').length : 0 };
+               subs: det ? det.querySelectorAll('.qa-sub').length : 0,
+               l1: b.querySelectorAll('.body .qa-l1').length,
+               nums: b.querySelectorAll('.body .qa-num').length };
     })()`);
-    check(/除草剂/.test(chemFirst.brief) && /未来 7 天/.test(chemFirst.brief),
+    check(/^(打药|除草剂)/.test(chemFirst.brief) && /未来 7 天/.test(chemFirst.brief),
       'week question answers with a week window: ' + chemFirst.brief.slice(0, 40));
+    check((chemFirst.brief.match(/\d{1,2}:\d{2}\s*[–-]\s*\d{1,2}:\d{2}/g) || []).length >= 1,
+      'week brief puts concrete time windows in the first bubble');
+    check(chemFirst.l1 && chemFirst.nums >= 2,
+      'verdict line is emphasised and numbers are bold: ' + chemFirst.nums);
     check(chemFirst.brief.split('\n').length === 2 && chemFirst.brief.length <= 170,
       'first answer is two short lines: ' + chemFirst.brief.length + ' chars');
     check(chemFirst.hasMore && chemFirst.open === false, 'full analysis collapsed by default');
@@ -489,7 +495,7 @@ async function waitData(timeoutMs) {
         await sleep(300);
         if (await ev("!document.querySelector('#qaLog .typing')")) break;
       }
-      return await ev("[...document.querySelectorAll('#qaLog .msg.bot:not(.typing-wrap)')].pop().querySelector('.body').childNodes[0].textContent");
+      return await ev("[...document.querySelectorAll('#qaLog .msg.bot:not(.typing-wrap)')].pop().querySelector('.body').getAttribute('data-brief')");
     }
     const sw = await sendQA('换成杀虫剂呢？');
     check(/杀虫剂/.test(sw), 'follow-up switches pesticide type: ' + sw.slice(0, 32));

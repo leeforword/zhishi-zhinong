@@ -2898,6 +2898,35 @@
   /* =========================================================
      问答
      ========================================================= */
+  /* 首答要能一眼看出「结论 / 时间 / 数字」：第一行加粗，日期与时段加重。
+     -------------------------------------------------------------
+     只做排版，不改文字：所有数字仍是规则引擎给的原字符串，
+     拆行与加重都在渲染层完成，复制/测试拿到的 data-brief 仍是纯文本。 */
+  var QA_EM = /(\d{1,2}:\d{2}\s*[–\-]\s*\d{1,2}:\d{2}|\d{1,2}\/\d{1,2}|\d+(?:\.\d+)?\s*(?:m\/s|℃|%|小时|天|份))/g;
+  var QA_EM_ONE = new RegExp('^' + QA_EM.source + '$');
+
+  function qaRichText(body, text, strong) {
+    body.setAttribute('data-brief', text);
+    String(text).split('\n').forEach(function (line, i) {
+      var row = document.createElement('div');
+      /* 只有「判定结论」这类两行答案才把第一行加粗；
+         开场白、知识库摘录、方法说明都是长段落，加粗只会显得吵。 */
+      row.className = strong ? (i === 0 ? 'qa-l1' : 'qa-l2') : 'qa-p';
+      String(line).split(QA_EM).forEach(function (part) {
+        if (!part) return;
+        if (QA_EM_ONE.test(part)) {
+          var b = document.createElement('b');
+          b.className = 'qa-num';
+          b.textContent = part;
+          row.appendChild(b);
+        } else {
+          row.appendChild(document.createTextNode(part));
+        }
+      });
+      body.appendChild(row);
+    });
+  }
+
   /**
    * 追加一条对话消息。
    * withNote=true 时给机器人回答挂上「依据 / 边界 / 核实」条与纠错入口——
@@ -2923,7 +2952,8 @@
       brief = text.slice(0, pIdx);
       rest = text.slice(pIdx + 2);
     }
-    body.textContent = brief;
+    if (role === 'bot') qaRichText(body, brief, !!(notes && notes.verdict));
+    else body.textContent = brief;
     if (sections && sections.length) {
       var det = document.createElement('details');
       det.className = 'qa-more';
@@ -3239,6 +3269,31 @@
   }
 
   /**
+   * 药剂判定的唯一出口：ask 与 respondWith 都走这里，
+   * 保证「同一类问法」永远是同一种排版与同一套数字。
+   */
+  function answerChem(m, result, plot) {
+    var CH = window.TianZhiChem;
+    if (!CH) return false;
+    var ans = CH.answer(m, {
+      result: result, raw: state.raw, rules: RULES, plot: plot, now: new Date()
+    });
+    if (!ans) return false;
+    qaContext.intent = 'chem';
+    lastIntent = 'chem';
+    /* prev 里存的是对象，不是 key：下一轮「那明天呢」要沿用整个药剂档案 */
+    qaContext.chem = {
+      type: ans.type, product: m.product || null,
+      dayIdx: ans.dayIdx || 0, scope: ans.scope || 'now', topic: m.topic
+    };
+    appendMsg('bot', ans.brief, true, {
+      source: ans.source, fold: true, verdict: true,
+      sections: ans.sections, suggest: chemSuggest(m)
+    });
+    return true;
+  }
+
+  /**
    * 每轮注入给大模型的会话上下文。
    * -------------------------------------------------------------
    * 为什么要有：LLM 只看到「待改写的一句话」时，很容易把用户的
@@ -3484,7 +3539,28 @@
     // 这些问题的答案不含实时数字，但可以解释「怎么算的、有多悬、边界在哪」，
     // 是交互智能体区别于「天气查询框」的关键。
     var pre = preAnswer(q, result, plot);
-    if (pre) { appendMsg('bot', pre, true); return; }
+    if (pre) {
+      /* 两行以内的「判定型」短答案才交给 AI 顺一遍、也才加粗首行；
+         方法说明、可靠性这类长段落保持原样。 */
+      var short = pre.length <= 220 && pre.indexOf('\n\n') < 0;
+      if (aiOn && LLM && LLM.isEnabled() && short) {
+        var tp0 = appendTyping();
+        LLM.refine(pre, {
+          place: plot.name + '（' + plot.place + '）',
+          crop: CROP_NAME[plot.crop], question: q,
+          context: buildTurnContext(plot, result)
+        }).then(function (nice) {
+          tp0.remove();
+          appendMsg('bot', nice, true, { verdict: true });
+        }, function () {
+          tp0.remove();
+          appendMsg('bot', pre, true, { verdict: true });
+        });
+        return;
+      }
+      appendMsg('bot', pre, true, { verdict: short });
+      return;
+    }
 
     // --- 第 0.5 步：药剂已定，判断「此时此地能不能施」---
     // 农户不问选药，只问选定的药在当前天气下能不能用。
@@ -3499,30 +3575,12 @@
         !/打药|喷药|施药|喷雾|用药|除草|杀虫|杀菌/.test(q);
       /* 只要问的是喷雾作业，就交给 chem：它有逐时窗口、药剂阈值和两行结论，
          通用规则层那段长段落不再抢这类问题，避免同一个问题两种排版。 */
-      var sprayWord = /打药|喷药|施药|喷雾|用药/.test(q);
+      var sprayWord = /打药|喷药|施药|喷雾|用药|喷洒|农药/.test(q);
       var shouldChem = !otherTask && (
         chemM.kind === 'banned' || !!chemM.product || chemM.topic !== null ||
         chemM.type !== 'generic' || sprayWord ||
         (chemM.isFollow && qaContext.intent === 'chem'));
-      if (shouldChem) {
-        qaContext.intent = 'chem';
-        lastIntent = 'chem';
-        var chemAns = CH.answer(chemM, {
-          result: result, raw: state.raw, rules: RULES, plot: plot, now: new Date()
-        });
-        if (chemAns) {
-          /* prev 里存的是对象，不是 key：下一轮「那明天呢」要沿用整个药剂档案 */
-          qaContext.chem = {
-            type: chemAns.type, product: chemM.product || null,
-            dayIdx: chemAns.dayIdx || 0, scope: chemAns.scope || 'now', topic: chemM.topic
-          };
-          appendMsg('bot', chemAns.brief, true, {
-            source: chemAns.source, fold: true,
-            sections: chemAns.sections, suggest: chemSuggest(chemM)
-          });
-          return;
-        }
-      }
+      if (shouldChem && answerChem(chemM, result, plot)) return;
     }
 
     // --- 第一步：规则层意图 ---
@@ -3598,6 +3656,12 @@
     if (!intent || !T.INTENT_QUERY[intent]) {
       appendMsg('bot', T.answerQuestion(q, result, plot), true);
       return;
+    }
+
+    /* 大模型把问题归到 spray 时，仍然交给 chem 出结论：
+       以前这里会退回逻辑层的长段落，同一个「哪天能打」出现两种排版。 */
+    if (intent === 'spray' && window.TianZhiChem) {
+      if (answerChem(window.TianZhiChem.match(q, qaContext.chem), result, plot)) return;
     }
 
     // 关键：答案由规则引擎产出，数字全部来自实时数据

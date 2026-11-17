@@ -203,6 +203,15 @@ check(/^飘移/.test(dr.a.brief), '飘移问题以「飘移」开头作答');
 check(CH.match('换成杀虫剂呢？', {
   type: 'herbicide', product: CH.PRODUCTS.filter(p => p.key === 'glyphosate')[0]
 }).product === null, '换药种后不再沿用草甘膦档案');
+check(CH.match('那明天呢？', {
+  type: 'herbicide', dayIdx: 0, scope: 'day', topic: 'dew'
+}).topic === 'dew', '追问沿用上一轮话题（露水）');
+const w2 = ask('哪天能打药？', {}, 18);
+check(/天能打：/.test(w2.a.brief), '一周清单把日期写在主内容里');
+check((w2.a.brief.match(/\d{1,2}:\d{2}\s*[–-]\s*\d{1,2}:\d{2}/g) || []).length >= 2,
+  '主内容直接给出每个可作业日的时段');
+check(w2.a.brief.split('\n').length === 2 && w2.a.brief.length <= 170,
+  '一周清单仍是两行、不超长（实际 ' + w2.a.brief.length + ' 字）');
 
 /* ---------------- 7. 离线知识库索引 ---------------- */
 console.log('\n===== 7. 本地知识库 =====');
