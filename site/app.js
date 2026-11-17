@@ -278,6 +278,213 @@
       p.join('') + '</svg>';
   }
 
+  /* ===== 依据层补充图（v5.1）：露点差 / 气温带 / 风向飘移 / 降雨与需水 =====
+     全部沿用 windChartSvg 的骨架：固定 0–24 轴、阈值虚线带白描边标签、
+     点色随达标状态变化，保证四张新图与旧图是同一套语言。 */
+
+  /** 24h 露点差：气温 − 露点。低于 dew_gap_min 视为叶面近饱和（结露） */
+  function dewChartSvg(hours, width) {
+    var W = width || 620, H = 238, L = 38, R = 12, TP = 18, B = 30;
+    var iw = W - L - R, ih = H - TP - B;
+    var gapMin = RULES.spray.dew_gap_min;
+    var gaps = hours.map(function (h) {
+      return (h.temp !== null && h.dew !== null && h.dew !== undefined) ? h.temp - h.dew : null;
+    });
+    var vals = gaps.filter(function (v) { return v !== null; });
+    if (!vals.length) return '<div class="chart-note">该日无露点数据</div>';
+    var ymax = Math.max(gapMin + 2.5, Math.ceil(Math.max.apply(null, vals)) + 1);
+    var ymin = Math.min(-1, Math.floor(Math.min.apply(null, vals)));
+    var x = function (h) { return L + (h / 24) * iw; };
+    var y = function (v) { return TP + ih - (v - ymin) / (ymax - ymin) * ih; };
+    var p = [];
+    for (var g = Math.ceil(ymin); g <= ymax; g += 2) {
+      p.push('<line x1="' + L + '" y1="' + y(g).toFixed(1) + '" x2="' + (W - R) + '" y2="' + y(g).toFixed(1) +
+        '" stroke="#eef1ea" stroke-width="1"/>');
+      p.push('<text x="' + (L - 6) + '" y="' + (y(g) + 3.5).toFixed(1) + '" font-size="9" text-anchor="end" fill="#9aa196">' + g + '</text>');
+    }
+    /* 结露时段底条：一眼看出"几点叶子是湿的" */
+    hours.forEach(function (h, i) {
+      if (gaps[i] === null || gaps[i] >= gapMin) return;
+      p.push('<rect x="' + (x(h.hour) + 1).toFixed(1) + '" y="' + TP + '" width="' +
+        Math.max(3, iw / 24 - 2).toFixed(1) + '" height="' + ih +
+        '" fill="rgba(107,114,128,.14)" rx="2"/>');
+    });
+    var line = '', started = false;
+    hours.forEach(function (h, i) {
+      if (gaps[i] === null) { started = false; return; }
+      line += (started ? ' L' : 'M') + x(h.hour).toFixed(1) + ',' + y(gaps[i]).toFixed(1);
+      started = true;
+    });
+    p.push('<path d="' + line + '" fill="none" stroke="#255677" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+    var dy = y(gapMin).toFixed(1);
+    p.push('<line x1="' + L + '" y1="' + dy + '" x2="' + (W - R) + '" y2="' + dy +
+      '" stroke="#BE4A3C" stroke-width="1.2" stroke-dasharray="4 4" opacity=".85"/>');
+    p.push('<text x="' + (L + 5) + '" y="' + (+dy - 6).toFixed(1) +
+      '" font-size="9" fill="#BE4A3C" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-linejoin="round">结露线 ' + gapMin + '℃</text>');
+    hours.forEach(function (h, i) {
+      if (gaps[i] === null) return;
+      var ok = gaps[i] > gapMin;
+      p.push('<circle cx="' + x(h.hour).toFixed(1) + '" cy="' + y(gaps[i]).toFixed(1) + '" r="2.4" fill="' +
+        (ok ? '#255677' : '#BE4A3C') + '" stroke="#fff" stroke-width="1"/>');
+    });
+    [0, 6, 12, 18, 24].forEach(function (h, i3) {
+      var a = i3 === 0 ? 'start' : (i3 === 4 ? 'end' : 'middle');
+      p.push('<text x="' + x(h).toFixed(1) + '" y="' + (H - 10) + '" font-size="9" text-anchor="' + a + '" fill="#9aa196">' +
+        (h === 24 ? '24 时' : h + ' 时') + '</text>');
+    });
+    p.push('<text x="' + L + '" y="' + (TP - 5) + '" font-size="9" fill="#9aa196">℃</text>');
+    return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '">' + p.join('') + '</svg>';
+  }
+
+  /** 24h 气温 + 作业温度带：出带的时段一眼看出是太冷还是太热 */
+  function tempBandSvg(hours, width) {
+    var W = width || 620, H = 238, L = 38, R = 12, TP = 18, B = 30;
+    var iw = W - L - R, ih = H - TP - B;
+    var lo = RULES.spray.temp_min, hi = RULES.spray.temp_max;
+    var temps = hours.map(function (h) { return (h.temp === null || h.temp === undefined) ? null : h.temp; })
+      .filter(function (v) { return v !== null; });
+    if (!temps.length) return '<div class="chart-note">该日无气温数据</div>';
+    var ymax = Math.ceil(Math.max(hi + 2, Math.max.apply(null, temps) + 1));
+    var ymin = Math.floor(Math.min(lo - 2, Math.min.apply(null, temps)) - 0);
+    var x = function (h) { return L + (h / 24) * iw; };
+    var y = function (v) { return TP + ih - (v - ymin) / (ymax - ymin) * ih; };
+    var p = [];
+    for (var g = ymin; g <= ymax; g += 5) {
+      p.push('<line x1="' + L + '" y1="' + y(g).toFixed(1) + '" x2="' + (W - R) + '" y2="' + y(g).toFixed(1) +
+        '" stroke="#eef1ea" stroke-width="1"/>');
+      p.push('<text x="' + (L - 6) + '" y="' + (y(g) + 3.5).toFixed(1) + '" font-size="9" text-anchor="end" fill="#9aa196">' + g + '°</text>');
+    }
+    /* 作业温度带 */
+    p.push('<rect x="' + L + '" y="' + y(hi).toFixed(1) + '" width="' + iw + '" height="' +
+      (y(lo) - y(hi)).toFixed(1) + '" fill="rgba(61,107,85,.10)" rx="3"/>');
+    var line = '', started = false;
+    hours.forEach(function (h, i) {
+      if (temps[i] === null) { started = false; return; }
+      line += (started ? ' L' : 'M') + x(h.hour).toFixed(1) + ',' + y(temps[i]).toFixed(1);
+      started = true;
+    });
+    p.push('<path d="' + line + '" fill="none" stroke="#C0811A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+    hours.forEach(function (h, i) {
+      if (temps[i] === null) return;
+      var t = temps[i];
+      var col = (t >= lo && t <= hi) ? '#3D6B55' : (t < lo ? '#255677' : '#BE4A3C');
+      p.push('<circle cx="' + x(h.hour).toFixed(1) + '" cy="' + y(t).toFixed(1) + '" r="2.4" fill="' + col + '" stroke="#fff" stroke-width="1"/>');
+    });
+    [0, 6, 12, 18, 24].forEach(function (h, i3) {
+      var a = i3 === 0 ? 'start' : (i3 === 4 ? 'end' : 'middle');
+      p.push('<text x="' + x(h).toFixed(1) + '" y="' + (H - 10) + '" font-size="9" text-anchor="' + a + '" fill="#9aa196">' +
+        (h === 24 ? '24 时' : h + ' 时') + '</text>');
+    });
+    p.push('<text x="' + L + '" y="' + (TP - 5) + '" font-size="9" fill="#9aa196">℃</text>');
+    return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '">' + p.join('') + '</svg>';
+  }
+
+  /** 24h 风向·飘移：箭头指向雾滴飘去的方向（下风向），红 = 该时风速超上限 */
+  function driftChartSvg(hours, width) {
+    var W = width || 620, H = 238, L = 38, R = 12, TP = 18, B = 30;
+    var iw = W - L - R, ih = H - TP - B;
+    var cy = TP + ih / 2;
+    var x = function (h) { return L + (h / 24) * iw; };
+    var p = [];
+    p.push('<line x1="' + L + '" y1="' + cy + '" x2="' + (W - R) + '" y2="' + cy + '" stroke="#eef1ea" stroke-width="1.5"/>');
+    /* 方位刻度：上北，帮助读出箭头朝向 */
+    p.push('<text x="' + (W - R + 1) + '" y="' + (cy - 8) + '" font-size="9" fill="#9aa196">N↑</text>');
+    var lim = RULES.spray.wind_max, maxW = 1;
+    hours.forEach(function (h) { if (h.wind > maxW) maxW = h.wind; });
+    var lenMax = Math.min(iw / 24 - 4, 26);
+    hours.forEach(function (h) {
+      if (h.dir === null || h.dir === undefined) return;
+      var over = h.wind > lim;
+      var col = over ? '#BE4A3C' : '#3D6B55';
+      var len = Math.max(7, (h.wind / Math.max(maxW, lim)) * lenMax);
+      /* 气象风向是「来向」；雾滴飘向 = 来向 + 180°。屏幕坐标：北 = 上 */
+      var to = (h.dir + 180) * Math.PI / 180;
+      var dx = Math.sin(to), dyy = -Math.cos(to);
+      var x0 = x(h.hour), y0 = cy, x1 = x0 + dx * len, y1 = cy + dyy * len;
+      var tip = pad2(h.hour) + ':00 ' + dirText(h.dir) + '风 ' + dirDeg(h.dir) + ' · ' + h.wind + ' m/s，飘向' + driftText(h.dir);
+      p.push('<g><title>' + tip + '</title>' +
+        '<line x1="' + x0.toFixed(1) + '" y1="' + y0.toFixed(1) + '" x2="' + x1.toFixed(1) + '" y2="' + y1.toFixed(1) +
+        '" stroke="' + col + '" stroke-width="2" stroke-linecap="round"/>' +
+        /* 箭头两撇 */
+        '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + (x1 - (dx * 5 + dyy * 3.2)).toFixed(1) + '" y2="' + (y1 - (dyy * 5 - dx * 3.2)).toFixed(1) +
+        '" stroke="' + col + '" stroke-width="1.6" stroke-linecap="round"/>' +
+        '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + (x1 - (dx * 5 - dyy * 3.2)).toFixed(1) + '" y2="' + (y1 - (dyy * 5 + dx * 3.2)).toFixed(1) +
+        '" stroke="' + col + '" stroke-width="1.6" stroke-linecap="round"/>' +
+        '<circle cx="' + x0.toFixed(1) + '" cy="' + y0.toFixed(1) + '" r="1.6" fill="' + col + '" opacity=".55"/></g>');
+    });
+    if (!hours.some(function (h) { return h.dir !== null && h.dir !== undefined; })) {
+      return '<div class="chart-note">该日无风向数据</div>';
+    }
+    [0, 6, 12, 18, 24].forEach(function (h, i3) {
+      var a = i3 === 0 ? 'start' : (i3 === 4 ? 'end' : 'middle');
+      p.push('<text x="' + x(h).toFixed(1) + '" y="' + (H - 10) + '" font-size="9" text-anchor="' + a + '" fill="#9aa196">' +
+        (h === 24 ? '24 时' : h + ' 时') + '</text>');
+    });
+    /* 每 3 小时一个风速读数，窄图自动跳过部分标签防重叠 */
+    var step = W < 470 ? 6 : 3;
+    hours.forEach(function (h) {
+      if (h.hour % step) return;
+      p.push('<text x="' + x(h.hour).toFixed(1) + '" y="' + (cy + 14).toFixed(1) +
+        '" font-size="8.5" text-anchor="middle" fill="#9aa196" stroke="#fff" stroke-width="2.5" paint-order="stroke">' +
+        h.wind + '</text>');
+    });
+    return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '">' + p.join('') + '</svg>';
+  }
+
+  /** 7 天降雨 vs 需水：柱 = 每日预报雨量，蓝线 = 累计，虚线 = 周有效降水参考 */
+  function rainNeedSvg(result, width) {
+    var W = width || 620, H = 238, L = 38, R = 40, TP = 18, B = 30;
+    var iw = W - L - R, ih = H - TP - B;
+    var days = result.days;
+    var REF = 15; /* 与灌溉判定同一口径：一周有效降水 15mm */
+    var maxBar = 0;
+    days.forEach(function (d) { if (d.dayRain > maxBar) maxBar = d.dayRain; });
+    var ymax = Math.max(4, Math.ceil(maxBar + 1));
+    var cum = 0, cums = days.map(function (d) { cum += (d.dayRain || 0); return cum; });
+    var cumMax = Math.max(REF + 5, Math.ceil(cum[cum.length - 1] + 2));
+    var x = function (i) { return L + (i + 0.5) / days.length * iw; };
+    var yL = function (v) { return TP + ih - Math.min(v, ymax) / ymax * ih; };
+    var yR = function (v) { return TP + ih - v / cumMax * ih; };
+    var p = [];
+    for (var g = 0; g <= ymax; g += 2) {
+      p.push('<line x1="' + L + '" y1="' + yL(g).toFixed(1) + '" x2="' + (W - R) + '" y2="' + yL(g).toFixed(1) +
+        '" stroke="#eef1ea" stroke-width="1"/>');
+      p.push('<text x="' + (L - 6) + '" y="' + (yL(g) + 3.5).toFixed(1) + '" font-size="9" text-anchor="end" fill="#9aa196">' + g + '</text>');
+    }
+    var bw = Math.max(6, iw / days.length * 0.42);
+    days.forEach(function (d, i) {
+      var v = d.dayRain || 0;
+      if (v <= 0) return;
+      var bh = Math.max(1.5, TP + ih - yL(v));
+      p.push('<rect x="' + (x(i) - bw / 2).toFixed(1) + '" y="' + yL(v).toFixed(1) +
+        '" width="' + bw.toFixed(1) + '" height="' + bh.toFixed(1) +
+        '" fill="rgba(47,111,159,.30)" rx="2.5"/>');
+    });
+    var line = '';
+    cums.forEach(function (v, i) { line += (i ? ' L' : 'M') + x(i).toFixed(1) + ',' + yR(v).toFixed(1); });
+    p.push('<path d="' + line + '" fill="none" stroke="#255677" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+    cums.forEach(function (v, i) {
+      p.push('<circle cx="' + x(i).toFixed(1) + '" cy="' + yR(v).toFixed(1) + '" r="2.4" fill="#255677" stroke="#fff" stroke-width="1"/>');
+    });
+    var ry = yR(REF).toFixed(1);
+    p.push('<line x1="' + L + '" y1="' + ry + '" x2="' + (W - R) + '" y2="' + ry +
+      '" stroke="#8A6110" stroke-width="1.2" stroke-dasharray="4 4" opacity=".85"/>');
+    p.push('<text x="' + (W - R - 3) + '" y="' + (+ry - 6).toFixed(1) +
+      '" font-size="9" fill="#8A6110" text-anchor="end" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-linejoin="round">周参考 ' + REF + 'mm</text>');
+    /* 干旱周整张图只剩一条贴底的零线，直说，别让人以为是图没画出来 */
+    if (maxBar === 0) {
+      p.push('<text x="' + (L + iw / 2) + '" y="' + (TP + ih * 0.42) + '" font-size="12" text-anchor="middle" fill="#9aa196">未来七天预报无有效降雨</text>');
+    }
+    days.forEach(function (d, i) {
+      var dt = new Date(d.date + 'T00:00:00');
+      p.push('<text x="' + x(i).toFixed(1) + '" y="' + (H - 10) + '" font-size="9" text-anchor="middle" fill="#9aa196">' +
+        (dt.getMonth() + 1) + '/' + dt.getDate() + '</text>');
+    });
+    p.push('<text x="' + L + '" y="' + (TP - 5) + '" font-size="9" fill="#9aa196">mm/日</text>');
+    p.push('<text x="' + (W - R + 26) + '" y="' + (TP - 5) + '" font-size="9" fill="#255677">累计</text>');
+    return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '">' + p.join('') + '</svg>';
+  }
+
   /* 热力图色板：一处定义，图例文字与色块不会再漂 */
   var HEAT_COLOR = {
     ok: '#bbf7d0', wind: '#fed7aa', cold: '#C7DCE8', hot: '#fde68a',
@@ -677,6 +884,17 @@
     $('tempChart').innerHTML = tempChartSvg(result, chartW($('tempChart')));
     if ($('donutChart')) $('donutChart').innerHTML = donutSvg(result);
     $('growthChart').innerHTML = growthSvg(plot, chartW($('growthChart')));
+    /* v5.1 新增四张：露点差 / 气温带 / 风向飘移（都跟选中日走）+ 7 天降雨需水 */
+    $('dewChart').innerHTML = hours.length
+      ? dewChartSvg(hours, chartW($('dewChart')))
+      : '<div class="chart-note">该日无逐小时数据</div>';
+    $('tempBandChart').innerHTML = hours.length
+      ? tempBandSvg(hours, chartW($('tempBandChart')))
+      : '<div class="chart-note">该日无逐小时数据</div>';
+    $('driftChart').innerHTML = hours.some(function (h) { return h.dir !== null && h.dir !== undefined; })
+      ? driftChartSvg(hours, chartW($('driftChart')))
+      : '<div class="chart-note">该日无风向数据</div>';
+    $('rainChart').innerHTML = rainNeedSvg(result, chartW($('rainChart')));
   }
 
   /* =========================================================

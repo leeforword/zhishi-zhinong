@@ -210,29 +210,30 @@ async function waitData(timeoutMs) {
       'reason cites real measured values');
     check(await ev("!!document.querySelector('#growthChart svg')"), 'growth chart svg');
 
-    /* v4.7：四张图统一骨架；v5.1 起收成 2×2 网格，两行各自必须等高对齐 */
+    /* v4.7：统一骨架；v5.1 起八张卡 2×N 网格，每一行必须等高对齐 */
     const pair = await ev(`(() => {
       const cards = [...document.querySelectorAll('.chart-card')];
-      const rows = [[cards[0], cards[1]], [cards[2], cards[3]]];
-      const out = { n: cards.length, rows: [] };
-      rows.forEach(function (r, i) {
-        if (!r[0] || !r[1]) { out.rows.push(null); return; }
-        const a = r[0].getBoundingClientRect(), b = r[1].getBoundingClientRect();
-        const sa = r[0].querySelector('svg'), sb = r[1].querySelector('svg');
-        out.rows.push({
-          dh: Math.abs(a.height - b.height), dy: Math.abs(a.top - b.top),
-          sh: Math.abs(sa.getBoundingClientRect().height - sb.getBoundingClientRect().height)
-        });
-      });
+      const out = { n: cards.length, bad: [] };
+      for (let r = 0; r * 2 + 1 < cards.length; r++) {
+        const a = cards[r * 2].getBoundingClientRect(), b = cards[r * 2 + 1].getBoundingClientRect();
+        const sa = cards[r * 2].querySelector('svg'), sb = cards[r * 2 + 1].querySelector('svg');
+        const dh = Math.abs(a.height - b.height), dy = Math.abs(a.top - b.top);
+        const sh = sa && sb ? Math.abs(sa.getBoundingClientRect().height - sb.getBoundingClientRect().height) : 0;
+        if (dh > 1 || dy > 1 || sh > 1) out.bad.push(r + ' (dh ' + dh.toFixed(1) + ' sh ' + sh.toFixed(1) + ')');
+      }
       return out;
     })()`);
-    check(pair.n === 4, 'four chart cards in a 2x2 grid: ' + pair.n);
-    check(pair.rows[0] && pair.rows[0].dh <= 1 && pair.rows[0].dy <= 1,
-      'row 1 cards aligned: Δh ' + pair.rows[0].dh.toFixed(1) + 'px');
-    check(pair.rows[1] && pair.rows[1].dh <= 1 && pair.rows[1].dy <= 1,
-      'row 2 cards aligned: Δh ' + pair.rows[1].dh.toFixed(1) + 'px');
-    check(pair.rows[0] && pair.rows[0].sh <= 1 && pair.rows[1] && pair.rows[1].sh <= 1,
-      'all four svgs equal height');
+    check(pair.n === 8, 'eight chart cards in a 2-column grid: ' + pair.n);
+    check(pair.bad.length === 0, 'every row aligned: ' + (pair.bad.join('; ') || 'all rows OK'));
+
+    /* v5.1 新增四张：露点差 / 气温带 / 风向飘移 / 降雨需水 */
+    check(await ev("!!document.querySelector('#dewChart svg') && /结露线/.test(document.getElementById('dewChart').textContent)"),
+      'dew-gap chart with condensation threshold');
+    check(await ev("!!document.querySelector('#tempBandChart svg')"), 'temperature band chart');
+    check(await ev("(function(){var c=document.querySelector('#driftChart');return c && c.querySelectorAll('line').length >= 20;})()"),
+      'drift chart with arrow glyphs');
+    check(await ev("!!document.querySelector('#rainChart svg') && /周参考/.test(document.getElementById('rainChart').textContent)"),
+      'rain vs water-need chart with weekly reference');
     check(await ev("document.querySelectorAll('#heatChart text').length") > 8, 'heatmap axis labels');
 
     /* 风向不该再出现「西西南 / 西西北」这种记录式写法 */

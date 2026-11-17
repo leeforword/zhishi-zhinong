@@ -2416,6 +2416,20 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 
         <div class="cbox chart-card">
           <div class="cbox-h">
+            <b>气温与作业温度带</b>
+            <div class="lg">
+              <i style="color:#C0811A"><s></s>气温</i>
+              <i style="color:#3D6B55"><s></s>作业区间</i>
+              <i style="color:#255677"><s></s>过冷</i>
+              <i style="color:#BE4A3C"><s></s>过热</i>
+            </div>
+          </div>
+          <div class="chart-scroll"><div id="tempBandChart"><div class="skel" style="height:150px"></div></div></div>
+          <div class="chart-note">绿带 = 当前阈值的作业温度区间；出带的时段气温不合规（蓝=过冷，红=过热）</div>
+        </div>
+
+        <div class="cbox chart-card">
+          <div class="cbox-h">
             <b>温度与降水</b>
             <div class="lg">
               <i style="color:#8C3025"><s></s>最高</i>
@@ -2425,6 +2439,19 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           </div>
           <div class="chart-scroll"><div id="tempChart"><div class="skel" style="height:150px"></div></div></div>
           <div class="chart-note">折线为逐日最高 / 最低温，柱为逐日雨量</div>
+        </div>
+
+        <div class="cbox chart-card">
+          <div class="cbox-h">
+            <b>降雨与需水</b>
+            <div class="lg">
+              <i style="color:#255677"><s></s>累计</i>
+              <i style="color:#7BA3C4"><s></s>日雨量</i>
+              <i style="color:#8A6110"><s class="dash"></s>周参考 15mm</i>
+            </div>
+          </div>
+          <div class="chart-scroll"><div id="rainChart"><div class="skel" style="height:150px"></div></div></div>
+          <div class="chart-note">柱为每日预报雨量，线为逐日累计；累计够 15mm，一周墒情一般不缺</div>
         </div>
 
         <div class="cbox chart-card">
@@ -2440,6 +2467,30 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           </div>
           <div class="chart-scroll"><div id="heatChart"><div class="skel" style="height:150px"></div></div></div>
           <div class="chart-note" id="heatNote">右侧红线为当日日落提前收工的时刻 · 点格子看该小时为什么不行</div>
+        </div>
+
+        <div class="cbox chart-card">
+          <div class="cbox-h">
+            <b>露点差 · 叶面干湿</b>
+            <div class="lg">
+              <i style="color:#255677"><s></s>露点差</i>
+              <i style="color:#BE4A3C"><s class="dash"></s>结露线 1.5℃</i>
+            </div>
+          </div>
+          <div class="chart-scroll"><div id="dewChart"><div class="skel" style="height:150px"></div></div></div>
+          <div class="chart-note">灰底时段叶面近饱和，药液干得慢；1.5℃ 以上才算「叶面是干的」</div>
+        </div>
+
+        <div class="cbox chart-card">
+          <div class="cbox-h">
+            <b>风向 · 飘移</b>
+            <div class="lg">
+              <i style="color:#3D6B55"><s></s>不超限</i>
+              <i style="color:#BE4A3C"><s></s>风速超限</i>
+            </div>
+          </div>
+          <div class="chart-scroll"><div id="driftChart"><div class="skel" style="height:150px"></div></div></div>
+          <div class="chart-note">箭头指向雾滴飘去的方向（悬停看时刻详情）；红色 = 该时风速超上限</div>
         </div>
 
         <div class="cbox chart-card">
