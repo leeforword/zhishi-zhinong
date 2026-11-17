@@ -2038,23 +2038,55 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 .cbox{padding:14px 15px}
 
 /* ---- L1 决策卡 ---- */
+/* 决策卡：背景随天气变（与页面 bg-blobs 同一套色相语言），
+   结论状态只靠结论文字与指标判断色表达，不再用「左侧一根色条」的模板样式 */
 .decision{
-  position:relative;background:var(--surface-solid);border:1px solid var(--border);
+  position:relative;border:1px solid var(--border);
   border-radius:16px;box-shadow:var(--shadow-md);padding:0 0 14px;overflow:hidden;
+  background:linear-gradient(170deg,#e7edf2 0%,#f0f4ee 52%,#fcfcf9 100%);
 }
-.decision:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--brand)}
-.decision.st-warn:before{background:var(--warn)}
-.decision.st-bad:before{background:var(--danger)}
+.decision.wx-clear{background:
+  radial-gradient(120% 95% at 14% -12%, rgba(86,150,220,.30), transparent 56%),
+  radial-gradient(85% 65% at 88% -14%, rgba(245,190,110,.22), transparent 55%),
+  linear-gradient(170deg,#e9f2f9 0%,#f4f8f1 52%,#fefbf1 100%)}
+.decision.wx-cloud{background:
+  radial-gradient(120% 95% at 16% -12%, rgba(120,150,178,.24), transparent 58%),
+  radial-gradient(85% 65% at 84% -14%, rgba(150,170,180,.18), transparent 55%),
+  linear-gradient(170deg,#e9eef3 0%,#eff3ee 52%,#fbfbf7 100%)}
+.decision.wx-rain{background:
+  radial-gradient(120% 95% at 14% -12%, rgba(70,110,140,.26), transparent 58%),
+  radial-gradient(85% 65% at 86% -14%, rgba(96,128,140,.20), transparent 55%),
+  linear-gradient(170deg,#e4ecEE 0%,#ebf1ec 52%,#f8faf4 100%)}
+.decision.wx-snow{background:
+  radial-gradient(120% 95% at 12% -12%, rgba(160,190,220,.26), transparent 56%),
+  radial-gradient(85% 65% at 88% -14%, rgba(185,205,220,.20), transparent 55%),
+  linear-gradient(170deg,#edf3f8 0%,#f2f6f2 52%,#fbfaf5 100%)}
+.decision.wx-fog{background:
+  radial-gradient(120% 95% at 20% -12%, rgba(160,168,160,.22), transparent 58%),
+  radial-gradient(85% 65% at 80% -14%, rgba(175,180,170,.18), transparent 55%),
+  linear-gradient(170deg,#edefeb 0%,#f2f4ef 52%,#fafaf5 100%)}
+.decision.wx-storm{background:
+  radial-gradient(120% 95% at 16% -12%, rgba(78,92,130,.24), transparent 58%),
+  radial-gradient(85% 65% at 84% -14%, rgba(110,96,140,.18), transparent 55%),
+  linear-gradient(170deg,#e5e9f0 0%,#eceeed 52%,#f6f5f0 100%)}
+.decision.wx-wind{background:
+  radial-gradient(120% 95% at 14% -12%, rgba(64,145,120,.24), transparent 58%),
+  radial-gradient(85% 65% at 86% -14%, rgba(120,170,150,.18), transparent 55%),
+  linear-gradient(170deg,#e6f1ea 0%,#eef4ee 52%,#f9fbf6 100%)}
+.decision.wx-night{background:
+  radial-gradient(120% 95% at 14% -12%, rgba(60,84,120,.22), transparent 58%),
+  radial-gradient(85% 65% at 86% -14%, rgba(80,96,120,.16), transparent 55%),
+  linear-gradient(170deg,#e5eaf0 0%,#ebeeeb 52%,#f6f5f1 100%)}
 
 .d-head{display:flex;align-items:center;gap:10px;padding:12px 16px 10px 20px;
-  border-bottom:1px solid var(--border);flex-wrap:wrap}
-.d-tabs{display:flex;gap:2px;background:var(--surface-2);border:1px solid var(--border);
+  border-bottom:1px solid rgba(26,31,27,.07);flex-wrap:wrap}
+.d-tabs{display:flex;gap:2px;background:rgba(255,255,255,.55);border:1px solid rgba(26,31,27,.08);
   border-radius:9px;padding:2px}
 .d-tabs button{
   border:0;background:transparent;font:inherit;font-size:12.5px;color:var(--text-2);
   padding:5px 14px;border-radius:7px;cursor:pointer;transition:background .16s,color .16s;
 }
-.d-tabs button.on{background:var(--surface-solid);color:var(--text);font-weight:600;
+.d-tabs button.on{background:rgba(255,255,255,.92);color:var(--text);font-weight:600;
   box-shadow:0 1px 2px rgba(26,31,27,.08)}
 .d-meta{margin-left:auto;font-size:11px;color:var(--text-3);white-space:nowrap}
 
@@ -2066,7 +2098,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 .decision.st-bad .d-word{color:#8C3025}
 .d-why{margin-top:6px;font-size:12px;line-height:1.65;color:var(--text-2);max-width:52ch}
 
-.d-when{flex:none;text-align:right;padding-left:16px;border-left:1px solid var(--border);min-width:132px}
+.d-when{flex:none;text-align:right;padding-left:16px;border-left:1px solid rgba(26,31,27,.08);min-width:132px}
 .d-day{display:block;font-size:10.5px;color:var(--text-3);letter-spacing:.04em}
 .d-time{display:block;font-size:20px;font-weight:600;color:var(--text);
   font-variant-numeric:tabular-nums;letter-spacing:-.01em;margin-top:2px}
@@ -2075,13 +2107,13 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 /* 「今天不能打」时，下面四项数值属于未来窗口；这条说明必须看得见，
    否则用户会把未来预报当成今天的实况 */
 .d-from{margin:12px 18px 0 20px;padding:8px 12px;border-radius:8px;
-  background:var(--surface-2);border-left:2px solid var(--warn);
+  background:rgba(255,255,255,.62);border:1px solid rgba(26,31,27,.06);
   font-size:11px;color:var(--text-2);line-height:1.5}
 .d-from:before{content:"ⓘ ";color:var(--warn)}
 @media (max-width:640px){.d-from{margin:10px 14px 0 16px}}
 .d-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;
-  margin:12px 18px 0 20px;padding:12px 0;border-top:1px dashed var(--border)}
-.d-metric{padding:0 14px;border-left:1px solid var(--border);min-width:0}
+  margin:12px 18px 0 20px;padding:12px 0;border-top:1px dashed rgba(26,31,27,.12)}
+.d-metric{padding:0 14px;border-left:1px solid rgba(26,31,27,.07);min-width:0}
 .d-metric:first-child{padding-left:0;border-left:0}
 .d-metric span{display:block;font-size:10px;color:var(--text-3);letter-spacing:.03em;white-space:nowrap}
 .d-metric b{display:block;font-size:15px;font-weight:600;color:var(--text);margin-top:3px;

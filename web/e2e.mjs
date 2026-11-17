@@ -182,6 +182,9 @@ async function waitData(timeoutMs) {
     check(/月/.test(todayTxt) && todayTxt.indexOf('undefined') < 0, 'masthead date ok: ' + todayTxt);
     check(await ev("document.getElementById('dMeta').textContent.indexOf('标准') >= 0"),
       'standard source shown on decision card');
+    /* 决策卡背景跟天气走（晴/阴/雨/雪/雾/雷/风/夜），不再是纯白模板卡 */
+    check(await ev("/wx-(clear|cloud|rain|snow|fog|storm|wind|night)/.test(document.getElementById('decision').className)"),
+      'decision card carries weather theme');
 
     check(await ev("!document.getElementById('consensusBox')"), 'consensus block removed');
 

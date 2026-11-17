@@ -879,7 +879,7 @@
 
 
   /* ---- 天气主题：背景随实况/预报变化，但正文始终深色可读 ---- */
-  function applyWeatherTheme(code) {
+  function applyWeatherTheme(code, windMax) {
     var h = new Date().getHours();
     var night = h < 6 || h >= 18;
     var cls = 'cloud';
@@ -890,15 +890,25 @@
     else if (code >= 71 && code <= 77) cls = 'snow';
     else if (code >= 80 && code <= 82) cls = 'rain';
     else if (code >= 95) cls = 'storm';
+    /* 大风本身就是一种「天」：风天单列一套背景（阈值跟属地标准走），
+       雷暴 / 暴雪保持自己的主题不被覆盖 */
+    var windLine = (RULES.spray.wind_max || 3.4) * 1.6;
+    if (windMax != null && windMax >= windLine && cls !== 'storm' && cls !== 'snow') cls = 'wind';
     document.body.className = document.body.className.replace(/\bwx-[a-z]+\b/g, '').trim();
     document.body.classList.add('wx-' + cls);
     if (night) document.body.classList.add('wx-night');
     var MAP = {
       clear: '#dceaf8', cloud: '#e4ebf1', rain: '#dfe8ea', snow: '#e8f0f7',
-      fog: '#e9ece7', storm: '#dfe4ee', night: '#dfe6ee'
+      fog: '#e9ece7', storm: '#dfe4ee', night: '#dfe6ee', wind: '#e0ede6'
     };
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', MAP[night ? 'night' : cls] || '#e6efe9');
+    /* 决策卡与页面同一天气语言；状态类 st-* 由 renderDecision 维护，这里只换 wx- */
+    var dec = $('decision');
+    if (dec) {
+      dec.className = dec.className.replace(/\bwx-[a-z]+\b/g, '').trim() +
+        ' wx-' + (night ? 'night' : cls);
+    }
   }
 
   /* =========================================================
@@ -1077,7 +1087,10 @@
     var dec = task === 'spray' ? sprayDecision(result)
       : (task === 'irrigation' ? irrDecision(result) : harvDecision(result));
 
-    box.className = 'decision st-' + (dec.status === 'ok' ? 'ok' : (dec.status === 'warn' ? 'warn' : 'bad'));
+    /* 重写状态类时保留天气类（applyWeatherTheme 写入的 wx-*），否则换地块瞬间背景会闪回默认 */
+    var wxKeep = (box.className.match(/\bwx-[a-z]+\b/) || [''])[0];
+    box.className = 'decision st-' + (dec.status === 'ok' ? 'ok' : (dec.status === 'warn' ? 'warn' : 'bad')) +
+      (wxKeep ? ' ' + wxKeep : '');
 
     if ($('dWord')) $('dWord').textContent = dec.word;
     if ($('dWhy')) $('dWhy').textContent = dec.why;
@@ -1593,7 +1606,7 @@
 
       $('tbSub').textContent = placeText(plot) +
         ' · ' + plot.lat.toFixed(2) + '°N ' + plot.lon.toFixed(2) + '°E';
-      applyWeatherTheme(result.days[0].weather_code);
+      applyWeatherTheme(result.days[0].weather_code, result.days[0].windMax);
       state.task = state.task || 'spray';
       renderDecision(result, state.task);
       renderWeek(result, state.task);
