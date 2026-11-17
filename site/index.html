@@ -326,7 +326,7 @@ button{font-family:inherit}
 .alert{
   display:flex;align-items:flex-start;gap:11px;
   padding:11px 14px;border-radius:var(--r-md);border:1px solid;
-  background:var(--surface);
+  background:rgba(255,255,255,.7);
 }
 .alert .a-icon{flex:none;margin-top:1px}
 .alert .a-body{flex:1;min-width:0}
@@ -334,17 +334,23 @@ button{font-family:inherit}
 .alert .a-desc{font-size:12px;color:var(--text-2);margin-top:2px;line-height:1.55}
 .alert .a-act{flex:none;display:flex;gap:6px;align-items:center}
 
-.alert.danger{border-color:#fecaca;background:var(--danger-weak)}
-.alert.danger .a-title{color:#b91c1c}
+/* 告警：不再用整条浅红/浅黄色块（与全页米绿基调打架），
+   改成卡片同语言的半透明白底 + 淡色描边， severity 只落在图标、标题和描边上 */
+.alert.danger{border-color:rgba(190,74,60,.28);
+  background:linear-gradient(165deg,rgba(190,74,60,.09),rgba(190,74,60,.03) 55%,rgba(255,255,255,.5))}
+.alert.danger .a-title{color:#9C3D30}
 .alert.danger .a-icon{color:var(--danger)}
-.alert.warn{border-color:#fde68a;background:var(--warn-weak)}
-.alert.warn .a-title{color:#b45309}
+.alert.warn{border-color:rgba(176,112,24,.30);
+  background:linear-gradient(165deg,rgba(176,112,24,.09),rgba(176,112,24,.03) 55%,rgba(255,255,255,.5))}
+.alert.warn .a-title{color:#8A6110}
 .alert.warn .a-icon{color:var(--warn)}
-.alert.info{border-color:#C7DCE8;background:var(--brand-weak)}
+.alert.info{border-color:rgba(47,86,67,.22);
+  background:linear-gradient(165deg,rgba(61,98,71,.08),rgba(61,98,71,.03) 55%,rgba(255,255,255,.5))}
 .alert.info .a-title{color:#2F5643}
 .alert.info .a-icon{color:var(--brand)}
-.alert.success{border-color:#bbf7d0;background:var(--success-weak)}
-.alert.success .a-title{color:#15803d}
+.alert.success{border-color:rgba(33,92,57,.24);
+  background:linear-gradient(165deg,rgba(33,92,57,.08),rgba(33,92,57,.03) 55%,rgba(255,255,255,.5))}
+.alert.success .a-title{color:#215C39}
 .alert.success .a-icon{color:var(--success)}
 
 /* 雨量迷你柱 */
@@ -2421,9 +2427,9 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           <div class="chart-note">折线为逐日最高 / 最低温，柱为逐日雨量</div>
         </div>
 
-        <div class="cbox chart-card wide">
+        <div class="cbox chart-card">
           <div class="cbox-h">
-            <b>作业窗口热力图</b><span>7 天 × 24 小时 · 按当前阈值逐时判定</span>
+            <b>作业窗口热力图</b><span>7 天 × 24 小时 · 逐时判定</span>
             <div class="lg">
               <i style="color:#1F7A4C"><s></s>可作业</i>
               <i style="color:#B07018"><s></s>风大</i>
@@ -2436,9 +2442,9 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           <div class="chart-note" id="heatNote">右侧红线为当日日落提前收工的时刻 · 点格子看该小时为什么不行</div>
         </div>
 
-        <div class="cbox chart-card wide">
+        <div class="cbox chart-card">
           <div class="cbox-h">
-            <b>长势判读 · 方法占位</b><span>未接入遥感，本版本不输出任何苗情结论</span>
+            <b>长势判读 · 方法占位</b><span>未接入遥感，不输出苗情结论</span>
             <div class="lg">
               <i style="color:#3D6B55"><s></s>形态示意</i>
               <i style="color:#8D958A"><s class="dash"></s>对照形态</i>

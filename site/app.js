@@ -291,7 +291,7 @@
        24 列的刻度和色块都看不全。改成按容器宽实时算，列宽自动收窄。 */
     var W = width || 620;
     var narrow = W < 470;
-    var H = 252, L = narrow ? 38 : 52, R = 12, TP = 22, B = 30;
+    var H = 238, L = narrow ? 38 : 52, R = 12, TP = 22, B = 30;
     var cw = (W - L - R) / 24, chh = (H - TP - B) / days.length;
 
     var p = [];
@@ -475,7 +475,8 @@
   /** 长势趋势（示意数据） */
   function growthSvg(plot, width) {
     var pts = T.growthTrend(plot, 8);
-    var W = width || 620, H = 168, L = 40, R = 14, TP = 16, B = 30;
+    /* 与其余三张图统一 238 高：2×2 网格里四张卡才真正对齐 */
+    var W = width || 620, H = 238, L = 40, R = 14, TP = 16, B = 30;
     var iw = W - L - R, ih = H - TP - B;
     var ymin = 0.30, ymax = 0.85;
     var x = function (i) { return L + i / (pts.length - 1) * iw; };

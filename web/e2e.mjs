@@ -210,23 +210,29 @@ async function waitData(timeoutMs) {
       'reason cites real measured values');
     check(await ev("!!document.querySelector('#growthChart svg')"), 'growth chart svg');
 
-    /* v4.7：四张图统一骨架，并排两张必须等高——之前底边参差就是没对齐 */
+    /* v4.7：四张图统一骨架；v5.1 起收成 2×2 网格，两行各自必须等高对齐 */
     const pair = await ev(`(() => {
-      const cards = [...document.querySelectorAll('.chart-card')].filter(c => !c.classList.contains('wide'));
-      if (cards.length !== 2) return { n: cards.length };
-      const a = cards[0].getBoundingClientRect(), b = cards[1].getBoundingClientRect();
-      const sa = cards[0].querySelector('svg'), sb = cards[1].querySelector('svg');
-      return {
-        n: 2,
-        dh: Math.abs(a.height - b.height), dy: Math.abs(a.top - b.top),
-        sw: Math.abs(sa.getBoundingClientRect().width - sb.getBoundingClientRect().width),
-        sh: Math.abs(sa.getBoundingClientRect().height - sb.getBoundingClientRect().height)
-      };
+      const cards = [...document.querySelectorAll('.chart-card')];
+      const rows = [[cards[0], cards[1]], [cards[2], cards[3]]];
+      const out = { n: cards.length, rows: [] };
+      rows.forEach(function (r, i) {
+        if (!r[0] || !r[1]) { out.rows.push(null); return; }
+        const a = r[0].getBoundingClientRect(), b = r[1].getBoundingClientRect();
+        const sa = r[0].querySelector('svg'), sb = r[1].querySelector('svg');
+        out.rows.push({
+          dh: Math.abs(a.height - b.height), dy: Math.abs(a.top - b.top),
+          sh: Math.abs(sa.getBoundingClientRect().height - sb.getBoundingClientRect().height)
+        });
+      });
+      return out;
     })()`);
-    check(pair.n === 2, 'two side-by-side chart cards');
-    check(pair.dh <= 1, 'chart cards equal height: Δ' + pair.dh.toFixed(1) + 'px');
-    check(pair.dy <= 1, 'chart cards aligned top: Δ' + pair.dy.toFixed(1) + 'px');
-    check(pair.sh <= 1, 'chart svg equal height: Δ' + pair.sh.toFixed(1) + 'px');
+    check(pair.n === 4, 'four chart cards in a 2x2 grid: ' + pair.n);
+    check(pair.rows[0] && pair.rows[0].dh <= 1 && pair.rows[0].dy <= 1,
+      'row 1 cards aligned: Δh ' + pair.rows[0].dh.toFixed(1) + 'px');
+    check(pair.rows[1] && pair.rows[1].dh <= 1 && pair.rows[1].dy <= 1,
+      'row 2 cards aligned: Δh ' + pair.rows[1].dh.toFixed(1) + 'px');
+    check(pair.rows[0] && pair.rows[0].sh <= 1 && pair.rows[1] && pair.rows[1].sh <= 1,
+      'all four svgs equal height');
     check(await ev("document.querySelectorAll('#heatChart text').length") > 8, 'heatmap axis labels');
 
     /* 风向不该再出现「西西南 / 西西北」这种记录式写法 */
