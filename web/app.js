@@ -790,11 +790,6 @@
     return m + '月';
   }
 
-  /* =========================================================
-     最佳窗口卡（含倒计时 + 已打药标记）
-     ========================================================= */
-  var countdownTimer = null;
-
   /* ---- 集合预报：置信度评估 ----
      优先用真集合（50 成员）；取不到时退回多模型分歧（4 模型）。
      两者都会在界面上标明是哪种，不混淆。 */
@@ -830,59 +825,6 @@
       '<b>' + Math.round(prob * 100) + '%</b></span>';
   }
 
-  /** 逐小时支持率条：一眼看出窗口稳不稳 */
-  function confStrip(strip, level) {
-    var cells = strip.map(function (h) {
-      var pct = Math.round(h.prob * 100);
-      var op = 0.15 + h.prob * 0.85;
-      var col = h.prob >= 0.7 ? '#16a34a' : h.prob >= 0.5 ? '#d97706' : '#dc2626';
-      return '<i title="' + pad2(h.hour) + ':00  ' + pct + '% 成员支持" ' +
-        'style="background:' + col + ';opacity:' + op.toFixed(2) + '"></i>';
-    }).join('');
-    return '<div class="conf-strip">' + cells + '</div>';
-  }
-
-  /** 余量评估：取不到集合预报时的替代口径
-      只用主预报就能算：窗口内风速峰值离上限还有多少空间 + 当天降雨概率。
-      必须标明这不是集合成员支持率——两者不是一回事，不能混着说。 */
-  function marginEval(day, win) {
-    var limit = T.RULES.spray.wind_max;
-    var peak = (win.maxWind != null ? win.maxWind : win.avgWind) || 0;
-    var ratio = limit > 0 ? peak / limit : 1;
-    var prob = day.dayProb || 0;
-    var level;
-    if (ratio <= 0.75 && prob <= 20) level = { label: '充足', color: '#16a34a' };
-    else if (ratio <= 0.9 && prob <= 40) level = { label: '偏紧', color: '#d97706' };
-    else level = { label: '紧张', color: '#dc2626' };
-    return { level: level, peak: peak, limit: limit, prob: prob, ratio: ratio };
-  }
-
-  /* 相对日：今天 / 明天 / 后天 / 周X */
-  function relDay(dateStr) {
-    var d = new Date(dateStr + 'T00:00:00');
-    var t = new Date(); t.setHours(0, 0, 0, 0);
-    var diff = Math.round((d - t) / 86400000);
-    if (diff === 0) return '今天';
-    if (diff === 1) return '明天';
-    if (diff === 2) return '后天';
-    return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
-  }
-
-  /* 窗口适配度：风速余量 50% + 降水概率 20% + 温度适宜 15% + 时长 15%。
-     是加权综合分，不是概率，界面上也不说成概率。 */
-  function windowScore(best, w) {
-    var limit = RULES.spray.wind_max;
-    var peak = (w.maxWind != null ? w.maxWind : w.avgWind) || 0;
-    var windFit = Math.max(0, Math.min(1, 1 - peak / limit));
-    var rainFit = Math.max(0, Math.min(1, 1 - (best.dayProb || 0) / 100));
-    var t = w.avgTemp;
-    var tempFit = t < RULES.spray.temp_min ? 0.2
-      : t > RULES.spray.temp_max ? 0.2
-      : t < 10 ? 0.7 : t > 28 ? 0.7 : 1;
-    var durFit = Math.min(1, w.hours / 6);
-    var score = Math.round(100 * (0.5 * windFit + 0.2 * rainFit + 0.15 * tempFit + 0.15 * durFit));
-    return { score: Math.max(0, Math.min(100, score)), windFit: windFit, rainFit: rainFit, durFit: durFit, peak: peak, limit: limit };
-  }
 
   /* =========================================================
      节气：21 世纪通用算式（精确到日），用于首页节气条
@@ -931,155 +873,10 @@
     if ($('jqNext')) $('jqNext').textContent = '距' + n.name + ' ' + toNext + ' 天';
     if ($('jqFarm') && CONTENT) {
       var tip = CONTENT.termNote(c.name);
-      $('jqFarm').innerHTML = '<b>' + CONTENT.esc(c.name) + ' · 农事提醒</b>：' +
-        CONTENT.esc(tip || '按当前天气窗口安排田间作业。') +
-        ' <span style="color:var(--text-3)">（通用常识，非这块地的苗情结论）</span>';
+      $('jqFarm').textContent = '农事：' + (tip || '按当前天气窗口安排田间作业');
     }
-
-    var from = Math.max(0, cur - 2), to = Math.min(evs.length - 1, cur + 3), html = '';
-    for (var k = from; k <= to; k++) {
-      var e = evs[k];
-      var cls = k === cur ? ' on' : (k < cur ? ' past' : '');
-      html += '<div class="jq-tick' + cls + '"><i></i><span>' + e.name + '</span><em>' +
-        (e.date.getMonth() + 1) + '/' + e.date.getDate() + '</em></div>';
-    }
-    if ($('jqRail')) $('jqRail').innerHTML = html;
   }
 
-  /* 窗口内的风向：打药真正要看的是"雾滴往哪飘"，
-     西南风意味着下风向是东北——邻地有敏感作物就得先打招呼。 */
-  function windLine(day, w) {
-    if (!state.raw || !state.raw.hourly) return '';
-    var hours = T.hoursOf(state.raw.hourly, day.date);
-    var mid = hours.filter(function (h) { return h.hour === w.start; })[0] ||
-              hours.filter(function (h) { return h.hour >= w.start && h.hour < w.end; })[0];
-    if (!mid || mid.dir === null || mid.dir === undefined) return '';
-    return ' · ' + dirText(mid.dir) + '风 ' + dirDeg(mid.dir) +
-      '，雾滴飘向' + driftText(mid.dir);
-  }
-
-  function renderHero(result) {
-    var box = $('heroIn');
-    var kpiBox = $('skyKpi');
-    var detail = $('heroDetail');
-    var best = T.bestWindow(result);
-    var now = new Date();
-    var dow = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()];
-    var todayTx = cnMonth(now.getMonth() + 1) + cnDay(now.getDate()) + '日 ' + dow;
-    if ($('todayDate')) $('todayDate').textContent = todayTx;
-
-    clearInterval(countdownTimer);
-    var ens = ensembleEval();
-
-    if (!best) {
-      if ($('windowSub')) $('windowSub').textContent = '未来七天';
-      if (box) {
-        box.innerHTML =
-          '<div class="date-b">' + todayTx + '</div>' +
-          '<h1>未来七天<br>没有合适的作业窗口</h1>' +
-          '<p>' + esc(result.days[0].spray.why) + '</p>';
-      }
-      if (kpiBox) kpiBox.innerHTML = '';
-      if ($('gaugeCard')) $('gaugeCard').style.display = 'none';
-      if (detail) detail.innerHTML = '';
-      return;
-    }
-
-    var w = best.spray.windows.slice().sort(function (a, b) { return b.hours - a.hours; })[0];
-    var dt = new Date(best.date + 'T00:00:00');
-    if ($('windowSub')) $('windowSub').textContent = cnMonth(dt.getMonth() + 1) + cnDay(dt.getDate()) + '日 · ' + best.dow;
-
-    var ev = ens && ens.evals[best.date];
-    var ensBest = ev && ev.best;
-    var mg = marginEval(best, w);
-    var sc = windowScore(best, w);
-
-    /* ---- 天象头：一句话结论 ---- */
-    if (box) {
-      box.innerHTML =
-        '<div class="date-b">' + todayTx + ' · ' +
-          (pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ' 更新') +
-          '<span class="jq">' + (dt.getMonth() + 1) + '/' + dt.getDate() + ' · ' + best.dow + '</span>' +
-        '</div>' +
-        '<h1>' + relDay(best.date) + ' <em>' + pad2(w.start) + '—' + pad2(w.end) + ' 时</em><br>' +
-          ((best.dayProb || 0) <= 40 ? '可以下地' : '可作业，但雨说来就来') + '</h1>' +
-        '<p>风速 ' + w.avgWind + ' / 上限 ' + sc.limit + ' m/s · 降雨概率 ' + (best.dayProb || 0) +
-          '% · 连续 ' + w.hours + ' 小时' + windLine(best, w) +
-          ((best.dayProb || 0) >= 30 ? '。出门前再看一眼雷达。' : '。') + '</p>';
-    }
-
-    /* ---- 四宫格 ---- */
-    if (kpiBox) {
-      var confTx = ensBest ? '置信度 ' + Math.round(ensBest.weakest.prob * 100) + '%'
-        : (ens ? '该日支持率不足' : '余量 ' + mg.level.label);
-      var windCls = w.avgWind > sc.limit * 0.9 ? 'warn' : 'good';
-      kpiBox.innerHTML =
-        kpiCell('窗口风速', w.avgWind, 'm/s', '上限 ' + sc.limit + ' m/s', windCls) +
-        kpiCell('气温', Math.round(w.avgTemp), '℃', best.tmin + '~' + best.tmax + ' ℃', '') +
-        kpiCell('降水概率', best.dayProb || 0, '%', '当日 ' + best.dayRain + ' mm', (best.dayProb || 0) >= 50 ? 'warn' : '') +
-        kpiCell('连续时长', w.hours, '小时', confTx, 'good');
-    }
-
-    /* ---- 这个窗口稳不稳：口语结论 + 三个可核对指标 ---- */
-    if ($('gaugeCard')) {
-      $('gaugeCard').style.display = '';
-      /* 口语结论按「可解释的硬条件」给，不用加权分：
-         分数低到 45 但风速 2.8 / 雨 5% / 7 小时，说"偏悬"没人服。
-         条件：降雨概率、平均风速占上限比例、窗口长度。 */
-      var avgWind = w.avgWind, prob0 = best.dayProb || 0, lim0 = RULES.spray.wind_max;
-      var word, cls;
-      if (prob0 >= 30 || avgWind >= lim0 * 0.9 || w.hours < 3) { word = '偏悬，建议临近再定'; cls = 'bad'; }
-      else if (prob0 <= 10 && avgWind <= lim0 * 0.78 && w.hours >= 5) { word = '稳，按这个时间去'; cls = 'good'; }
-      else { word = '基本可用，出门前再看一次'; cls = 'warn'; }
-      if ($('gaugeWord')) {
-        $('gaugeWord').textContent = word;
-        $('gaugeWord').className = 'vb ' + cls;
-      }
-      var gb = $('gaugeBars');
-      if (gb) {
-        // 不再用百分比进度条：5% 的降雨概率画成短条，会被误读成"差"。
-        // 直接给可核对的原值 + 达标判断，比任何评分都好懂。
-        var rows = [
-          ['风速', w.avgWind + ' / ' + sc.limit + ' m/s', '不超上限', true],
-          ['降雨概率', (best.dayProb || 0) + '%', (best.dayProb || 0) < 30 ? '低' : '偏高', (best.dayProb || 0) < 30],
-          ['连续时长', w.hours + ' 小时', w.hours >= 4 ? '够长' : '偏短', w.hours >= 4]
-        ];
-        gb.innerHTML = rows.map(function (r) {
-          return '<div class="grow"><span>' + r[0] + '</span><b>' + r[1] + '</b>' +
-            '<i class="' + (r[3] ? 'ok' : 'warn') + '">' + r[2] + '</i></div>';
-        }).join('');
-      }
-    }
-
-    /* ---- 置信度：只留一行，细节收进「依据」弹层 ---- */
-    var confTx;
-    if (ensBest) {
-      var memberWord2 = ens.kind === 'ensemble' ? '集合成员' : '模型';
-      confTx = '置信度 ' + Math.round(ensBest.weakest.prob * 100) + '% · ' +
-        ens.data.precip.count + ' 个' + memberWord2 + '中支持最薄弱时段';
-    } else if (ens) {
-      confTx = '置信度不足 · ' + (ens.caveat || ens.label);
-    } else {
-      confTx = '未取到集合预报 · 按主预报余量估算（' + mg.level.label + '）';
-    }
-    if (detail) detail.innerHTML = '<div class="hero-conf">' + esc(confTx) + '</div>';
-
-
-    paintSky(best.code);
-  }
-
-  function kpiCell(k, v, u, sub, cls) {
-    return '<div class="kpi ' + (cls || '') + '">' +
-      '<div class="k">' + k + '</div>' +
-      '<div class="v">' + v + '<span class="u">' + u + '</span></div>' +
-      '<div class="sub">' + sub + '</div></div>';
-  }
-
-  function gbar(label, pct, val) {
-    return '<div class="gbar"><span class="bl">' + label + '</span>' +
-      '<span class="gtrack"><i class="gfill" style="width:' + pct + '%"></i></span>' +
-      '<span class="bv">' + val + '</span></div>';
-  }
 
   /* ---- 天气主题：背景随实况/预报变化，但正文始终深色可读 ---- */
   function applyWeatherTheme(code) {
@@ -1104,558 +901,421 @@
     if (meta) meta.setAttribute('content', MAP[night ? 'night' : cls] || '#e6efe9');
   }
 
-  /* ---- 天象插画：纯 SVG，晴/云/雨/风/雪 各一套 ---- */
-  var skyPainted = '';
-  function paintSky(code) {
-    var el = $('skyArt');
-    if (!el) return;
-    var kind = 'sun';
-    if (code === null || code === undefined) kind = 'sun';
-    else if (code >= 71 && code <= 77) kind = 'snow';
-    else if (code >= 51 && code <= 67) kind = 'rain';
-    else if (code >= 80) kind = 'rain';
-    else if (code === 45 || code === 48 || (code >= 1 && code <= 3)) kind = 'cloud';
-    if (skyPainted === kind) return;
-    skyPainted = kind;
-    var root = document.documentElement;
-    root.classList.remove('sky-rain', 'sky-wind', 'sky-snow', 'sky-cloud');
-    if (kind !== 'sun') root.classList.add('sky-' + kind);
+  /* =========================================================
+     L1 决策卡
+     -------------------------------------------------------------
+     一个页面只回答一个问题：这件活，现在/今天能不能干、几点干。
+     所以结论按「动作」写，不按「状态」写：
+       能打 / 明天能打 / 今天别打 —— 而不是"适宜 / 不宜"。
+     ========================================================= */
 
-    var cs = getComputedStyle(root);
-    var ac = cs.getPropertyValue('--sky-ac').trim() || '#E0A55C';
-    var br = cs.getPropertyValue('--brand').trim() || '#3D6B55';
-    var glow = cs.getPropertyValue('--sky-glow').trim() || 'rgba(242,182,102,.55)';
+  function longestWin(list) {
+    if (!list || !list.length) return null;
+    return list.slice().sort(function (a, b) { return b.hours - a.hours; })[0];
+  }
 
-    var g = '<defs>' +
-      '<radialGradient id="skGlow"><stop offset="0" stop-color="' + glow + '"/><stop offset="1" stop-color="' + glow + '" stop-opacity="0"/></radialGradient>' +
-      '<linearGradient id="skHillA" x1="0" y1="0" x2="0" y2="1">' +
-        '<stop offset="0" stop-color="' + ac + '" stop-opacity=".38"/><stop offset="1" stop-color="' + ac + '" stop-opacity=".06"/></linearGradient>' +
-      '<linearGradient id="skHillB" x1="0" y1="0" x2="0" y2="1">' +
-        '<stop offset="0" stop-color="' + br + '" stop-opacity=".24"/><stop offset="1" stop-color="' + br + '" stop-opacity=".04"/></linearGradient>' +
-      '</defs>';
+  function hoursUntil(dateStr, hour) {
+    var t = new Date(dateStr + 'T' + pad2(hour) + ':00:00');
+    return (t - new Date()) / 3600000;
+  }
 
-    if (kind === 'sun') {
-      /* 冬日低角度太阳：放在左下地平线上，右上角被四宫格挡住看不见 */
-      g += '<circle cx="196" cy="300" r="112" fill="url(#skGlow)"/>' +
-        '<circle cx="196" cy="300" r="16" fill="' + ac + '" opacity=".8"/>';
-      for (var i = 0; i < 5; i++) {
-        g += '<path d="M' + (110 + i * 34) + ' 262 L' + (60 + i * 46) + ' 214" stroke="' + ac +
-          '" stroke-width="1" opacity="' + (0.12 - i * 0.012).toFixed(3) + '"/>';
+  function relDayShort(dateStr, result) {
+    var today = result.days[0] && result.days[0].date;
+    var t1 = result.days[1] && result.days[1].date;
+    var t2 = result.days[2] && result.days[2].date;
+    if (dateStr === today) return '今天';
+    if (dateStr === t1) return '明天';
+    if (dateStr === t2) return '后天';
+    return dateStr.slice(5).replace('-', '/');
+  }
+
+  /** 打药：主结论永远先回答"今天/现在"，再给"下一次机会" */
+  function sprayDecision(result) {
+    var today = result.days[0];
+    var now = new Date();
+    var nowH = now.getHours() + now.getMinutes() / 60;
+    var rem = null;
+    if (state.raw && state.raw.hourly) {
+      try { rem = T.todayRemaining(state.raw.hourly, state.raw.daily, now, 'spray'); } catch (e) { rem = null; }
+    }
+
+    /* ---- 今天还有机会：分"正在窗口里"和"稍后进窗口" ---- */
+    if (rem && !rem.ended && rem.status === 'ok') {
+      var live = rem.windows.filter(function (w) { return nowH >= w.start && nowH < w.end; });
+      var later = rem.windows.filter(function (w) { return w.start > nowH; });
+      if (live.length) {
+        var w0 = longestWin(live);
+        return {
+          kind: 'live', day: today, date: today.date, win: w0, status: 'ok',
+          word: '现在就能打',
+          why: '这个时段风速 ' + w0.avgWind + ' m/s（上限 ' + RULES.spray.wind_max +
+            '）、降雨概率 ' + today.dayProb + '%、露点差 ' + dewGapOf(today) +
+            '℃，叶面是干的。还剩 ' + Math.max(1, Math.round(w0.end - nowH)) + ' 小时。',
+          whenDay: '今天 ' + today.date.slice(5).replace('-', '/') + ' ' + today.dow,
+          whenTime: pad2(w0.start) + ':00–' + pad2(w0.end) + ':00',
+          whenLeft: '进行中'
+        };
       }
-    } else if (kind === 'cloud') {
-      // 云别画太大：在宽屏上会被拉成一团灰块，压住四宫格
-      g += '<ellipse cx="600" cy="86" rx="130" ry="56" fill="url(#skGlow)" opacity=".55"/>';
-      g += skyCloud(540, 62, 1.05, ac) + skyCloud(700, 104, 0.8, ac);
-    } else if (kind === 'rain') {
-      g += '<ellipse cx="420" cy="86" rx="190" ry="74" fill="url(#skGlow)" opacity=".8"/>';
-      g += skyCloud(320, 84, 1.7, ac) + skyCloud(480, 66, 2.0, ac);
-      for (var r = 0; r < 34; r++) {
-        g += '<path d="M' + (70 + (r * 41) % 690) + ' ' + (152 + (r * 47) % 140) + ' l-6 18" stroke="' + ac +
-          '" stroke-width="1.1" opacity="' + (0.18 + (r % 5) * 0.06).toFixed(2) + '" stroke-linecap="round"/>';
-      }
-    } else if (kind === 'snow') {
-      g += '<ellipse cx="440" cy="80" rx="200" ry="70" fill="url(#skGlow)" opacity=".85"/>';
-      g += skyCloud(350, 80, 1.6, ac);
-      for (var s = 0; s < 26; s++) {
-        var sx = 60 + (s * 47) % 700, sy = 150 + (s * 61) % 130, z = 3 + (s % 3);
-        g += '<g opacity="' + (0.35 + (s % 4) * 0.12).toFixed(2) + '" stroke="' + ac + '" stroke-width="1.2" stroke-linecap="round">' +
-          '<path d="M' + sx + ' ' + (sy - z) + ' v' + (z * 2) + 'M' + (sx - z) + ' ' + sy + ' h' + (z * 2) + '"/></g>';
+      if (later.length) {
+        var w1 = longestWin(later);
+        return {
+          kind: 'today', day: today, date: today.date, win: w1, status: 'ok',
+          word: '今天 ' + w1.start + ' 点后可以打',
+          why: '现在还没到窗口' + (nowH < RULES.spray.hours[0] ? '（作业时段从 ' + RULES.spray.hours[0] + ' 点开始）' : '') +
+            '。' + w1.start + ' 点起风速 ' + w1.avgWind + ' m/s、降雨概率 ' + today.dayProb +
+            '%，能连续干 ' + w1.hours + ' 小时。',
+          whenDay: '今天 ' + today.date.slice(5).replace('-', '/') + ' ' + today.dow,
+          whenTime: pad2(w1.start) + ':00–' + pad2(w1.end) + ':00',
+          whenLeft: '距开始 ' + Math.max(1, Math.round(hoursUntil(today.date, w1.start))) + ' 小时'
+        };
       }
     }
 
-    /* 远山 + 麦田 */
-    g += '<path d="M0 330 L100 296 L200 326 L310 286 L420 320 L540 282 L660 316 L760 292 L800 306 L800 420 L0 420Z" fill="url(#skHillB)"/>' +
-      '<path d="M0 362 L130 334 L250 358 L370 324 L500 354 L620 320 L740 348 L800 334 L800 420 L0 420Z" fill="url(#skHillA)"/>';
-    for (var row = 0; row < 3; row++) {
-      var y0 = 372 + row * 14;
-      g += '<path d="M' + (360 + row * 12) + ' ' + y0 + ' L800 ' + (y0 - 4) + ' L800 ' + (y0 + 3) + ' L' + (360 + row * 12) + ' ' + (y0 + 5) + 'Z" fill="' + br + '" opacity="' + (0.08 + row * 0.04) + '"/>';
+    /* ---- 今天不行：先讲清楚今天为什么不行，再给下一次机会 ---- */
+    var todayWhy = (rem && !rem.ended) ? rem.why : today.spray.why;
+    todayWhy = todayWhy.replace(/^今日/, '今天');
+
+    for (var i = 1; i < result.days.length; i++) {
+      var d = result.days[i];
+      if (d.spray.status === 'ok' && d.spray.windows.length) {
+        var w2 = longestWin(d.spray.windows);
+        var rel = i === 1 ? '明天' : (i === 2 ? '后天' : d.dow);
+        return {
+          kind: 'future', day: d, date: d.date, win: w2, status: 'warn',
+          word: '今天不能打',
+          why: todayWhy + '。下一次机会在' + rel + '（' + d.date.slice(5).replace('-', '/') + '）的 ' +
+            w2.start + '–' + w2.end + ' 点，只有 ' + w2.hours + ' 小时。',
+          whenDay: '下一次窗口 · ' + rel + ' ' + d.date.slice(5).replace('-', '/'),
+          whenTime: pad2(w2.start) + ':00–' + pad2(w2.end) + ':00',
+          whenLeft: Math.round(hoursUntil(d.date, w2.start) / 24) + ' 天后',
+          /* 结论说「今天不能打」，右侧大号时间和下面四项数值却来自未来，
+             不写清楚就会被读成今天的实况。 */
+          fromNote: '右边的时段和下面四项，都是 ' + rel + ' ' + d.date.slice(5).replace('-', '/') +
+            ' 那个窗口的预报值，不是今天的'
+        };
+      }
     }
-    el.innerHTML = g;
+
+    return {
+      kind: 'none', day: today, date: today.date, win: null, status: 'bad',
+      word: '这七天都不能打',
+      why: todayWhy + '。雨前打药会被冲刷，风大会飘到邻地，两种都不值得赌。',
+      whenDay: '未来七天', whenTime: '—', whenLeft: ''
+    };
   }
 
-  function skyCloud(x, y, s, c) {
-    return '<g transform="translate(' + x + ',' + y + ') scale(' + s + ')" opacity=".32" fill="' + c + '">' +
-      '<ellipse cx="0" cy="0" rx="42" ry="24"/><ellipse cx="-26" cy="8" rx="26" ry="16"/>' +
-      '<ellipse cx="28" cy="9" rx="30" ry="17"/><ellipse cx="6" cy="-14" rx="24" ry="16"/></g>';
+  function dewGapOf(d) {
+    if (!state.raw || !state.raw.hourly || !d) return '—';
+    var hours = T.hoursOf(state.raw.hourly, d.date);
+    var h = hours.filter(function (x) { return x.hour >= RULES.spray.hours[0] && x.hour < RULES.spray.hours[1]; })[0];
+    if (!h || h.dew === null || h.dew === undefined) return '—';
+    return round1(h.temp - h.dew).toFixed(1);
   }
 
-  /* ---- 推迟代价：窗口往后挪，风险怎么变 ---- */
-  function renderDelayCost(ens, bestDate) {
-    if (!ens) return '';
-    var base = ens.evals[bestDate];
-    if (!base || !base.best) return '';
+  function irrDecision(result) {
+    var d = result.days[0];
+    var it = d.irrigation;
+    var word = it.status === 'ok' ? '今天不用浇'
+      : (it.status === 'warn' ? '该安排浇水了' : '今天别浇');
+    return {
+      kind: 'today', day: d, date: d.date, win: null,
+      status: it.status === 'ok' ? 'ok' : (it.status === 'warn' ? 'warn' : 'bad'),
+      word: word, why: it.why,
+      whenDay: '今天 ' + d.date.slice(5).replace('-', '/') + ' ' + d.dow,
+      whenTime: '日出前后',
+      whenLeft: '蒸发最小'
+    };
+  }
 
-    // 找出后面第一个明显更差的日子
-    var later = ens.dates.filter(function (d) { return d > bestDate; }).slice(0, 4);
-    var rows = [];
-    later.forEach(function (d) {
-      var ev = ens.evals[d];
-      if (!ev) return;
-      var risk, label;
-      if (ev.best) {
-        risk = 1 - ev.best.weakest.prob;
-        label = '仍有窗口（' + pad2(ev.best.start) + ':00–' + pad2(ev.best.end) + ':00）';
+  function harvDecision(result) {
+    var d = result.days[0];
+    var it = d.harvest;
+    var word = it.status === 'ok' ? '今天适合晾晒'
+      : (it.status === 'warn' ? '能晒，但效率不高' : '今天别晒');
+    return {
+      kind: 'today', day: d, date: d.date, win: null,
+      status: it.status === 'ok' ? 'ok' : (it.status === 'warn' ? 'warn' : 'bad'),
+      word: word, why: it.why,
+      whenDay: '今天 ' + d.date.slice(5).replace('-', '/') + ' ' + d.dow,
+      whenTime: (d.sunrise && d.sunset) ? (d.sunrise + '–' + d.sunset) : '白天',
+      whenLeft: d.daylightH ? '日照 ' + d.daylightH.toFixed(1) + ' 小时' : ''
+    };
+  }
+
+  function metricsFor(task, dec, result) {
+    var d = dec.day, r = RULES.spray;
+    if (task === 'spray') {
+      var w = dec.win;
+      var gap = dewGapOf(d);
+      var gapN = gap === '—' ? null : Number(gap);
+      return [
+        { k: '风速', v: w ? w.avgWind + ' m/s' : '—', j: '上限 ' + r.wind_max, cls: w && w.avgWind > r.wind_max * 0.9 ? 'warn' : 'ok' },
+        { k: '降雨概率', v: d.dayProb + '%', j: d.dayProb < 30 ? '低' : '偏高', cls: d.dayProb < 30 ? 'ok' : (d.dayProb < 50 ? 'warn' : 'bad') },
+        { k: '露点差', v: gap + '℃', j: gapN === null ? '' : (gapN > r.dew_gap_min ? '叶面干' : '有露水'), cls: gapN === null ? '' : (gapN > r.dew_gap_min ? 'ok' : 'bad') },
+        { k: '窗口长度', v: w ? w.hours + ' 小时' : '—', j: w && w.hours >= 4 ? '够长' : '偏短', cls: w && w.hours >= 4 ? 'ok' : 'warn' }
+      ];
+    }
+    if (task === 'irrigation') {
+      return [
+        { k: '今日降水', v: d.dayRain + ' mm', j: d.dayRain >= 5 ? '够了' : '偏少', cls: d.dayRain >= 5 ? 'ok' : 'warn' },
+        { k: '7 天累计', v: result.weekRain + ' mm', j: result.weekRain >= 15 ? '墒情够' : '偏干', cls: result.weekRain >= 15 ? 'ok' : 'warn' },
+        { k: '降雨概率', v: d.dayProb + '%', j: d.dayProb >= 70 ? '等雨' : '可浇', cls: d.dayProb >= 70 ? 'bad' : 'ok' },
+        { k: '最高气温', v: d.tmax + '℃', j: d.tmax >= 28 ? '蒸发大' : '正常', cls: d.tmax >= 28 ? 'warn' : 'ok' }
+      ];
+    }
+    return [
+      { k: '日照时长', v: d.daylightH ? d.daylightH.toFixed(1) + ' h' : '—', j: d.sunHours === null ? '' : (d.sunHours >= 3 ? '够晒' : '不足'), cls: d.sunHours === null ? '' : (d.sunHours >= 3 ? 'ok' : 'warn') },
+      { k: '平均云量', v: (d.cloudNoon === null ? '—' : d.cloudNoon + '%'), j: d.cloudNoon === null ? '' : (d.cloudNoon < 50 ? '晴好' : '偏阴'), cls: d.cloudNoon === null ? '' : (d.cloudNoon < 50 ? 'ok' : 'warn') },
+      { k: '降雨概率', v: d.dayProb + '%', j: d.dayProb >= 50 ? '要盖' : '无雨', cls: d.dayProb >= 50 ? 'bad' : 'ok' },
+      { k: '最高气温', v: d.tmax + '℃', j: d.tmax < 8 ? '效率低' : '可以', cls: d.tmax < 8 ? 'warn' : 'ok' }
+    ];
+  }
+
+  function renderDecision(result, task) {
+    var box = $('decision');
+    if (!box) return;
+    var dec = task === 'spray' ? sprayDecision(result)
+      : (task === 'irrigation' ? irrDecision(result) : harvDecision(result));
+
+    box.className = 'decision st-' + (dec.status === 'ok' ? 'ok' : (dec.status === 'warn' ? 'warn' : 'bad'));
+
+    if ($('dWord')) $('dWord').textContent = dec.word;
+    if ($('dWhy')) $('dWhy').textContent = dec.why;
+    if ($('dDay')) $('dDay').textContent = dec.whenDay || '';
+    if ($('dTime')) $('dTime').textContent = dec.whenTime || '';
+    if ($('dLeft')) $('dLeft').textContent = dec.whenLeft || '';
+    if ($('dFrom')) {
+      $('dFrom').textContent = dec.fromNote || '';
+      $('dFrom').style.display = dec.fromNote ? '' : 'none';
+    }
+
+    var n = new Date();
+    if ($('dMeta')) {
+      var city = activePlot() ? activePlot().city : '';
+      var eff = window.TianZhiStandards ? window.TianZhiStandards.effective(city) : null;
+      var stdTx = eff && eff.cityName ? eff.cityName + '属地标准' : '省级标准';
+      $('dMeta').textContent = stdTx + ' · ' + pad2(n.getHours()) + ':' + pad2(n.getMinutes()) + ' 更新';
+    }
+    /* 顶栏日期原先由旧天象头写入，v5 删掉天象头后会一直停在「—」，在这里补回来 */
+    if ($('todayDate')) {
+      var dow0 = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][n.getDay()];
+      $('todayDate').textContent = (n.getMonth() + 1) + '月' + n.getDate() + '日 ' + dow0;
+    }
+
+    if ($('dMetrics')) {
+      $('dMetrics').innerHTML = metricsFor(task, dec, result).map(function (m) {
+        return '<div class="d-metric"><span>' + esc(m.k) + '</span><b>' + esc(m.v) + '</b>' +
+          (m.j ? '<i class="' + (m.cls || '') + '">' + esc(m.j) + '</i>' : '') + '</div>';
+      }).join('');
+    }
+
+    renderLogLine(task);
+  }
+
+  /* ---- 作业记录：本机留痕，用来回答"上次打药是几天前" ---- */
+  function loadLogs() {
+    try { return JSON.parse(localStorage.getItem('tz_logs') || '[]'); } catch (e) { return []; }
+  }
+  function saveLogs(list) {
+    try { localStorage.setItem('tz_logs', JSON.stringify(list.slice(-40))); } catch (e) {}
+  }
+  function renderLogLine(task) {
+    var line = $('dLogLine');
+    if (!line) return;
+    var logs = loadLogs().filter(function (x) { return x.task === task; });
+    var names = { spray: '打药', irrigation: '灌溉', harvest: '晾晒' };
+    if (!logs.length) {
+      line.innerHTML = '<b>' + names[task] + '</b> 还没有记录，干完点一下左边的按钮。';
+      return;
+    }
+    var last = logs[logs.length - 1];
+    var d0 = new Date(last.date + 'T00:00:00');
+    var days = Math.round((new Date(new Date().toDateString()) - new Date(d0.toDateString())) / 86400000);
+    var when = days <= 0 ? '今天' : (days === 1 ? '昨天' : days + ' 天前');
+    line.innerHTML = '<b>上次' + names[task] + '</b> ' + when + '（' + last.date.slice(5).replace('-', '/') + '）' +
+      ' · 记录只存在这台设备' +
+      ' <button type="button" id="dLogUndo">撤销</button>';
+    var u = $('dLogUndo');
+    if (u) u.onclick = function () {
+      var all = loadLogs();
+      all.splice(all.lastIndexOf(last), 1);
+      saveLogs(all);
+      renderLogLine(task);
+    };
+  }
+
+  /* =========================================================
+     L2 未来七天：一条条带
+     -------------------------------------------------------------
+     七张卡要横滑、要逐张读；一条条带能一眼看出"这周哪两天能干活"。
+     ========================================================= */
+  function renderWeek(result, task) {
+    var strip = $('weekStrip');
+    if (!strip) return;
+    var today = result.days[0].date;
+    var dec = task === 'spray' ? sprayDecision(result)
+      : (task === 'irrigation' ? irrDecision(result) : harvDecision(result));
+    /* 首次进入时，详情跟决策卡指向同一天，避免"上面说周六、下面讲今天" */
+    if (dec.kind === 'future' && (!state.chartDay || state.chartDay === today)) {
+      state.chartDay = dec.date;
+    }
+    var sel = state.chartDay || dec.date || today;
+    var names = { spray: '打药', irrigation: '灌溉', harvest: '晾晒' };
+    if ($('wkTitle')) $('wkTitle').textContent = names[task] + '的窗口分布';
+    if ($('wkSub')) {
+      $('wkSub').textContent = task === 'spray'
+        ? '色块是当天可作业的时段，位置对应钟点'
+        : '整格颜色代表当天是否适合' + names[task];
+    }
+    /* 这行原先由已删除的「今日判读」卡写入，v5 后一直空着 */
+    if ($('weekRainNote')) $('weekRainNote').textContent = '一周累计雨量 ' + result.weekRain + ' mm';
+    /* 图例必须跟当前任务一致：打药只有「可作业 / 无窗口」两态，
+       挂着一个用不上的「勉强」色块，会让人以为漏判了一档。 */
+    if ($('wkLegend')) {
+      $('wkLegend').innerHTML = task === 'spray'
+        ? '<i><s style="background:#3D6B55"></s>可作业</i>' +
+          '<i><s style="background:#EFEFEC;border:1px solid #DDD"></s>无窗口</i>'
+        : '<i><s style="background:#3D6B55"></s>适合</i>' +
+          '<i><s style="background:#C0811A"></s>勉强</i>' +
+          '<i><s style="background:#EBCFC9"></s>不宜</i>';
+    }
+
+    strip.innerHTML = result.days.map(function (d, i) {
+      var dt = new Date(d.date + 'T00:00:00');
+      var item = d[task] || {};
+      var isToday = d.date === today;
+      var inner = '', note = '';
+
+      if (task === 'spray') {
+        var w = longestWin(d.spray.windows);
+        if (d.spray.status === 'ok' && w) {
+          var from = 6, span = 12;                     // 条带覆盖 6–18 时
+          var l = Math.max(0, (w.start - from) / span * 100);
+          var wd = Math.min(100 - l, (w.end - w.start) / span * 100);
+          inner = '<div class="wk-fill" style="left:' + l.toFixed(1) + '%;width:' + Math.max(6, wd).toFixed(1) + '%"></div>';
+          note = pad2(w.start) + '–' + pad2(w.end);
+        } else {
+          /* 不画块：空白就是"这天没有窗口"，比给一条灰色更像"没有" */
+          inner = '';
+          note = d.spray.blocked ? '雨阻' : '无窗口';
+        }
       } else {
-        risk = 1;
-        label = '无窗口';
+        var st = item.status;
+        var cls = st === 'ok' ? '' : (st === 'warn' ? ' warn' : ' bad');
+        inner = '<div class="wk-fill' + cls + '" style="left:0;width:100%"></div>';
+        note = st === 'ok' ? '可以' : (st === 'warn' ? '勉强' : '不宜');
       }
-      rows.push({ date: d, risk: risk, label: label, hasWin: !!ev.best, level: ev.best && ev.best.level });
-    });
 
-    if (!rows.length) return '';
-
-    // 只显示风险显著上升的那一天
-    var baseRisk = 1 - base.best.weakest.prob;
-    var worse = rows.filter(function (r) { return r.risk > baseRisk + 0.15; })[0];
-    if (!worse) {
-      var last = rows[rows.length - 1];
-      return '<div class="delay-row">推迟到 ' + fmtDate(last.date) + ' 风险 ' +
-        Math.round(last.risk * 100) + '%，与推荐日（' + Math.round(baseRisk * 100) + '%）差别不大</div>';
-    }
-
-    var dt2 = new Date(worse.date + 'T00:00:00');
-    return '<div class="delay-row warn">' +
-      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 8v5"/><circle cx="12" cy="17" r="1"/><path d="M10.3 3.9 2.6 17.4A2 2 0 0 0 4.3 20.4h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
-      '<span>若推迟到 <b>' + (dt2.getMonth() + 1) + '/' + dt2.getDate() + '</b>，作业风险从 <b>' +
-        Math.round(baseRisk * 100) + '%</b> 升到 <b>' + Math.round(worse.risk * 100) + '%</b>' +
-        (worse.hasWin ? '' : '（该日无可用窗口）') + '</span>' +
-    '</div>';
-  }
-
-  /* ---- 窗口关闭条件 ---- */
-  function renderCloseCondition(ensBest) {
-    if (!ensBest || !ensBest.weakest) return '';
-    var weak = ensBest.weakest;
-    var pct = Math.round(weak.prob * 100);
-    var nextThr = weak.prob >= 0.7 ? 70 : weak.prob >= 0.5 ? 50 : null;
-    var cond = nextThr
-      ? '若 ' + pad2(weak.hour) + ':00 的成员支持率跌到 ' + nextThr + '% 以下，窗口置信度会下降一档'
-      : '当前已是最低置信档，窗口随时可能关闭';
-    return '<div class="close-cond"><b>窗口关闭条件</b>' + cond +
-      '<span class="cc-now">（该小时现为 ' + pct + '%，是窗口内最薄弱的一环）</span></div>';
-  }
-
-  /* ---- 反事实推演：如果换个假设，结论会怎样 ----
-     设计要点：假设必须是"能真的改变结论"的那几种，否则点了没反应
-     会显得功能是假的。这里从当前数据里实时算出每个假设的影响，
-     并标注哪些会改变结论。 */
-  var WHATIF_CASES = [
-    { key: 'wind20', label: '风速要求收紧到 2.0 m/s', rule: { wind_max: 2.0 },
-      why: '更保守的飘移控制' },
-    { key: 'wind50', label: '风速放宽到 5.0 m/s', rule: { wind_max: 5.0 },
-      why: '抢农时，接受一定飘移' },
-    { key: 'temp2', label: '气温下限降到 2℃', rule: { temp_min: 2 },
-      why: '早晚温度低也能打' },
-    { key: 'rain0', label: '完全不能有雨（0 mm）', rule: { rain_hour_max: 0 },
-      why: '要求绝对无雨' },
-    { key: 'hours', label: '只看上午 6–12 时', rule: { hours: [6, 12] },
-      why: '人手只够半天' }
-  ];
-
-  function renderWhatIf(best) {
-    var ens = ensembleEval();
-    // 先算出每个假设的影响，按钮上直接标注，避免用户点了没反应
-    var impacts = {};
-    if (ens && ens.evals[best.date] && ens.evals[best.date].best) {
-      WHATIF_CASES.forEach(function (c) {
-        impacts[c.key] = computeWhatIf(ens, best.date, c);
-      });
-    }
-
-    var btns = WHATIF_CASES.map(function (c) {
-      var im = impacts[c.key];
-      var tip = im
-        ? (im.flipped ? '会改变结论' : '结论不变') + '：' + im.newTxt
-        : c.why;
-      return '<button data-whatif="' + c.key + '" title="' + esc(tip) + '"' +
-        (im && im.flipped ? ' class="flips"' : '') + '>' +
-        c.label +
-        (im && im.flipped ? '<i class="flip-dot"></i>' : '') +
+      return '<button type="button" class="wk' + (d.date === sel ? ' sel' : '') + '" data-date="' + d.date + '">' +
+        '<span class="wk-dow"><b>' + (isToday ? '今天' : d.dow) + '</b>' +
+          (dt.getMonth() + 1) + '/' + dt.getDate() + '</span>' +
+        '<span class="wk-slot">' + inner + '</span>' +
+        '<span class="wk-note">' + note + '</span>' +
       '</button>';
     }).join('');
 
-    var flipCount = Object.keys(impacts).filter(function (k) { return impacts[k] && impacts[k].flipped; }).length;
-
-    return '<div class="whatif">' +
-      '<div class="whatif-t">' +
-        '质疑一下这个窗口：<span>换个假设，重算给你看' +
-          (flipCount ? '（带 <i class="flip-dot inline"></i> 的会改变结论）' : '') +
-        '</span>' +
-      '</div>' +
-      '<div class="whatif-btns">' + btns +
-        '<button data-whatif="reset" class="reset">恢复默认</button>' +
-      '</div>' +
-      '<div class="whatif-out" id="whatifOut"></div>' +
-    '</div>';
-  }
-
-  /** 计算某个假设的影响（供按钮标注与实际点击共用） */
-  function computeWhatIf(ens, date, c) {
-    var base = E.DEFAULT_RULE;
-    var rule = {};
-    Object.keys(base).forEach(function (k) { rule[k] = base[k]; });
-    Object.keys(c.rule).forEach(function (k) { rule[k] = c.rule[k]; });
-
-    var ev2 = E.evaluateDay(ens.data, date, rule, 0.5, 2);
-    var oldBest = ens.evals[date] && ens.evals[date].best;
-    var newBest = ev2 && ev2.best;
-
-    var oldTxt = oldBest
-      ? pad2(oldBest.start) + ':00–' + pad2(oldBest.end) + ':00，' + oldBest.hours + ' 小时，置信「' + oldBest.level.label + '」'
-      : '无窗口';
-    var newTxt = newBest
-      ? pad2(newBest.start) + ':00–' + pad2(newBest.end) + ':00，' + newBest.hours + ' 小时，置信「' + newBest.level.label + '」'
-      : '无窗口';
-
-    var flipped = (!oldBest && !!newBest) || (!!oldBest && !newBest) ||
-                  (!oldBest && !newBest ? false :
-                   (oldBest && newBest && oldBest.level.key !== newBest.level.key) ||
-                   (oldBest && newBest && Math.abs(oldBest.hours - newBest.hours) >= 1));
-
-    return { oldTxt: oldTxt, newTxt: newTxt, flipped: flipped, rule: rule };
-  }
-
-  function bindWhatIf(best, result) {
-    var box = document.querySelector('.whatif');
-    if (!box) return;
-    Array.prototype.forEach.call(box.querySelectorAll('button[data-whatif]'), function (b) {
+    Array.prototype.forEach.call(strip.querySelectorAll('.wk'), function (b) {
       b.onclick = function () {
-        var key = b.getAttribute('data-whatif');
-        Array.prototype.forEach.call(box.querySelectorAll('button'), function (x) {
-          if (x.getAttribute('data-whatif') !== 'reset') x.classList.toggle('on', x === b);
-        });
-        if (key === 'reset') {
-          $('whatifOut').innerHTML = '';
-          $('whatifOut').classList.remove('on');
-          Array.prototype.forEach.call(box.querySelectorAll('button'), function (x) {
-            x.classList.remove('on');
-          });
-          return;
-        }
-        runWhatIf(key, best);
-      };
-    });
-  }
-
-  /** 真的重算一遍：改规则 → 重跑集合统计 → 对比窗口 */
-  function runWhatIf(key, best) {
-    var out = $('whatifOut');
-    var ens = ensembleEval();
-    if (!ens || !out) return;
-
-    var c = WHATIF_CASES.filter(function (x) { return x.key === key; })[0];
-    if (!c) return;
-
-    var im = computeWhatIf(ens, best.date, c);
-    var oldRisk = null, newRisk = null;
-    var ev2 = E.evaluateDay(ens.data, best.date, im.rule, 0.5, 2);
-    var ob = ens.evals[best.date] && ens.evals[best.date].best;
-    var nb = ev2 && ev2.best;
-    if (ob) oldRisk = 1 - ob.weakest.prob;
-    if (nb) newRisk = 1 - nb.weakest.prob;
-
-    out.innerHTML =
-      '<div class="wf-line">' +
-        '<div class="wf-row"><span>默认规则</span><b>' + im.oldTxt + '</b></div>' +
-        '<div class="wf-row"><span>' + esc(c.label) + '</span><b class="' + (im.flipped ? 'flip' : '') + '">' + im.newTxt + '</b></div>' +
-        (oldRisk !== null && newRisk !== null
-          ? '<div class="wf-row"><span>最弱环节风险</span><b>' +
-            Math.round(oldRisk * 100) + '% → ' + Math.round(newRisk * 100) + '%</b></div>'
-          : '') +
-        '<div class="wf-verdict ' + (im.flipped ? 'flip' : 'same') + '">' +
-          (im.flipped
-            ? '⚠ 结论改变 —— 这个假设对结论有实质影响，说明窗口对这个条件敏感'
-            : '结论没变 —— 即使按这个假设，窗口依然成立，说明判断比较稳') +
-        '</div>' +
-      '</div>';
-    out.classList.add('on');
-  }
-
-  /* ---- 倒计时：距窗口开始 / 结束还有多久 ---- */
-  function startCountdown(best, w) {
-    var targetStart = new Date(best.date + 'T' + pad2(w.start) + ':00:00');
-    var targetEnd = new Date(best.date + 'T' + pad2(w.end) + ':00:00');
-
-    function tick() {
-      var elLabel = $('cdLabel'), elTime = $('cdTime');
-      if (!elLabel || !elTime) { clearInterval(countdownTimer); return; }
-
-      var now = new Date();
-      var diff, label, urgent = false;
-
-      if (now < targetStart) {
-        diff = targetStart - now;
-        label = '距窗口开始';
-      } else if (now < targetEnd) {
-        diff = targetEnd - now;
-        label = '距窗口结束';
-        urgent = diff < 60 * 60 * 1000;       // 不到 1 小时标红
-      } else {
-        elLabel.textContent = '本窗口已结束';
-        elTime.textContent = '—';
-        elTime.className = 'cd-time';
-        clearInterval(countdownTimer);
-        return;
-      }
-
-      var totalSec = Math.floor(diff / 1000);
-      var d = Math.floor(totalSec / 86400);
-      var hh = Math.floor((totalSec % 86400) / 3600);
-      var mm = Math.floor((totalSec % 3600) / 60);
-      var ss = totalSec % 60;
-
-      elLabel.innerHTML = label + ' · 为 <b>' +
-        cnMonth(targetStart.getMonth() + 1) + cnDay(targetStart.getDate()) + '日</b>';
-      if (d > 0) {
-        elTime.textContent = d + ' 天 ' + hh + ':' + pad2(mm) + ':' + pad2(ss);
-      } else {
-        elTime.textContent = pad2(hh) + ':' + pad2(mm) + ':' + pad2(ss);
-      }
-      elTime.className = 'cd-time' + (urgent ? ' urgent' : '');
-    }
-
-    tick();
-    countdownTimer = setInterval(tick, 1000);
-  }
-
-  /* ---- 无窗口时：列出本周主要限制因素 ---- */
-  function renderLimits(result) {
-    var raw = state.raw;
-    if (!raw || !raw.hourly) return '';
-    var cnt = { cold: 0, wind: 0, hot: 0, rain: 0 };
-    result.days.forEach(function (d) {
-      T.hoursOf(raw.hourly, d.date).forEach(function (h) {
-        if (h.hour < 6 || h.hour > 17) return;
-        var v = T.hourVerdict(h);
-        if (v !== 'ok') cnt[v]++;
-        if (h.rain >= 0.1) cnt.rain++;
-      });
-    });
-    var rows = [
-      { k: 'cold', label: '气温过低', color: '#3B7CA3' },
-      { k: 'wind', label: '风速过大', color: '#f59e0b' },
-      { k: 'hot', label: '气温过高', color: '#ef4444' },
-      { k: 'rain', label: '降雨', color: '#6366f1' }
-    ].filter(function (r) { return cnt[r.k] > 0; });
-
-    if (!rows.length) return '';
-
-    var totalH = result.days.length * 12;
-    return '<div style="margin-top:12px;padding-top:10px;border-top:1px dashed #e5e7eb">' +
-      '<div style="font-size:11px;color:#6b7280;margin-bottom:6px">本周作业时段受限原因（共 ' + totalH + ' 小时）</div>' +
-      rows.map(function (r) {
-        return '<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:2px 0">' +
-          '<span style="width:6px;height:6px;border-radius:50%;background:' + r.color + ';flex:none"></span>' +
-          '<span style="flex:1;color:#374151">' + r.label + '</span>' +
-          '<span style="font-family:var(--mono);color:#111827;font-weight:600">' + cnt[r.k] + '</span>' +
-          '<span style="font-size:11px;color:#9ca3af">小时</span>' +
-        '</div>';
-      }).join('') +
-    '</div>';
-  }
-
-  /* ---- 已打药标记 ---- */
-  function renderSprayRow(best, win) {
-    var rec = getSprayRecord();
-    if (rec) {
-      var t = new Date(rec.at);
-      return '<div class="spray-row">' +
-        '<span class="spray-note">' +
-          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.4 2.4 4.6-4.8"/></svg>' +
-          '已标记打药 · ' + (t.getMonth() + 1) + '/' + t.getDate() + ' ' + pad2(t.getHours()) + ':' + pad2(t.getMinutes()) +
-        '</span>' +
-        '<button class="btn btn-sm btn-ghost" id="sprayUndoBtn">撤销</button>' +
-      '</div>';
-    }
-    return '<div class="spray-row">' +
-      '<button class="btn btn-sm" id="sprayDoneBtn">标记已打药</button>' +
-      '<span class="spray-note">标记后自动监控未来 24 小时降雨</span>' +
-    '</div>';
-  }
-
-  function bindSprayButtons() {
-    var done = $('sprayDoneBtn');
-    if (done) {
-      done.onclick = function () {
-        setSprayRecord(new Date().toISOString());
-        toast('已标记打药，将监控未来 24 小时降雨');
-        renderHero(state.result);
-        renderAlerts(state.result);
-        bindSprayButtons();
-      };
-    }
-    var undo = $('sprayUndoBtn');
-    if (undo) {
-      undo.onclick = function () {
-        setSprayRecord(null);
-        toast('已撤销打药标记');
-        renderHero(state.result);
-        renderAlerts(state.result);
-        bindSprayButtons();
-      };
-    }
-  }
-
-  /* =========================================================
-     七日卡片
-     ========================================================= */
-  function renderDays(result) {
-    var box = $('days');
-    var best = T.bestWindow(result);
-    var now = new Date();
-    var todayStr = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate());
-    var sel = state.chartDay || (result.days[0] && result.days[0].date);
-    var task = state.task || 'spray';
-    box.innerHTML = '';
-
-    result.days.forEach(function (d) {
-      var dt = new Date(d.date + 'T00:00:00');
-      var isBest = task === 'spray' && best && best.date === d.date;
-      var item = d[task];
-
-      var el = document.createElement('div');
-      el.className = 'day'
-        + (d.date === todayStr ? ' today' : '')
-        + (isBest ? ' best' : '')
-        + (d.date === sel ? ' sel' : '');
-      el.title = item.why;
-
-      // 打药额外显示具体可作业时段
-      var detail = '';
-      if (task === 'spray') {
-        if (item.windows && item.windows.length) {
-          var w = item.windows.slice().sort(function (a, b) { return b.hours - a.hours; })[0];
-          detail = pad2(w.start) + ':00–' + pad2(w.end) + ':00';
-        } else {
-          detail = d.dayRain > 0 ? '雨 ' + d.dayRain.toFixed(1) + ' mm' : '无窗口';
-        }
-      } else if (task === 'irrigation') {
-        // 灌溉按日雨量说明，比"无雨"更能解释为什么不宜
-        detail = d.dayRain > 0
-          ? '雨 ' + d.dayRain.toFixed(1) + ' mm'
-          : (d.dayProb >= 50 ? '降雨概率 ' + d.dayProb + '%' : '无雨');
-      } else {
-        detail = d.dayRain > 0 ? '雨 ' + d.dayRain.toFixed(1) + ' mm'
-               : (d.dayProb >= 50 ? '概率 ' + d.dayProb + '%' : '无雨');
-      }
-
-      el.innerHTML =
-        (isBest ? '<div class="day-badge">最佳</div>' : '') +
-        '<div class="day-dow">' + (d.date === todayStr ? '今天' : d.dow) + '</div>' +
-        '<div class="day-date">' + (dt.getMonth() + 1) + '/' + dt.getDate() + '</div>' +
-        '<div class="day-icon">' + iconOf(d.code, 18) + '</div>' +
-        '<div class="day-weather">' + (d.weather || '') + '</div>' +
-        '<div class="day-temp"><b>' + d.tmax + '°</b> / ' + d.tmin + '°</div>' +
-        '<div class="day-rain' + (d.dayRain > 0 ? '' : ' none') + '">' + detail + '</div>' +
-        '<div class="day-state" style="background:' + stateBg(item.status) + ';color:' + stateFg(item.status) + '">' +
-          verdictOf(task, item.status) + '</div>';
-
-      el.onclick = function () {
-        state.chartDay = d.date;
-        renderDays(state.result);
+        state.chartDay = b.getAttribute('data-date');
+        renderWeek(state.result, state.task || 'spray');
         renderCharts();
-      };
-      box.appendChild(el);
-    });
-
-    // 若七天结论完全相同，加一句整体说明，避免用户以为卡片没生效
-    var statuses = result.days.map(function (d) { return (d[task] || {}).status; });
-    var allSame = statuses.every(function (s) { return s === statuses[0]; });
-    var note = $('daysNote');
-    if (note) {
-      if (allSame && statuses[0]) {
-        var txt = verdictOf(task, statuses[0]);
-        note.textContent = '未来七天判断一致：均为「' + txt + '」';
-        note.style.display = '';
-      } else {
-        note.style.display = 'none';
-      }
-    }
-  }
-
-  function stateBg(s) { return s === 'ok' ? 'rgba(240,253,244,.95)' : s === 'warn' ? 'rgba(255,251,235,.95)' : 'rgba(254,242,242,.95)'; }
-  function stateFg(s) { return s === 'ok' ? '#15803d' : s === 'warn' ? '#b45309' : '#b91c1c'; }
-
-  /** 三种作业各自的结论文案 */
-  var VERDICT_TEXT = {
-    spray:      { ok: '可作业', warn: '谨慎',     bad: '不宜' },
-    irrigation: { ok: '无需灌溉', warn: '建议灌溉', bad: '不宜灌溉' },
-    harvest:    { ok: '适宜晾晒', warn: '勉强可晒', bad: '不宜晾晒' }
-  };
-  function verdictOf(task, status) {
-    return (VERDICT_TEXT[task] || VERDICT_TEXT.spray)[status] || status;
-  }
-
-  /** 作业类型切换 */
-  function bindTaskSwitch() {
-    var box = $('taskSwitch');
-    if (!box || box.__bound) return;
-    box.__bound = true;
-    Array.prototype.forEach.call(box.querySelectorAll('.task-btn'), function (b) {
-      b.onclick = function () {
-        var t = b.getAttribute('data-task');
-        if (state.task === t) return;
-        state.task = t;
-        Array.prototype.forEach.call(box.querySelectorAll('.task-btn'), function (x) {
-          x.classList.toggle('on', x === b);
-        });
-        if (state.result) renderDays(state.result);
+        renderDayDetail(state.result, state.task || 'spray', state.chartDay);
       };
     });
+
+    renderDayDetail(result, task, sel);
   }
 
-  /* =========================================================
-     今日判读（列表）
-     -------------------------------------------------------------
-     打药一项分两段说清楚：
-       · 今日剩余时段能不能干（避免早上打开就显示"不宜"的误导）
-       · 最近一个能干活的日子是哪天
-     ========================================================= */
-  function renderCards(result) {
-    var box = $('cards');
-    var t = result.days[0];
-
-    // 今日剩余时段
-    var remain = null;
-    if (state.raw && state.raw.hourly) {
-      try {
-        remain = T.todayRemaining(state.raw.hourly, state.raw.daily, new Date(), 'spray');
-      } catch (e) { remain = null; }
+  function renderDayDetail(result, task, date) {
+    var box = $('weekDay');
+    if (!box) return;
+    var d = result.days.filter(function (x) { return x.date === date; })[0] || result.days[0];
+    var dt = new Date(d.date + 'T00:00:00');
+    var item = d[task] || {};
+    var cells;
+    if (task === 'spray') {
+      var w = longestWin(d.spray.windows);
+      cells = [
+        ['可作业时段', w ? pad2(w.start) + '–' + pad2(w.end) : '无'],
+        ['平均风速', w ? w.avgWind + ' m/s' : d.windMax + ' m/s'],
+        ['降雨概率', d.dayProb + '%'],
+        ['日落 / 收工', (d.sunset || '—') + ' / ' + d.spray.hours[1] + ' 时']
+      ];
+    } else if (task === 'irrigation') {
+      cells = [
+        ['当日降水', d.dayRain + ' mm'],
+        ['降雨概率', d.dayProb + '%'],
+        ['最高气温', d.tmax + '℃'],
+        ['7 天累计', result.weekRain + ' mm']
+      ];
+    } else {
+      cells = [
+        ['日照 / 白天', (d.sunHours === null ? '—' : d.sunHours + ' h') + ' / ' + (d.daylightH ? d.daylightH.toFixed(1) + ' h' : '—')],
+        ['平均云量', d.cloudNoon === null ? '—' : d.cloudNoon + '%'],
+        ['当日降水', d.dayRain + ' mm'],
+        ['最高气温', d.tmax + '℃']
+      ];
     }
-
-    var best = T.bestWindow(result);
-
-    // 打药：优先说今日剩余时段，再补最近好日子
-    var sprayStatus = t.spray.status, sprayWhy = t.spray.why;
-    if (remain && !remain.ended) {
-      sprayStatus = remain.status;
-      sprayWhy = remain.why;
-      if (best && best.date !== remain.date) {
-        var bd = new Date(best.date + 'T00:00:00');
-        sprayWhy += '；最近好日子 ' + (bd.getMonth() + 1) + '/' + bd.getDate() + '（' + best.dow + '）';
-      }
-    }
-
-    var items = [
-      { key: 'spray', name: '打药', status: sprayStatus, why: sprayWhy },
-      { key: 'irrigation', name: '灌溉', status: t.irrigation.status, why: t.irrigation.why },
-      { key: 'harvest', name: '晾晒', status: t.harvest.status, why: t.harvest.why }
-    ];
-
-    box.innerHTML = items.map(function (it) {
-      var cls = it.status === 'ok' ? 'ok' : it.status === 'warn' ? 'warn' : 'bad';
-      return '<div class="kpi-item">' +
-        '<span class="kpi-dot ' + cls + '"></span>' +
-        '<div class="kpi-main">' +
-          '<div class="kpi-t">' + it.name +
-            '<span class="badge ' + cls + '">' + verdictOf(it.key, it.status) + '</span>' +
-          '</div>' +
-          '<div class="kpi-d">' + esc(it.why) + '</div>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-    $('weekRainNote').textContent = '一周累计雨量 ' + result.weekRain + ' mm';
+    box.innerHTML =
+      '<div class="wd-h"><b>' + (dt.getMonth() + 1) + ' 月 ' + dt.getDate() + ' 日 ' + d.dow + '</b>' +
+        '<span>' + (d.weather || '—') + ' · ' + d.tmax + '° / ' + d.tmin + '° · 日出 ' + (d.sunrise || '—') + '</span></div>' +
+      '<div class="wd-grid">' + cells.map(function (c) {
+        return '<div class="wd-cell"><span>' + esc(c[0]) + '</span><b>' + esc(c[1]) + '</b></div>';
+      }).join('') + '</div>' +
+      '<div class="wd-why">' + esc(item.why || '') + '</div>';
   }
+
+  function bindDecision() {
+    var tabs = $('dTabs');
+    if (tabs && !tabs.__bound) {
+      tabs.__bound = true;
+      Array.prototype.forEach.call(tabs.querySelectorAll('button'), function (b) {
+        b.onclick = function () {
+          var t = b.getAttribute('data-task');
+          if (state.task === t) return;
+          state.task = t;
+          Array.prototype.forEach.call(tabs.querySelectorAll('button'), function (x) {
+            x.classList.toggle('on', x === b);
+          });
+          if (state.result) {
+            renderDecision(state.result, t);
+            renderWeek(state.result, t);
+            renderCharts();
+          }
+        };
+      });
+    }
+    if ($('dLogBtn') && !$('dLogBtn').__bound) {
+      $('dLogBtn').__bound = true;
+      $('dLogBtn').onclick = function () {
+        var task = state.task || 'spray';
+        var logs = loadLogs();
+        logs.push({ task: task, date: todayStr(), at: new Date().toISOString() });
+        saveLogs(logs);
+        renderLogLine(task);
+        toast('已记下：' + todayStr().slice(5).replace('-', '/') + ' ' +
+          ({ spray: '打药', irrigation: '灌溉', harvest: '晾晒' })[task]);
+      };
+    }
+    if ($('dBasisBtn') && !$('dBasisBtn').__bound) {
+      $('dBasisBtn').__bound = true;
+      $('dBasisBtn').onclick = function () {
+        var p = $('basisPanel');
+        if (p) {
+          p.open = true;
+          if (p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          openBasis();
+        }
+      };
+    }
+  }
+
+  function todayStr() {
+    var n = new Date();
+    return n.getFullYear() + '-' + pad2(n.getMonth() + 1) + '-' + pad2(n.getDate());
+  }
+
 
   /* =========================================================
      告警栈：临雨 / 打药后避雨 / 霜冻
@@ -1840,37 +1500,36 @@
    *    2. 为什么（最可能的原因）
    *    3. 怎么办（具体操作）
    */
+  /* v5：错误态也用决策页的骨架。
+     旧版第一行就写 $('heroIn')，那个 DOM 在 v5 已删除，会直接抛错——
+     连「重新获取」按钮都渲染不出来，用户只能刷新页面。 */
   function renderError(msg) {
     var isFile = location.protocol === 'file:';
-    $('heroIn').innerHTML =
-      '<div class="window-label">暂时取不到天气数据</div>' +
-      '<div class="window-date" style="color:#b45309;font-size:20px">需要联网才能使用</div>' +
-      '<div class="window-meta" style="margin-top:8px">' + esc(msg || '') + '</div>' +
-      '<div class="err-help">' +
-        '<div class="err-help-t">可以这样处理：</div>' +
-        '<ol>' +
-          '<li>检查设备是否连上网络（打开任意网站试试）</li>' +
-          '<li>如果用了代理 / VPN / 校园网，尝试关掉后重试</li>' +
-          '<li>点击下面的「重新获取」按钮</li>' +
-        '</ol>' +
-        (isFile
-          ? '<div class="err-note">当前是直接双击打开（file://）模式。' +
-            '若长期无法联网，可双击 start.bat 用本地服务打开，同样需要网络。</div>'
-          : '') +
-      '</div>' +
-      '<div style="margin-top:12px"><button class="btn btn-sm btn-primary" id="retryBtn">重新获取</button></div>';
-
-    $('days').innerHTML = '<div style="grid-column:1/-1;color:var(--text-3);font-size:12px;padding:20px 6px;text-align:center">' +
-      '联网后可查看未来七天作业窗口</div>';
-    $('cards').innerHTML = '<div style="color:var(--text-3);font-size:12px;padding:16px 0">等待数据</div>';
-    if ($('alerts')) $('alerts').innerHTML = '';
-    ['windChart', 'heatChart', 'tempChart', 'donutChart', 'growthChart'].forEach(function (k) {
+    var box = $('alerts');
+    if (box) {
+      box.innerHTML =
+        '<div class="cbox" style="padding:14px 16px;border-color:#E3B7AE">' +
+          '<b style="font-size:13px;color:#8C3025">暂时取不到天气数据 · 需要联网才能使用</b>' +
+          '<p style="margin:6px 0 8px;font-size:11.5px;color:var(--text-2);line-height:1.6">' + esc(msg || '') + '</p>' +
+          '<div style="font-size:11px;color:var(--text-2);line-height:1.85">' +
+            '可以这样处理：<br>1. 检查设备是否连上网络<br>' +
+            '2. 用了代理 / 校园网时，先关掉再试<br>' +
+            '3. 点下面的「重新获取」' +
+            (isFile ? '<br>当前是双击打开（file://）模式，也可以双击 start.bat 用本地服务打开。' : '') +
+          '</div>' +
+          '<button class="btn" id="retryBtn" type="button" style="margin-top:10px">重新获取</button>' +
+        '</div>';
+    }
+    if ($('dWord')) $('dWord').textContent = '等待实时天气';
+    if ($('dWhy')) $('dWhy').textContent = '结论必须由实时气象算出，没有数据就不猜。原因与重试入口在上面。';
+    if ($('dMeta')) $('dMeta').textContent = '未更新';
+    if ($('dFrom')) { $('dFrom').textContent = ''; $('dFrom').style.display = 'none'; }
+    ['dDay', 'dTime', 'dLeft', 'dMetrics', 'weekStrip', 'weekDay', 'nowStrip', 'proSum', 'proTable']
+      .forEach(function (k) { var el = $(k); if (el) el.innerHTML = ''; });
+    ['windChart', 'heatChart', 'tempChart', 'growthChart'].forEach(function (k) {
       var el = $(k);
       if (el) el.innerHTML = '<div class="chart-note">暂无数据</div>';
     });
-    var note = $('daysNote');
-    if (note) note.style.display = 'none';
-
     var rb = $('retryBtn');
     if (rb) rb.onclick = function () { load(); };
   }
@@ -1935,18 +1594,14 @@
       $('tbSub').textContent = placeText(plot) +
         ' · ' + plot.lat.toFixed(2) + '°N ' + plot.lon.toFixed(2) + '°E';
       applyWeatherTheme(result.days[0].weather_code);
-      renderHero(result);
-      renderDays(result);
-      renderCards(result);
+      state.task = state.task || 'spray';
+      renderDecision(result, state.task);
+      renderWeek(result, state.task);
       renderCharts();
       renderAlerts(result);
       renderNowStrip(result);
-      bindSprayButtons();
-
-      // 报头数据源
-      if ($('heroMeta')) {
-        $('heroMeta').textContent = plot.name + ' · ' + CROP_NAME[plot.crop] + ' · ' + plot.area + ' 亩';
-      }
+      bindDecision();
+      renderSolarTerm();
 
       var n = new Date();
       setStatus('', '实时数据 · ' + pad2(n.getHours()) + ':' + pad2(n.getMinutes()) + ' 更新');
@@ -2287,10 +1942,20 @@
 
   /* 供自动化测试与调试使用：程序化取点（模拟点击地图中心） */
   window.__tzPickCenter = function () {
-    if (!MAP.instance) return false;
-    var c = MAP.instance.getCenter();
-    onMapPick(c.getLng(), c.getLat());
-    return true;
+    if (MAP.instance) {
+      var c = MAP.instance.getCenter();
+      onMapPick(c.getLng(), c.getLat());
+      return true;
+    }
+    /* 高德不可用时，本地示意图同样能点选取点；测试钩子也走同一条链路，
+       免得「降级后取点功能是否存在」永远没人验证。 */
+    var svg = $('fallbackSvg');
+    if (svg && svg.onclick) {
+      var r = svg.getBoundingClientRect();
+      svg.onclick({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 });
+      return true;
+    }
+    return false;
   };
 
   /* ---------- 点击取点：GCJ-02 → WGS-84 ---------- */
@@ -2479,9 +2144,16 @@
   function updateMapMode() {
     var el = $('mapMode');
     if (!el) return;
-    if (MAP.failed) el.textContent = '示意地图（高德加载失败）';
-    else if (MAP.ready) el.textContent = '高德地图 · 河北';
-    else el.textContent = '地图加载中…';
+    if (MAP.failed) {
+      el.textContent = '本地示意地图 · 可点选';
+      el.title = '高德地图未加载，已自动切换为本地行政区划示意图；点选与地点搜索照常可用';
+    } else if (MAP.ready) {
+      el.textContent = '高德地图 · 河北';
+      el.title = '';
+    } else {
+      el.textContent = '地图加载中…';
+      el.title = '';
+    }
   }
 
   /* ---------- 降级：本地行政区划示意 ---------- */
@@ -2544,7 +2216,8 @@
 
   /* ---------- 统一入口 ---------- */
   function renderMap(sel) {
-    if (MAP.failed) { renderFallbackMap(sel); return; }
+    /* 降级后标签也要跟着改，否则用户看到示意图却一直显示「地图加载中…」 */
+    if (MAP.failed) { updateMapMode(); renderFallbackMap(sel); return; }
 
     var center = sel ? [sel.lon, sel.lat] : [116.30, 39.05];
     initAMap(center, sel ? 10 : 8).then(function () {
@@ -2585,6 +2258,7 @@
     // 这样用户点"展开地图"时基本已经就绪（避免首屏多等 1-2 秒）
     loadAMap().catch(function (err) {
       MAP.failed = true;
+      updateMapMode();
       console.warn('[知时智农] 高德 SDK 预加载失败：', err.message);
     });
   }
@@ -4026,7 +3700,7 @@
   setTimeout(function () { moveTabPill(currentView || 'content'); }, 120);
   var advWide = null;
   function syncAdv(force) {
-    var el = $('advPanel');
+    var el = $('basisPanel');
     if (!el) return;
     var wide = window.matchMedia('(min-width:900px)').matches;
     if (force || wide !== advWide) { el.open = wide; advWide = wide; }
@@ -4035,8 +3709,20 @@
     moveTabPill(currentView || 'content');
     syncAdv(false);
   });
+  /* 手机上「数据与依据」默认收起，图表是在宽度为 0 的容器里画的；
+     点开时按真实宽度重画一次，否则图会被压成一条或字小到看不清。 */
+  (function () {
+    var el = $('basisPanel');
+    if (!el) return;
+    el.addEventListener('toggle', function () {
+      if (!el.open || !state.result) return;
+      setTimeout(function () {
+        renderCharts();
+        renderNowStrip(state.result);
+      }, 40);
+    });
+  })();
   buildPresets();     // 预设城市按钮已移除，这里只清理旧 DOM
-  bindTaskSwitch();   // 未来七天：打药 / 灌溉 / 晾晒 切换
   bindViews();        // 内容 / 对话 / 我的 三个视图
   bindMine();         // 「我的」页：阈值 / AI 设置
   bindMapStage();     // 提前绑定并预加载高德 SDK

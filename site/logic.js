@@ -1040,7 +1040,11 @@
           : (probBlocked0 ? '今日降雨概率 ' + dayProb + '%，不排窗口' : '前一日降雨 ' + prevRain + ' mm，田间偏湿');
       } else if (!windows.length) {
         status = 'bad';
-        var bad = future.filter(function (h) { return hourVerdict(h) !== 'ok'; });
+        /* 只统计作业时段内的小时：未来 7 天里 16 点以后风速也超限，
+           但那些小时本来就不作业，算进"超限 X 小时"会夸大问题。 */
+        var bad = future.filter(function (h) {
+          return h.hour >= r.hours[0] && h.hour < cutoff && hourVerdict(h) !== 'ok';
+        });
         var cold = bad.filter(function (h) { return hourVerdict(h) === 'cold'; }).length;
         var wind = bad.filter(function (h) { return hourVerdict(h) === 'wind'; }).length;
         var bits = [];
@@ -1048,7 +1052,8 @@
         if (cold) bits.push('气温低于 ' + r.temp_min + '℃ 有 ' + cold + ' 小时');
         if (wind) bits.push('风速超 ' + r.wind_max + ' m/s 有 ' + wind + ' 小时');
         if (dewN) bits.push('叶面结露有 ' + dewN + ' 小时');
-        why = '今日剩余时段不可作业：' + (bits.length ? bits.join('，') : '气象条件不满足');
+        why = '今日剩余时段不可作业：' + (bits.length ? bits.join('，')
+          : '剩余时段凑不出连续达标的可作业窗口（风速、气温、露水逐时判定）');
       } else {
         status = 'ok';
         var w = windows.slice().sort(function (a, b) { return b.hours - a.hours; })[0];

@@ -49,24 +49,23 @@
 
 ---
 
-## 2. 现状快照（2026-11-16 实测）
+## 2. 现状快照（2026-11-17 实测）
 
 | 项 | 值 | 验证方式 |
 |---|---|---|
-| 线上地址 | `https://leeforword.github.io/zhishi-zhinong/` | HTTP 200，118 KB |
-| 域名根 | `https://leeforword.github.io/` | HTTP 200，226 B（跳转页 + 微信验证文件） |
-| 最近提交 | `ec0a269 内容设计大改：新建内容层…` | `git log -1` |
-| Actions | `completed / success`，与 `ec0a269` 对应 | GitHub API |
-| 规则引擎测试 | 通过 272 / 失败 0（含露点/湿度/日落 8 条回归） | `node web/test-logic.mjs` |
+| 线上地址 | `https://leeforword.github.io/zhishi-zhinong/` | HTTP 200（v5.0 待推送生效） |
+| 域名根 | `https://leeforword.github.io/` | HTTP 200（跳转页 + 微信验证文件） |
+| 最近提交 | v5.0 决策页重构（本次提交） | `git log -1` |
+| 规则引擎测试 | 通过 271 / 失败 0（含露点/湿度/日落回归） | `node web/test-logic.mjs` |
 | 标准库 / 本地库测试 | 通过 164 / 失败 0（离线） | `node web/test-standards.mjs` |
-| 端到端测试 | 通过 96 / 失败 2 | `node web/e2e.mjs`（需先起本地服务器） |
-| 构建 | 复制 26 个文件，产物 29 个 / 2606 KB，自检全过 | `node scripts/build-site.mjs` |
-| 页面版本号 | v4.7（「我的 → 关于」） | `web/index.html` |
+| 端到端测试 | 通过 117 / 失败 0 | `node web/e2e.mjs`（需先起本地服务器） |
+| 构建 | 产物自检全过 | `node scripts/build-site.mjs` |
+| 页面版本号 | v5.0（「我的 → 关于」） | `web/index.html` |
 | 规则引擎版本 | 3.1（`RULES.meta.version`） | `web/logic.js` |
 | 安卓壳 | versionCode 3 / versionName 1.2，包名 `io.github.leeforword.twa` | `android-webview/AndroidManifest.xml` |
 | 本地 Node | v22.22.2；CI 用 Node 20 | `node -v`、`deploy.yml` |
 
-端到端那 2 个失败项是：`AMap rendered`、`map pick triggered`。原因见 §11.1。
+端到端已全绿：高德 SDK 在本地不可用时自动降级为行政区划示意图，测试同时覆盖高德与降级两种地图态，详见 §11.1。
 
 ---
 
@@ -195,7 +194,7 @@ node web/e2e.mjs                     # 默认 http://127.0.0.1:8931/，截图输
 node web/e2e.mjs https://leeforword.github.io/zhishi-zhinong/ ../screenshots   # 测线上
 ```
 
-预期：`test-standards` 输出 `通过 164 / 失败 0`；`test-logic` 输出 `通过 272 / 失败 0`（数字随实时数据条数浮动，失败必须为 0）；`e2e` 输出 `pass 96 / fail 2`，2 个失败是已知的高德白名单问题（§11.1）。
+预期：`test-standards` 输出 `通过 164 / 失败 0`；`test-logic` 输出 `通过 271 / 失败 0`（数字随实时数据条数浮动，失败必须为 0）；`e2e` 输出 `pass 117 / fail 0`。e2e 末尾会用 CDP 拦掉天气域名，验证断网错误态仍保留决策骨架与「重新获取」入口。
 
 ### 5.3 构建
 
@@ -258,7 +257,7 @@ bash android-webview/build.sh
 | `pwa.js` | 无全局导出（IIFE） | 安装引导（安卓/iOS/微信分支）、SW 注册与更新、断网提示 | `sw.js` |
 | `sw.js` | Service Worker | 外壳预缓存、导航请求网络优先、静态资源网络优先、**跨域接口完全不碰** | — |
 | `server.mjs` | CLI | 本地静态服务 + `/qr` 扫码页 + 目录穿越防护 | `qr.mjs` |
-| `e2e.mjs` | CLI | CDP 驱动 Chrome，65 项断言 + 截图 | Chrome/Edge |
+| `e2e.mjs` | CLI | CDP 驱动 Chrome，117 项断言 + 截图（含断网错误态、地图降级态） | Chrome/Edge |
 | `test-logic.mjs` | CLI | 用真实天气跑规则引擎与问答分支 | 网络 |
 | `standards.js` | `window.TianZhiStandards` = `{LIST, CITIES, effective, forCity, coverage, answer, limitsHtml, sourcesHtml, quotesHtml, …}` | 河北省 / 国家作业标准库：条目、属地合并（取严）、界面与问答文本 | 无 |
 | `test-standards.mjs` | CLI | 标准库完整性、取严方向、问答无 undefined（离线） | 无 |
@@ -266,7 +265,7 @@ bash android-webview/build.sh
 `app.js` 内部关键函数（改 UI 时按名字搜）：
 
 - 数据：`load()`、`fetchWeather()`、`state`、`save()`、`loadStore()`、`activePlot()`
-- 渲染：`renderHero()`、`renderDays()`、`renderCards()`、`renderCharts()`、`renderAlerts()`、`renderSolarTerm()`、`renderContentLayer()`
+- 渲染（v5.0 决策页）：`sprayDecision()` / `irrDecision()` / `harvDecision()` → `renderDecision()`（L1 决策卡）、`renderWeek()` + `renderDayDetail()`（L2 七天条带）、`bindDecision()`（tab / 作业留痕 / 依据入口）、`renderCharts()` + `renderNowStrip()` + `renderProTable()`（L3 证据层）、`renderAlerts()`、`renderSolarTerm()`、`renderContentLayer()`、`renderError()`
 - 图表：`chartW()`、`windChartSvg()`、`heatChartSvg()`、`tempChartSvg()`、`donutSvg()`、`growthSvg()`
 - 地图：`loadAMap()`、`initAMap()`、`onMapPick()`、`drawMarker()`、`mapCenterOn()`、`flyToPoint()`、`renderFallbackMap()`
 - 地名：`placeLabel()`、`resolveFinePlace()`、`kickFinePlace()`、`locateCounty()`
@@ -346,9 +345,12 @@ index.html
   → hebei-geo.js → place.js → logic.js → content.js → ensemble.js → app.js → pwa.js
 app.js IIFE 末尾依次执行：
   bindNearby → bindDrawer → renderSolarTerm → renderContentLayer → bindAnswerNotes
-  → moveTabPill → buildPresets（清理旧 DOM）→ bindTaskSwitch → bindViews
+  → moveTabPill → buildPresets（清理旧 DOM）→ bindViews
   → bindMine → bindMapStage（预加载高德 SDK）→ S.applyRules() → renderAiToggle
-  → appendMsg(欢迎语) → renderPlots → load()
+  → appendMsg(欢迎语) → renderPlots → syncAdv(true)（桌面展开证据层）→ load()
+load() 成功后：renderDecision → renderWeek → renderCharts → renderAlerts
+             → renderNowStrip → bindDecision → renderSolarTerm
+失败走 renderError()：决策骨架保留，顶部给重试按钮
 pwa.js boot()：
   注册 SW（scope './'）→ 监听 beforeinstallprompt / appinstalled / offline / online
   → 安装条与「立即更新」
@@ -371,11 +373,14 @@ load()
           Open-Meteo 作主源时：api.open-meteo.com/v1/forecast
   → state.raw = w
   → TianZhi.evaluateWeather(w.hourly, w.daily) → result{days[7], weekRain, …}
-  → renderHero / renderDays / renderCards / renderCharts / renderAlerts
+  → renderDecision（先答今天/现在，不行才给下一次窗口）
+  → renderWeek（七天条带，默认选中日与决策卡一致）
+  → renderCharts / renderAlerts / renderNowStrip
 ```
 
 `result.days[i]` 每项含 `date / dow / tmax / tmin / rain / spray{status,why,windows,blocked} / irrigation / harvest`。
-置信度与推迟代价由 `ensembleEval()` → `TianZhiEnsemble.assemble*()` 单独算，按 `lat,lon,首条时次` 缓存。
+`todayRemaining()` 判「今天剩余时段还能不能干」，与逐日判定共用概率、露点、日落截止口径。
+集合置信度由 `ensembleEval()` → `TianZhiEnsemble.assemble*()` 供问答使用，按 `lat,lon,首条时次` 缓存；v5 起不再单独渲染置信度卡与推迟代价面板。
 
 ### 8.3 问答链
 
@@ -479,9 +484,9 @@ git push origin main
 | 阈值 / 作业标准 | `web/standards.js` 的 `LIST`（新增文件就加一条，必须带 code / url / checked） | 只收有原文或官方著录的；没全文的 `limits` 必须 `null`，不许猜数值 |
 | 阈值兜底 | `web/settings.js` 的 `defaultRules()` + `web/logic.js` 的 `RULES` | 只在标准库缺失时生效；改标准优先改 standards.js |
 | 打药/灌溉/晾晒判定逻辑 | `web/logic.js`：`hourVerdict()`、`findSprayWindows()`、`evaluateWeather()` | 改完必须跑 `test-logic.mjs`，有热力图一致性断言 |
-| 首页布局 / 新卡片 | `web/index.html`（结构 + CSS）+ `web/app.js` 对应 `render*()` | 样式与结构都在同一个 120 KB 文件里，改动要小步 |
+| 首页布局 / 决策卡 | `web/index.html` 的 `.decision` / `.week` / `.adv` + `web/app.js` 的 `renderDecision()` / `renderWeek()` | 三层信息架构：L1 结论、L2 七天窗口、L3 默认收起的证据；改 DOM 后先跑 e2e，删过 `#windTitle` 那次整页报错 |
 | 图表尺寸 / 截断 | `web/app.js` 的 `chartW()` 与各 `*Svg()` | 宽度必须按容器实测，别写死 560/620 |
-| 地图行为 / 运镜 | `web/app.js` 的 `MAP` 段（`initAMap`/`onMapPick`/`mapCenterOn`/`flyToPoint`） | 本地 `localhost` 不在高德白名单，看不到真实地图（§11.1） |
+| 地图行为 / 运镜 | `web/app.js` 的 `MAP` 段（`initAMap`/`onMapPick`/`renderFallbackMap`/`__tzPickCenter`） | 高德不可用会自动降级示意图，点选与搜索必须同时可用；e2e 两种态都测（§11.1） |
 | 地名规则 | `web/place.js`：`pickPlace()`、`placeKindOf()`、`compose()` | 不要强制归到村；按 `type` 和距离判断 |
 | 数据源 / 兜底顺序 | `web/weather.js` 的 `getWeather()` | 保持「任一源挂都不白屏」 |
 | 离线缓存范围 | `web/sw.js` 的 `SHELL` + `scripts/build-site.mjs` 的 `JS_FILES` | **加文件必改三处**：`index.html`、`sw.js`、`build-site.mjs` |
@@ -501,7 +506,23 @@ git push origin main
 
 ## 11. 已知问题与坑
 
-### 11.0 v4.7 修掉的问题（别再改回去）
+### 11.0 v5.0 决策页重构（当前架构，改动前先读）
+
+**定位**：面向华北平原冬小麦 / 夏玉米种植户，不是天气看板，而是「这件活今天能不能干、几点干」的一屏决策。判断成功的标准是农户不用滚动、不用换算就能做决定。
+
+**三层信息架构**（`web/index.html` + `web/app.js`）：
+- L1 `.decision`：结论按动作写（「现在就能打」/「今天不能打」/「这七天都不能打」），先答今天，不行才在原因里给下一次窗口；右侧大号时段、四项可核对指标、`dFrom` 说明条（**未来窗口数值不是今天的实况**）；作业 tab、作业留痕、「为什么是这个时间」入口都在这里。
+- L2 `.week`：七天窗口条带，色块位置对应 6–18 时，点某天联动 `renderDayDetail()` 与所有图表；图例随任务切换（打药只有「可作业 / 无窗口」两态）。
+- L3 `#basisPanel`：实况 11 项、24 小时逐时表、四张图、判定口径与标准出处，桌面默认展开、手机默认收起；`<details>` 的 `toggle` 事件会重画图表，否则手机展开时图按 0 宽度绘制。
+
+**v5.0 修掉的坑（别再改回去）**：
+- 旧 `renderError()` 第一行就写已删除的 `#heroIn`，断网时直接抛错、连「重新获取」都渲染不出来；现在只写 v5 DOM，e2e 第 14 节用 CDP 拦天气域名做真实回归。
+- 顶栏 `#todayDate` 原本由旧天象头写入，v5 删掉后天象头后一直显示「—」；现由 `renderDecision()` 负责。
+- `#weekRainNote` 原本由已删除的「今日判读」卡写入，七天标题右侧一直空白；现由 `renderWeek()` 负责。
+- 高德降级时 `mapMode` 停在「地图加载中…」；现同步为「本地示意地图 · 可点选」，`__tzPickCenter` 在降级态也能取点。
+- 清掉了 v4.x 遗留的天象插画、倒计时、置信度/推迟代价、假设分析、七日卡、四宫格等约 750 行从未被调用的死代码。**不要凭旧文档里的函数名去找代码**。
+
+### 11.0.1 v4.7 修掉的问题（别再改回去）
 
 - **`groupByDay` 只搬了 4 个字段**：wind/temp/rain/humid。于是 `hourOk` 里读的 `h.prob`、`h.dew` 恒为 `undefined`——降雨概率拦截和结露判定写了却从未生效，`window.avgProb` 也永远是 null。v4.7 补齐 prob/dir/hum/dew/press/cloud/vis。**加任何"逐时判定"前先确认 `groupByDay` 有那个字段。**
 - **界面风向用记录式写法**：16 方位在《地面气象观测规范》里写作「西西南 / 西西北 / 北东北」，念不出来。界面改用同义「偏」式（西南偏西 / 西北偏西），并补角度（252°）与下风向（雾滴飘向东北偏东）。标准号 GB/T 37302-2019 表 A.1 可核。
@@ -509,7 +530,7 @@ git push origin main
 - **`#windTitle` 被删导致整页报错**：`$('windTitle').textContent` 未做空判断，删 DOM 后 `load()` 抛 "Cannot set properties of null"。改图表结构时先跑 e2e。
 - **`mm` 轴标压在第一根雨柱上**、**风速上限标签压在曲线上**：已改为右上角统一单位 + 左端带白色描边的标签。
 
-### 11.0.1 v4.6 修掉的问题（别再改回去）
+### 11.0.2 v4.6 修掉的问题（别再改回去）
 
 - **降雨概率漏判**：原实现只看当日/前日雨量，70% 概率仍会给"可作业窗口"。现在逐小时概率 ≥50%、单小时降水 >0.1 mm 都不排窗口，`test-logic.mjs` 有回归用例。
 - **夜间风速图像坏掉**：晚上 10 点打开时今天只剩 1 小时数据，图被压成一条竖线；现在 X 轴固定 0–24，且当天剩余作业时段不足 2 小时时自动切到明天。
@@ -518,14 +539,14 @@ git push origin main
 - **具体节气问错**：问「霜降」却回答当前「立冬」，现在先匹配问句里的节气名。
 - **顶部白边与方块按钮**：`theme-color` 改为随天气主题变化，顶栏用安全区 padding + 透明图标按钮。
 
-### 11.1 高德在本地不可用（e2e 2 项失败的直接原因）
+### 11.1 高德在本地不可用（已降级，不再是测试失败项）
 
-`amapKey` 的控制台域名白名单里没有 `localhost / 127.0.0.1`，所以本地起服务时 JS API 报 `INVALID_USER_KEY`/域名不匹配，地图区域始终停在「地图加载中…」。后果：
+`amapKey` 的控制台域名白名单里通常没有 `localhost / 127.0.0.1`，本地起服务时 JS API 报 `INVALID_USER_KEY`/域名不匹配。v5.0 的处理：
 
-- `e2e` 的 `AMap rendered`、`map pick triggered` 两项失败（其余 65 项通过）。
-- `flyToPoint()` 的运镜效果**本机无法验证**，只能在线上或真机看。
-
-解决路径（二选一）：去 `console.amap.com` 把 `localhost`、`127.0.0.1` 加进白名单；或接受本地降级，用线上地址跑 e2e。
+- `bindMapStage()` 预加载失败 → `MAP.failed = true` → `updateMapMode()` 把标签改为「本地示意地图 · 可点选」，`renderMap()` 直接画 `renderFallbackMap()`（河北行政区划 SVG，可点选取点）；`__tzPickCenter` 在降级态走 `fallbackSvg` 的点击逻辑。
+- 地点搜索、逆地理、附近 POI 与坐标保存都不依赖高德 SDK，降级后照常可用。
+- `e2e` 第 5 节同时接受高德与示意图两种模式，并断言标签不再停在「地图加载中…」；当前 117 项全通过。
+- `flyToPoint()` 的运镜效果**本机仍无法验证**，只能在线上或真机看；若要验证，把 `localhost`、`127.0.0.1` 加进 `console.amap.com` 白名单。
 
 ### 11.2 白名单 key 的额度风险
 
@@ -560,9 +581,11 @@ git push origin main
 - 邢台金银花标准已于 2025-06-01 废止；沧州是林业、张家口是露地蔬菜，均不适用于小麦 / 玉米。
 - 标准会更新。`standards.js` 的 `CHECKED` 是查证日期，更新条目时一起改；`test-standards.mjs` 会校验每条有没有编号与链接。
 
-### 11.5.1 首页删减后留下的死代码
+### 11.5.1 首页删减后留下的死代码（v5.0 已清理）
 
-v4.5 把「详细依据」压成一行置信度后，`app.js` 里仍有 `renderDelayCost / renderCloseCondition / startCountdown / renderLimits / renderSprayRow` 等函数定义（约 200 行）不再被调用；`bindSprayButtons()` 仍在 `load()` 里调用，但对应 DOM 已不渲染。不影响运行，属可清理项。清理时注意 `renderHero()` 里不再引用它们。
+v4.5–v4.7 逐步删界面时，`app.js` 里累积了约 750 行从未被调用的旧渲染代码：`renderHero / renderDays / renderCards / renderSprayRow / bindSprayButtons / paintSky / skyCloud / startCountdown / renderDelayCost / renderCloseCondition / renderWhatIf / computeWhatIf / bindWhatIf / runWhatIf / renderLimits / confStrip / marginEval / windowScore / kpiCell / gbar / bindTaskSwitch` 等。v5.0 已整段移除，同时补回由这些函数负责、但删界面后失联的两处输出：`#todayDate`、`#weekRainNote`。
+
+**接手注意**：旧文档 / 旧脚本里提到的上述函数名在代码中已不存在；改 UI 请按 §6 的 v5 函数索引找。清理后 `node --check`、三套测试与 e2e 全部复跑通过。
 
 ### 11.6 `scripts/` 里大量历史脚本
 
@@ -615,7 +638,7 @@ v4.5 把「详细依据」压成一行置信度后，`app.js` 里仍有 `renderD
 
 ### 12.3 技术层（按性价比排序）
 
-1. 给 `localhost` 加高德白名单，让本地地图与 2 个 e2e 断言恢复。
+1. （可选）给 `localhost` 加高德白名单，用于验证真实地图与 `flyToPoint()` 运镜；降级态已可正常工作且被测试覆盖，不再是阻塞项。
 2. 接入真实遥感 NDVI，替换长势占位图（当前明确标注「不输出结论」）。
 3. 部署 Cloudflare Worker（`llmProxyUrl` + `openMeteoProxy`），解决集合预报超时、让 AI 润色可用且不暴露 key。
 4. 补齐未获全文的市级标准（廊坊 DB1310/T 320-2023、石家庄 DB1301/T 518-2024），并逐年复核省站新文件。

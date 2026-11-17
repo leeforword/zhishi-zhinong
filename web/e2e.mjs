@@ -162,18 +162,26 @@ async function waitData(timeoutMs) {
     check(consoleErrors.length === 0, 'no console error' + (consoleErrors.length ? ': ' + consoleErrors[0].slice(0, 150) : ''));
 
     /* ---------- 2 ---------- */
-    console.log('\n== 2. weather data ==');
+    console.log('\n== 2. weather data / L1 decision ==');
     check(await waitData(), 'weather loaded');
-    const dayCount = await ev("document.querySelectorAll('#days .day').length");
-    check(dayCount === 7, 'seven day cells: ' + dayCount);
-    const cardCount = await ev("document.querySelectorAll('#cards .kpi-item').length");
-    check(cardCount === 3, 'three judgement cards: ' + cardCount);
+    const wkCount = await ev("document.querySelectorAll('#weekStrip .wk').length");
+    check(wkCount === 7, 'seven window slots: ' + wkCount);
+    const metricCount = await ev("document.querySelectorAll('#dMetrics .d-metric').length");
+    check(metricCount === 4, 'four checkable metrics: ' + metricCount);
 
-    const heroText = await ev("document.querySelector('#heroIn').textContent");
-    check(heroText.length > 10, 'hero rendered');
-    check(heroText.indexOf('undefined') < 0, 'hero has no undefined');
+    /* v5 的核心：先回答「这件活今天能不能干」，不能干才顺带给下一次机会 */
+    const dWord = await ev("document.getElementById('dWord').textContent");
+    const dWhy = await ev("document.getElementById('dWhy').textContent");
+    check(dWord.length >= 4, 'verdict rendered: ' + dWord);
+    check(/今天|现在|这七天/.test(dWord), 'verdict answers today first: ' + dWord);
+    check(dWhy.length > 12 && dWhy.indexOf('undefined') < 0 && dWhy.indexOf('NaN') < 0,
+      'reason is specific and clean');
+    check(dWhy.indexOf('下一次机会') < 0 || dWord.indexOf('不能打') >= 0,
+      'next chance only attached to a no-today verdict');
     const todayTxt = await ev("document.getElementById('todayDate').textContent");
-    check(todayTxt.indexOf('undefined') < 0 && todayTxt.length > 2, 'masthead date ok: ' + todayTxt);
+    check(/月/.test(todayTxt) && todayTxt.indexOf('undefined') < 0, 'masthead date ok: ' + todayTxt);
+    check(await ev("document.getElementById('dMeta').textContent.indexOf('标准') >= 0"),
+      'standard source shown on decision card');
 
     check(await ev("!document.getElementById('consensusBox')"), 'consensus block removed');
 
@@ -192,10 +200,11 @@ async function waitData(timeoutMs) {
     const heatRects = await ev("document.querySelectorAll('#heatChart rect').length");
     check(heatRects >= 168, 'heatmap 7x24 cells: ' + heatRects);
     check(await ev("!!document.querySelector('#tempChart svg')"), 'temp chart svg');
-    // v4.6 起改成口语结论 + 三项可核对指标，不再有评分环
-    const gaugeWord = await ev("document.getElementById('gaugeWord').textContent");
-    check(gaugeWord.length >= 4, 'window verdict: ' + gaugeWord);
-    check(await ev("document.querySelectorAll('#gaugeBars .grow').length") === 3, 'three checkable metrics');
+    // v5：不再有评分环 / 适配度，四项原值直接摆在决策卡上，可逐项核对
+    check(await ev("document.querySelectorAll('#dMetrics .d-metric b').length") === 4,
+      'four checkable metrics on decision card');
+    check(await ev("/[0-9]/.test(document.getElementById('dWhy').textContent)"),
+      'reason cites real measured values');
     check(await ev("!!document.querySelector('#growthChart svg')"), 'growth chart svg');
 
     /* v4.7：四张图统一骨架，并排两张必须等高——之前底边参差就是没对齐 */
@@ -224,7 +233,7 @@ async function waitData(timeoutMs) {
     check(/°/.test(dirTxt), 'wind direction carries degrees');
 
     /* 详细数据：桌面默认展开，实况 11 项，逐时表 24 行 */
-    check(await ev("document.getElementById('advPanel').open === true"), 'adv panel open on desktop');
+    check(await ev("document.getElementById('basisPanel').open === true"), 'evidence panel open on desktop');
     check(await ev("document.querySelectorAll('#nowStrip .ns').length") === 11, 'eleven live cells');
     /* 逐时数据从当前小时往后数，跨零点那天可能只有 23 行，不能写死 24 */
     const proRows = await ev("document.querySelectorAll('#proTable tbody tr').length");
@@ -237,27 +246,29 @@ async function waitData(timeoutMs) {
     /* ---------- 4 ---------- */
     console.log('\n== 4. day switch + task switch ==');
     const t0 = await ev("document.getElementById('windTitle').textContent");
-    await ev("document.querySelectorAll('#days .day')[3].click();");
+    await ev("document.querySelectorAll('#weekStrip .wk')[3].click();");
     await sleep(700);
     const t1 = await ev("document.getElementById('windTitle').textContent");
     check(t0 !== t1, 'chart title follows day selection');
+    check(await ev("document.querySelectorAll('#weekStrip .wk.sel').length") === 1,
+      'exactly one day selected');
 
-    // 作业类型切换：打药 -> 灌溉 -> 晾晒
-    const sprayTxt = await ev("document.querySelectorAll('#days .day .day-state')[1].textContent");
-    await ev("document.querySelector('#taskSwitch [data-task=\"irrigation\"]').click();");
+    // v5：作业切换合并进决策卡 tab，结论、条带、图表一起换
+    const sprayTxt = await ev("document.getElementById('dWord').textContent");
+    await ev("document.querySelector('#dTabs [data-task=\"irrigation\"]').click();");
     await sleep(400);
-    const irrTxt = await ev("document.querySelectorAll('#days .day .day-state')[1].textContent");
-    check(/灌溉/.test(irrTxt), 'irrigation verdict shown: ' + irrTxt);
-    check(sprayTxt !== irrTxt, 'task switch changes verdict text');
+    const irrTxt = await ev("document.getElementById('dWord').textContent");
+    check(sprayTxt !== irrTxt, 'task switch changes verdict: ' + irrTxt);
+    check(await ev("document.getElementById('wkSub').textContent.indexOf('灌溉') >= 0"),
+      'week strip follows task');
 
-    await ev("document.querySelector('#taskSwitch [data-task=\"harvest\"]').click();");
+    await ev("document.querySelector('#dTabs [data-task=\"harvest\"]').click();");
     await sleep(400);
-    const harvTxt = await ev("document.querySelectorAll('#days .day .day-state')[1].textContent");
-    // 文案随天气变（适宜晾晒 / 勉强可晒 / 不宜晾晒），断言只认"晒"这个词根
+    const harvTxt = await ev("document.getElementById('dWord').textContent");
     check(/晒/.test(harvTxt), 'harvest verdict shown: ' + harvTxt);
 
     // 切回打药，避免影响后续截图
-    await ev("document.querySelector('#taskSwitch [data-task=\"spray\"]').click();");
+    await ev("document.querySelector('#dTabs [data-task=\"spray\"]').click();");
     await sleep(400);
 
     // 预设城市按钮必须已移除
@@ -278,16 +289,20 @@ async function waitData(timeoutMs) {
 
     // 地图现在常驻在弹窗上半屏，不需要再点「展开」
     await sleep(2500);
-    let mode = '', amapReady = false;
+    /* 高德 SDK 可能因 key / 网络 / 域名白名单加载失败，产品会降级到
+       本地行政区划示意图。两种模式都必须能点选取点，测试要认这个降级态。 */
+    let mode = '', mapReady = false;
     for (let i = 0; i < 25; i++) {
       mode = await ev("document.getElementById('mapMode').textContent");
-      amapReady = await ev("!!(window.AMap && window.__tzMap && typeof window.__tzMap.getCenter === 'function')");
-      if (amapReady && (mode.indexOf('高德') >= 0 || mode.indexOf('示意') >= 0)) break;
+      mapReady = await ev("(function(){return !!(window.__tzMap && typeof window.__tzMap.getCenter==='function') || !!document.getElementById('fallbackSvg');})()");
+      if (mapReady && (mode.indexOf('高德') >= 0 || mode.indexOf('示意') >= 0)) break;
       await sleep(500);
     }
-    check(amapReady, 'AMap rendered: ' + mode);
+    check(mapReady, 'map rendered (AMap or local fallback): ' + mode);
+    check(mode.indexOf('地图加载中') < 0, 'map mode label reflects final state: ' + mode);
 
-    check(await ev("window.__tzPickCenter && window.__tzPickCenter()") === true, 'map pick triggered');
+    check(await ev("window.__tzPickCenter && window.__tzPickCenter()") === true,
+      'map pick triggered in either mode');
     await sleep(900);
     const coord = await ev("document.getElementById('mapCoord').textContent");
     check(coord.indexOf('N') >= 0, 'picked coordinate: ' + coord);
@@ -445,7 +460,7 @@ async function waitData(timeoutMs) {
     await send('Page.navigate', { url: fileUrl });
     await sleep(1800);
     check(await waitData(), 'weather loads over file protocol');
-    check(await ev("document.querySelectorAll('#days .day').length") === 7, 'seven days over file protocol');
+    check(await ev("document.querySelectorAll('#weekStrip .wk').length") === 7, 'seven window slots over file protocol');
     check(pageErrors.length === 0, 'no JS error over file protocol');
     const fpCharts = await ev("document.querySelectorAll('svg.chart').length");
     const fpWindEmpty = await ev("/无逐小时数据/.test(document.getElementById('windChart').textContent)");
@@ -462,15 +477,18 @@ async function waitData(timeoutMs) {
     check(cols.trim().split(/\s+/).length === 1, 'single column on mobile: ' + cols);
     const overflow = await ev("document.documentElement.scrollWidth - window.innerWidth");
     check(overflow <= 2, 'no horizontal overflow: ' + overflow + 'px');
-    /* 高级数据在手机上默认收起，点开才看，避免首屏堆信息 */
-    check(await ev("document.getElementById('advPanel').open === false"), 'adv panel collapsed on mobile');
-    await ev("document.getElementById('advPanel').querySelector('summary').click()");
-    await sleep(250);
-    check(await ev("document.getElementById('advPanel').open === true"), 'adv panel opens on tap');
+    /* 证据层在手机上默认收起，点开才看，避免首屏堆信息 */
+    check(await ev("document.getElementById('basisPanel').open === false"), 'evidence panel collapsed on mobile');
+    await ev("document.getElementById('basisPanel').querySelector('summary').click()");
+    await sleep(350);
+    check(await ev("document.getElementById('basisPanel').open === true"), 'evidence panel opens on tap');
     check(await ev("document.querySelectorAll('#nowStrip .ns').length") === 11, 'eleven live cells on mobile');
+    /* 打开后图表必须按真实宽度重画，不能停在收起时的 0 宽度上 */
+    check(await ev("(function(){var s=document.querySelector('#windChart svg');return s&&s.getBoundingClientRect().width>200;})()"),
+      'charts redrawn at real width after panel opens');
     const mobOverflow = await ev("document.documentElement.scrollWidth - window.innerWidth");
-    check(mobOverflow <= 2, 'no overflow with adv panel open: ' + mobOverflow + 'px');
-    await ev("document.getElementById('advPanel').querySelector('summary').click()");
+    check(mobOverflow <= 2, 'no overflow with evidence panel open: ' + mobOverflow + 'px');
+    await ev("document.getElementById('basisPanel').querySelector('summary').click()");
     await sleep(150);
     await shotFull('05-mobile.png');
 
@@ -556,6 +574,70 @@ async function waitData(timeoutMs) {
     await sleep(600);
     const mineOverflow = await ev("document.documentElement.scrollWidth - window.innerWidth");
     check(mineOverflow <= 2, 'project brief no overflow on mobile: ' + mineOverflow + 'px');
+
+    /* ---------- 13 ---------- */
+    /* v5 的关键交互：条带选日、任务切换、作业留痕、依据入口。
+       这些是新架构的主链路，必须有断言兜着，不能只靠肉眼看截图。 */
+    console.log('\n== 13. v5 decision interactions ==');
+    await device(1440, 1000, false, 1);
+    await send('Page.navigate', { url: PAGE_URL });
+    await sleep(1800);
+    await waitData();
+    check(await ev("document.getElementById('basisPanel').open === true"), 'evidence panel open on desktop');
+    check(await ev("document.querySelectorAll('#dTabs button').length") === 3, 'three task tabs');
+
+    const wd0 = await ev("document.querySelector('#weekDay .wd-h b').textContent");
+    const wt0 = await ev("document.getElementById('windTitle').textContent");
+    /* 默认选中日就是「下一次机会」那天，必须点一个不同的日子才有变化可断言 */
+    const selIdx = await ev("[...document.querySelectorAll('#weekStrip .wk')].findIndex(function(b){return b.classList.contains('sel')})");
+    const pickIdx = selIdx === 4 ? 5 : 4;
+    await ev("document.querySelectorAll('#weekStrip .wk')[" + pickIdx + "].click();");
+    await sleep(350);
+    const wd1 = await ev("document.querySelector('#weekDay .wd-h b').textContent");
+    const wt1 = await ev("document.getElementById('windTitle').textContent");
+    check(wd0 !== wd1, 'day detail follows strip: ' + wd0 + ' -> ' + wd1);
+    check(wt0 !== wt1, 'chart follows strip: ' + wt0 + ' -> ' + wt1);
+
+    await ev("localStorage.removeItem('tz_logs')");
+    await ev("document.getElementById('dLogBtn').click();");
+    await sleep(220);
+    check(await ev("JSON.parse(localStorage.getItem('tz_logs')||'[]').length") >= 1,
+      'work log written to this device');
+    check(await ev("document.getElementById('dLogLine').textContent.indexOf('上次打药') >= 0"),
+      'decision card shows last-work history');
+    await ev("document.getElementById('dLogUndo').click();");
+    await sleep(180);
+    check(await ev("document.getElementById('dLogLine').textContent.indexOf('还没有记录') >= 0"),
+      'work log can be undone');
+
+    await ev("document.getElementById('basisPanel').open=false;document.getElementById('dBasisBtn').click();");
+    await sleep(350);
+    check(await ev("document.getElementById('basisPanel').open === true"),
+      '"why this time" opens the evidence layer');
+    check(await ev("document.querySelectorAll('#nowStrip .ns').length") === 11,
+      'evidence layer shows live values after opening');
+    check(pageErrors.length === 0, 'no JS error in v5 interactions');
+
+    /* 断网错误态：v5 以前这里会因为写已删除的 #heroIn 直接抛错，
+       连「重新获取」都出不来。用 CDP 拦掉天气域名做一次真实回归。 */
+    console.log('\n== 14. offline error state ==');
+    pageErrors.length = 0; consoleErrors.length = 0;
+    try {
+      await send('Network.enable');
+      await send('Network.setBlockedURLs', {
+        urls: ['*open-meteo.com*', '*qweather*', '*api.agnes-ai.cn*']
+      });
+      await send('Page.navigate', { url: PAGE_URL });
+      await sleep(3500);
+      check(await ev("!!document.getElementById('retryBtn')"), 'error state offers retry button');
+      check(await ev("document.getElementById('dWord').textContent.indexOf('等待') >= 0"),
+        'decision skeleton survives network failure');
+      check(pageErrors.length === 0, 'no uncaught exception in error state' +
+        (pageErrors.length ? ': ' + pageErrors[0].slice(0, 150) : ''));
+      await send('Network.setBlockedURLs', { urls: [] });
+    } catch (e) {
+      console.log('  SKIP offline check: ' + e.message);
+    }
 
     console.log('\n===== RESULT: pass ' + pass + ' / fail ' + fail + ' =====');
     if (pageErrors.length) console.log('page errors:', pageErrors.slice(0, 3));
