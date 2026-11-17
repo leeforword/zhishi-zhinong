@@ -314,6 +314,14 @@ async function waitData(timeoutMs) {
     }
     check(mapReady, 'map rendered (AMap or local fallback): ' + mode);
     check(mode.indexOf('地图加载中') < 0, 'map mode label reflects final state: ' + mode);
+    check(await ev("document.getElementById('layerRoad').classList.contains('on') && !document.getElementById('layerSat').classList.contains('on')"),
+      'map opens on road layer, not satellite');
+    check(await ev(`(function(){
+      var l = document.querySelector('.map-layers');
+      if (getComputedStyle(l).display === 'none') return true; // 本地示意地图没有图层切换
+      var r = l.getBoundingClientRect(), s = document.getElementById('mapStage').getBoundingClientRect();
+      return (r.top - s.top) < 60 && (s.right - r.right) < 60;
+    })()`), 'layer switch sits top-right (or hidden on fallback map)');
 
     check(await ev("window.__tzPickCenter && window.__tzPickCenter()") === true,
       'map pick triggered in either mode');
@@ -651,6 +659,24 @@ async function waitData(timeoutMs) {
     check(lib.src >= 10 && lib.links >= 10, 'mine page lists sources with links: ' + lib.src);
     check(lib.prod >= 10, 'mine page lists pesticide profiles: ' + lib.prod);
 
+    const stdFold = JSON.parse(await ev(`(function(){
+      var d = [...document.querySelectorAll('#stdBox details')].find(function(x){
+        var s = x.querySelector('summary');
+        return s && s.textContent.indexOf('依据文件清单') >= 0;
+      });
+      var b = document.querySelector('#stdBox .std-file-top b');
+      return JSON.stringify({
+        has: !!d, open: d ? d.open : null,
+        files: d ? d.querySelectorAll('.std-file').length : 0,
+        color: b ? getComputedStyle(b).color : ''
+      });
+    })()`));
+    check(stdFold.has && stdFold.open === false, 'standards source list folded by default');
+    check(stdFold.files >= 3, 'folded list renders the city applicable files: ' + stdFold.files);
+    check(stdFold.color !== 'rgb(0, 0, 238)', 'source titles use brand colour, not default link blue: ' + stdFold.color);
+    check(await ev("(function(){var s=getComputedStyle(document.documentElement);return !!s.getPropertyValue('--brand-d').trim() && !!s.getPropertyValue('--shadow-sm').trim();})()"),
+      'design tokens brand-d/shadow-sm are defined');
+
     /* ---------- 13 ---------- */
     /* v5 的关键交互：条带选日、任务切换、作业留痕、依据入口。
        这些是新架构的主链路，必须有断言兜着，不能只靠肉眼看截图。 */
@@ -673,6 +699,15 @@ async function waitData(timeoutMs) {
     const wt1 = await ev("document.getElementById('windTitle').textContent");
     check(wd0 !== wd1, 'day detail follows strip: ' + wd0 + ' -> ' + wd1);
     check(wt0 !== wt1, 'chart follows strip: ' + wt0 + ' -> ' + wt1);
+
+    /* 回归：点「今天」不能被自动跳到下一个窗口日 */
+    await ev("document.querySelectorAll('#weekStrip .wk')[0].click();");
+    await sleep(320);
+    const selDate = await ev("(function(){var b=document.querySelector('#weekStrip .wk.sel');return b?b.getAttribute('data-date'):'';})()");
+    const firstDate = await ev("document.querySelectorAll('#weekStrip .wk')[0].getAttribute('data-date')");
+    check(selDate === firstDate, 'clicking today keeps today selected: ' + selDate);
+    const wkFont = await ev("parseFloat(getComputedStyle(document.querySelector('#weekStrip .wk-dow b')).fontSize)");
+    check(wkFont >= 12.5, 'day labels are readable on mobile/desktop: ' + wkFont + 'px');
 
     await ev("localStorage.removeItem('tz_logs')");
     await ev("document.getElementById('dLogBtn').click();");

@@ -1426,11 +1426,16 @@
     var today = result.days[0].date;
     var dec = task === 'spray' ? sprayDecision(result)
       : (task === 'irrigation' ? irrDecision(result) : harvDecision(result));
-    /* 首次进入时，详情跟决策卡指向同一天，避免"上面说周六、下面讲今天" */
-    if (dec.kind === 'future' && (!state.chartDay || state.chartDay === today)) {
-      state.chartDay = dec.date;
+    /* 首次进入时，详情跟决策卡指向同一天，避免"上面说周六、下面讲今天"。
+       注意：只在「还没有选中日期」时才自动选——以前这里判断
+       `state.chartDay === today` 也归零，导致用户点「今天」又被弹到周五。 */
+    var valid = state.chartDay && result.days.some(function (d) {
+      return d.date === state.chartDay;
+    });
+    if (!valid) {
+      state.chartDay = (dec.kind === 'future' && dec.date) ? dec.date : today;
     }
-    var sel = state.chartDay || dec.date || today;
+    var sel = state.chartDay;
     var names = { spray: '打药', irrigation: '灌溉', harvest: '晾晒' };
     if ($('wkTitle')) $('wkTitle').textContent = names[task] + '的窗口分布';
     if ($('wkSub')) {
@@ -1477,7 +1482,8 @@
         note = st === 'ok' ? '可以' : (st === 'warn' ? '勉强' : '不宜');
       }
 
-      return '<button type="button" class="wk' + (d.date === sel ? ' sel' : '') + '" data-date="' + d.date + '">' +
+      return '<button type="button" class="wk' + (d.date === sel ? ' sel' : '') +
+          (inner ? ' has' : '') + '" data-date="' + d.date + '">' +
         '<span class="wk-dow"><b>' + (isToday ? '今天' : d.dow) + '</b>' +
           (dt.getMonth() + 1) + '/' + dt.getDate() + '</span>' +
         '<span class="wk-slot">' + inner + '</span>' +
@@ -2197,7 +2203,7 @@
 
       // 供自动化测试访问（也是调试入口）
       window.__tzMap = MAP.instance;
-      setMapLayer('sat');   // 默认卫星图：选地块时看得清地块形状
+      setMapLayer('road');   // 默认路网：先看清村道、地块边界与周边参照，再切卫星
 
       // 叠加河北省/市边界（本地 GeoJSON，离线可用）
       setTimeout(function () { addBoundaries(); }, 100);
@@ -2233,6 +2239,9 @@
 
   /* ---------- 点击取点：GCJ-02 → WGS-84 ---------- */
   function onMapPick(gLng, gLat) {
+    /* 地图点选是这一步的主操作：先把软键盘收起来，
+       否则手机上键盘会一直压在表单上，看不到刚选的位置。 */
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     // 高德给的是 GCJ-02，转回 WGS-84 才能和县界/天气数据对齐
     var w = T.gcjToWgs84(gLng, gLat);
     var lon = Math.round(w[0] * 10000) / 10000;
@@ -2417,6 +2426,10 @@
   function updateMapMode() {
     var el = $('mapMode');
     if (!el) return;
+    /* 本地示意地图没有卫星图层：这时把「路网/卫星」藏起来，
+       否则点了没反应、还高亮成卫星，比没有按钮更让人困惑。 */
+    var layers = document.querySelector('.map-layers');
+    if (layers) layers.style.display = MAP.failed ? 'none' : '';
     if (MAP.failed) {
       el.textContent = '本地示意地图 · 可点选';
       el.title = '高德地图未加载，已自动切换为本地行政区划示意图；点选与地点搜索照常可用';
@@ -2782,7 +2795,11 @@
       renderMap({ lat: base.lat, lon: base.lon });
       if (MAP.instance) MAP.instance.resize();
     }, 80);
-    setTimeout(function () { $('fName').focus(); }, 60);
+    /* 手机端不自动聚焦名称：弹窗一开就弹键盘，会把地图挡掉一半，
+       而这一步真正要做的是先在地图上点自己的地。桌面端保留聚焦方便直接输入。 */
+    if (window.innerWidth >= 900) {
+      setTimeout(function () { $('fName').focus(); }, 60);
+    }
   }
 
   function closeModal() {
@@ -3704,6 +3721,7 @@
   // 可选元素一律先判空，避免缺一个按钮就把整段初始化打断
   if ($('modalCancel')) $('modalCancel').onclick = closeModal;
   if ($('modalSave')) $('modalSave').onclick = formSave;
+  if ($('modalSave2')) $('modalSave2').onclick = formSave;
   /* 点遮罩空白处关闭弹窗
      -------------------------------------------------------------
      注意：不能简单用 click 判断。用户拖拽地图时，鼠标按下在地图上、
@@ -3911,7 +3929,16 @@
       '</div></div>';
 
     html += auto ? STD.limitsHtml(city) : manualLimitsHtml();
-    html += STD.sourcesHtml(city);
+
+    /* 依据文件清单很长（13 份 + 链接），默认展开会把「我的」撑成几屏，
+       收进折叠层：要看原文的再点开，日常只看上面的生效阈值。 */
+    var srcHtml = STD.sourcesHtml(city);
+    var srcN = (srcHtml.match(/class="std-file"/g) || []).length;
+    if (srcHtml) {
+      html += '<details class="std-adv" style="margin-top:12px">' +
+        '<summary>依据文件清单（' + srcN + ' 份，点开核对原文）</summary>' +
+        '<div class="std-adv-body">' + srcHtml + '</div></details>';
+    }
 
     html += '<details class="std-adv" style="margin-top:12px">' +
       '<summary>河北省 11 市收录情况（含未检索到的市）</summary>' +
