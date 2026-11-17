@@ -928,6 +928,7 @@
     d.className = 'plot' + (p.id === state.activeId ? ' on' : '');
     d.innerHTML =
       '<div class="plot-main">' +
+        '<img class="plot-art" src="img/crop-' + (p.crop === 'maize' ? 'corn' : 'wheat') + '.webp" alt="" loading="lazy" onerror="this.style.display=\'none\'">' +
         '<span class="plot-dot"></span>' +
         '<span class="plot-name">' + esc(p.name) + '</span>' +
         '<span class="plot-area">' + p.area + ' 亩</span>' +
@@ -1096,6 +1097,33 @@
     }
   }
 
+  /* 物候横幅：按月份切到当前生育期的插画，夏玉米季（7–10 月）不显示 */
+  function renderSeasonBanner() {
+    var box = $('seasonBanner');
+    if (!box) return;
+    var m = new Date().getMonth() + 1;
+    var map = {
+      1: ['season-winter', '越冬期', '幼苗贴伏越冬 · 防冻害，视墒情与苗情考虑越冬水'],
+      2: ['season-regreen', '返青期', '新叶开始抽出 · 促弱苗转壮，关注倒春寒'],
+      3: ['season-regreen', '返青期', '新叶抽出 · 看墒情浇返青水，防倒春寒'],
+      4: ['season-jointing', '拔节期', '节间伸长 · 需水需肥高峰，注意防倒伏与病虫'],
+      5: ['season-mature', '灌浆成熟期', '穗重易倒伏 · 降雨前留意抢收与晾晒'],
+      6: ['season-mature', '成熟期', '临近收获 · 阴雨会降低品质，及早安排'],
+      11: ['season-winter', '越冬期', '幼苗贴伏越冬 · 防冻害，视墒情与苗情考虑越冬水'],
+      12: ['season-winter', '越冬期', '幼苗贴伏越冬 · 防冻害，视墒情与苗情考虑越冬水']
+    };
+    var e = map[m];
+    if (!e) { box.hidden = true; return; }
+    var img = $('seasonImg');
+    if (img) {
+      var f = 'img/' + e[0] + '.webp';
+      if (img.getAttribute('src') !== f) img.setAttribute('src', f);
+    }
+    if ($('seasonName')) $('seasonName').textContent = e[1];
+    if ($('seasonDesc')) $('seasonDesc').textContent = e[2];
+    box.hidden = false;
+  }
+
 
   /* ---- 天气主题：背景随实况/预报变化，但正文始终深色可读 ---- */
   function applyWeatherTheme(code, windMax) {
@@ -1127,6 +1155,17 @@
     if (dec) {
       dec.className = dec.className.replace(/\bwx-[a-z]+\b/g, '').trim() +
         ' wx-' + (night ? 'night' : cls);
+    }
+    /* 决策卡插画：与 wx-* 同名映射，multiply 融进卡片渐变；加载失败自动隐藏 */
+    var ART = {
+      clear: 'weather-clear', cloud: 'weather-cloud', rain: 'weather-rain',
+      snow: 'weather-snow', fog: 'weather-fog', storm: 'weather-storm',
+      wind: 'weather-wind', night: 'weather-night'
+    };
+    var art = $('dArt');
+    if (art) {
+      var f = 'img/' + (ART[night ? 'night' : cls] || 'weather-cloud') + '.webp';
+      if (art.getAttribute('src') !== f) art.setAttribute('src', f);
     }
   }
 
@@ -1741,6 +1780,7 @@
     if (box) {
       box.innerHTML =
         '<div class="cbox" style="padding:14px 16px;border-color:#E3B7AE">' +
+          '<img class="err-art" src="img/empty-offline.webp" alt="" loading="lazy" onerror="this.style.display=\'none\'">' +
           '<b style="font-size:13px;color:#8C3025">暂时取不到天气数据 · 需要联网才能使用</b>' +
           '<p style="margin:6px 0 8px;font-size:11.5px;color:var(--text-2);line-height:1.6">' + esc(msg || '') + '</p>' +
           '<div style="font-size:11px;color:var(--text-2);line-height:1.85">' +
@@ -1834,6 +1874,7 @@
       renderNowStrip(result);
       bindDecision();
       renderSolarTerm();
+      renderSeasonBanner();
 
       var n = new Date();
       setStatus('', '实时数据 · ' + pad2(n.getHours()) + ':' + pad2(n.getMinutes()) + ' 更新');
@@ -3956,6 +3997,13 @@
   })();
   buildPresets();     // 预设城市按钮已移除，这里只清理旧 DOM
   bindViews();        // 内容 / 对话 / 我的 三个视图
+  /* 决策卡插画：某张图缺失时隐藏，换到有图的主题再恢复，不留破图图标 */
+  (function () {
+    var art = $('dArt');
+    if (!art) return;
+    art.onload = function () { art.style.display = ''; };
+    art.onerror = function () { art.style.display = 'none'; };
+  })();
   bindMine();         // 「我的」页：阈值 / AI 设置
   bindMapStage();     // 提前绑定并预加载高德 SDK
 

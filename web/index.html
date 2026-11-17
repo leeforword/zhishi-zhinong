@@ -9,6 +9,9 @@
 <!-- ========== 可安装到手机桌面（PWA） ========== -->
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#e6efe9">
+<meta property="og:title" content="知时智农 · 农事时机问答智能体">
+<meta property="og:description" content="一屏回答这件活今天能不能干、几点干。判定由本地规则引擎按实时气象与属地作业标准算出。">
+<meta property="og:image" content="img/share-cover.webp">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
@@ -2132,8 +2135,36 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 .d-actions .btn{font-size:12.5px;padding:8px 16px}
 .d-log{padding:8px 20px 0;font-size:10.5px;color:var(--text-3);line-height:1.6}
 .d-log b{color:var(--text-2);font-weight:600}
-.d-log button{border:0;background:none;font:inherit;font-size:10.5px;color:var(--brand);
-  cursor:pointer;padding:0 2px}
+.d-log button{border:0;background:none;font:inherit;font-size:10.5px;color:var(--brand);  cursor:pointer;padding:0 2px}
+
+/* 决策卡插画：博物志手绘风水印，multiply 让米白纸底融进卡片天气渐变；
+   加载失败直接隐藏，不留破图图标。
+   ⚠️ 特异性必须是 .decision > .d-art：下面那条 .decision > * 会把
+   position:relative 发给所有子元素，单纯 .d-art 的 absolute 会被它覆盖。 */
+.decision > *{position:relative;z-index:1}
+.decision > .d-art{position:absolute;z-index:0;right:-6px;bottom:-10px;width:190px;height:190px;
+  object-fit:cover;mix-blend-mode:multiply;opacity:.5;pointer-events:none;user-select:none}
+@media (max-width:640px){
+  .decision > .d-art{width:132px;height:132px;right:-4px;bottom:-8px;opacity:.45}
+}
+
+/* 物候横幅：当前生育期插画 + 一行农事提醒，按月份切换，夏玉米季隐藏 */
+.season{display:flex;border:1px solid var(--border);border-radius:16px;overflow:hidden;
+  background:var(--surface);box-shadow:var(--shadow-sm)}
+.season img{width:46%;object-fit:cover;object-position:50% 74%;max-height:126px;display:block;
+  mix-blend-mode:multiply}
+.season-cap{flex:1;min-width:0;padding:12px 16px;display:flex;flex-direction:column;
+  justify-content:center;gap:4px}
+.season-cap b{font-size:13px;font-weight:600;color:var(--text)}
+.season-cap span{font-size:11px;color:var(--text-2);line-height:1.6}
+@media (max-width:640px){.season img{width:40%;max-height:100px}.season-cap{padding:10px 12px}}
+
+/* 错误态插画 */
+.err-art{display:block;width:130px;margin:2px auto 10px;mix-blend-mode:multiply;opacity:.92}
+
+/* 地块行首的作物标本小图 */
+.plot-art{width:20px;height:20px;object-fit:contain;flex:none;mix-blend-mode:multiply;
+  border-radius:4px}
 
 /* ---- L2 七天条带 ---- */
 .week{padding:12px 14px 10px}
@@ -2356,6 +2387,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           <button class="btn gh" id="dBasisBtn" type="button">为什么是这个时间</button>
         </div>
         <div class="d-log" id="dLogLine"></div>
+        <img class="d-art" id="dArt" alt="" loading="lazy">
       </section>
 
       <!-- ---------- 地块（手机端在这里切换；桌面用左侧栏） ---------- -->
@@ -2380,6 +2412,15 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
       <div class="jq-line" id="jqLine">
         <b id="jqNow">—</b><em id="jqSub"></em><span id="jqFarm"></span>
         <span class="jq-tip" id="jqNext"></span>
+      </div>
+
+      <!-- 物候横幅：当前生育期 + 博物志插画，按月份自动切换（夏玉米季隐藏） -->
+      <div class="season" id="seasonBanner" hidden>
+        <img id="seasonImg" alt="" loading="lazy">
+        <div class="season-cap">
+          <b id="seasonName"></b>
+          <span id="seasonDesc"></span>
+        </div>
       </div>
 
       <!-- ================= L3 数据与依据：默认收起，点开才看 ================= -->
@@ -2599,7 +2640,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           </details>
         </div>
 
-        <div class="sec-h"><h2>关于</h2><span class="hint">v5.0</span></div>
+        <div class="sec-h"><h2>关于</h2><span class="hint">v5.1</span></div>
         <div class="disc">
           <b>知时智农 · 华北平原冬小麦 / 夏玉米农事时机助手</b>
           <p>气象 和风天气 + Open-Meteo · 地图 高德 · 标准 河北省 / 市级公开文件</p>

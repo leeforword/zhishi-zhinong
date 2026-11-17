@@ -36,3 +36,7 @@ npm-debug.log*
 # 安卓壳构建产物与便携 JDK
 .build/
 android-webview/build/
+
+# ---------- 插画原稿与临时构建工具 ----------
+web/img-src/
+.sharp-tmp/

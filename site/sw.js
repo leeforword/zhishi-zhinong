@@ -18,7 +18,7 @@
 
 /* build-site.mjs 会把 __BUILD__ 替换成构建时间戳；
    开发时（web/ 目录直接打开）保持 dev，不影响使用 */
-const BUILD_ID = '20261117072639';
+const BUILD_ID = '20261117091643';
 const VERSION = /^__BUILD__$/.test(BUILD_ID) ? 'dev' : BUILD_ID;
 
 const CACHE = 'zhishi-zhinong-' + VERSION;
@@ -46,6 +46,15 @@ const SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-192.png',
+  /* 首屏决策卡插画按天气二选一显示，必须预缓存，否则离线首屏没有图 */
+  './img/weather-clear.webp',
+  './img/weather-cloud.webp',
+  './img/weather-rain.webp',
+  './img/weather-snow.webp',
+  './img/weather-fog.webp',
+  './img/weather-storm.webp',
+  './img/weather-wind.webp',
+  './img/weather-night.webp',
   './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png'
 ];

@@ -60,7 +60,8 @@
 | 标准库 / 本地库测试 | 通过 164 / 失败 0（离线） | `node web/test-standards.mjs` |
 | 端到端测试 | 通过 117 / 失败 0 | `node web/e2e.mjs`（需先起本地服务器） |
 | 构建 | 产物自检全过 | `node scripts/build-site.mjs` |
-| 页面版本号 | v5.0（「我的 → 关于」） | `web/index.html` |
+| 页面版本号 | v5.1（「我的 → 关于」） | `web/index.html` |
+| 插画素材 | `web/img/` 17 张 webp（约 1.5MB）；PNG 原稿在 `web/img-src/`（不进仓库） | `ls web/img` |
 | 规则引擎版本 | 3.1（`RULES.meta.version`） | `web/logic.js` |
 | 安卓壳 | versionCode 3 / versionName 1.2，包名 `io.github.leeforword.twa` | `android-webview/AndroidManifest.xml` |
 | 本地 Node | v22.22.2；CI 用 Node 20 | `node -v`、`deploy.yml` |
@@ -521,6 +522,12 @@ git push origin main
 - `#weekRainNote` 原本由已删除的「今日判读」卡写入，七天标题右侧一直空白；现由 `renderWeek()` 负责。
 - 高德降级时 `mapMode` 停在「地图加载中…」；现同步为「本地示意地图 · 可点选」，`__tzPickCenter` 在降级态也能取点。
 - 清掉了 v4.x 遗留的天象插画、倒计时、置信度/推迟代价、假设分析、七日卡、四宫格等约 750 行从未被调用的死代码。**不要凭旧文档里的函数名去找代码**。
+
+**v5.1 增补（插画层）**：17 张 19 世纪博物志风插画（AI 生成，提示词脚本见 `D:\minimax\v3-prompts.md`）已接入——
+- 决策卡右下角水印 `#dArt`：`applyWeatherTheme()` 按 `wx-*` 类映射 `img/weather-*.webp`，`mix-blend-mode:multiply` 融底，加载失败隐藏。**特异性必须写 `.decision > .d-art`**，普通 `.d-art` 会被 `.decision > *` 的 relative 覆盖掉定位（踩过）。
+- 物候横幅 `#seasonBanner`：`renderSeasonBanner()` 按月份映射（11–1 越冬 / 2–3 返青 / 4 拔节 / 5–6 成熟，7–10 隐藏）。
+- 空态 `renderError()` 带 `empty-offline.webp`；地块行首有作物标本小图；og:image 用 `share-cover.webp`。
+- `sw.js` SHELL 预缓存 8 张天气图；`build-site.mjs` §6.8 只复制 webp。换图重压：用 sharp（转换脚本写法见 git 历史或本节描述），PNG → webp q80，方图 512、横幅 1280。
 
 ### 11.0.1 v4.7 修掉的问题（别再改回去）
 

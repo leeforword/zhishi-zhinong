@@ -69,7 +69,7 @@ function send(method, params) {
 async function ev(expr) {
   const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
   if (r.exceptionDetails) {
-    throw new Error('JS exception: ' + JSON.stringify(r.exceptionDetails).slice(0, 250));
+    throw new Error('JS exception: ' + JSON.stringify(r.exceptionDetails).slice(0, 900));
   }
   return r.result ? r.result.value : undefined;
 }
@@ -185,6 +185,10 @@ async function waitData(timeoutMs) {
     /* 决策卡背景跟天气走（晴/阴/雨/雪/雾/雷/风/夜），不再是纯白模板卡 */
     check(await ev("/wx-(clear|cloud|rain|snow|fog|storm|wind|night)/.test(document.getElementById('decision').className)"),
       'decision card carries weather theme');
+    /* v5.1：决策卡随天气换博物志插画，物候横幅按月份显示 */
+    check(await ev("/img\\/weather-/.test(document.getElementById('dArt').getAttribute('src')||'')"),
+      'decision card carries weather illustration');
+    check(await ev("!!document.getElementById('seasonBanner')"), 'season banner element exists');
 
     check(await ev("!document.getElementById('consensusBox')"), 'consensus block removed');
 
@@ -640,6 +644,7 @@ async function waitData(timeoutMs) {
       await send('Page.navigate', { url: PAGE_URL });
       await sleep(3500);
       check(await ev("!!document.getElementById('retryBtn')"), 'error state offers retry button');
+      check(await ev("!!document.querySelector('#alerts .err-art')"), 'error state carries offline illustration');
       check(await ev("document.getElementById('dWord').textContent.indexOf('等待') >= 0"),
         'decision skeleton survives network failure');
       check(pageErrors.length === 0, 'no uncaught exception in error state' +

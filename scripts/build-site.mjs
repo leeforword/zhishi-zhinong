@@ -128,6 +128,20 @@ for (const f of VERIFY_FILES) {
   log('  OK   微信验证文件 ' + f);
 }
 
+/* ---- 6.8 插画素材（webp）----
+   只复制 web/img/ 下的 webp；PNG 原稿留在 web/img-src/（不进仓库）。 */
+const IMG = path.join(WEB, 'img');
+if (fs.existsSync(IMG)) {
+  fs.mkdirSync(path.join(OUT, 'img'), { recursive: true });
+  let imgs = 0;
+  for (const f of fs.readdirSync(IMG)) {
+    if (!/\.webp$/i.test(f)) continue;
+    fs.copyFileSync(path.join(IMG, f), path.join(OUT, 'img', f));
+    imgs++;
+  }
+  if (imgs) log('  OK   img/ 插画 ' + imgs + ' 张');
+}
+
 /* ---- 7. 安装引导里用到的两张截图 ---- */
 fs.mkdirSync(path.join(OUT, 'screenshots'), { recursive: true });
 for (const f of ['01-desktop-overview.png', '12-mobile-iphone.png']) {
