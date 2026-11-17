@@ -2278,6 +2278,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 .wk-legend{margin-left:auto;display:flex;gap:10px;font-size:10px;color:var(--text-3)}
 .wk-legend i{font-style:normal;display:flex;align-items:center;gap:4px}
 .wk-legend s{width:8px;height:8px;border-radius:2px;text-decoration:none;display:block}
+.wk-legend s.none{width:11px;height:2px;border-radius:1px;background:var(--border-strong);align-self:center}
 
 .week-strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;
   background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
@@ -2288,12 +2289,12 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 .wk-dow{font-size:10px;color:var(--text-3);display:flex;flex-direction:column;gap:2px;
   align-items:center;line-height:1.3;white-space:nowrap}
 .wk-dow b{font-size:12.5px;color:var(--text);font-weight:600}
-/* 无窗口的日子留一个空框，有窗口才画色块与时刻底纹：
-   以前所有格子都铺虚线底纹，像一排加载占位图。 */
+/* 无窗口的日子不要画方框——空白方框会被当成输入框。
+   这一天就留空，靠下面的「无窗口 / 雨阻」说明；有窗口才画色块与时刻底纹。 */
 .wk-slot{display:block;position:relative;height:28px;margin:7px 0 6px;border-radius:4px;
-  background:transparent;box-shadow:inset 0 0 0 1px var(--border)}
-.wk.has .wk-slot{background:repeating-linear-gradient(90deg,var(--surface-2) 0 6px,transparent 6px 12px);
-  box-shadow:none}
+  background:transparent;box-shadow:none}
+.wk.has .wk-slot{background:repeating-linear-gradient(90deg,var(--surface-2) 0 6px,transparent 6px 12px)}
+.wk:not(.has) .wk-note{color:var(--text-2)}
 .wk-fill{position:absolute;top:0;height:100%;border-radius:3px;background:var(--brand);opacity:.85}
 .wk-fill.warn{background:var(--warn)}
 .wk-fill.bad{background:#EBCFC9;opacity:1}

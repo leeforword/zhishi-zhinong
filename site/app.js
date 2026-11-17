@@ -1450,7 +1450,7 @@
     if ($('wkLegend')) {
       $('wkLegend').innerHTML = task === 'spray'
         ? '<i><s style="background:#3D6B55"></s>可作业</i>' +
-          '<i><s style="background:#EFEFEC;border:1px solid #DDD"></s>无窗口</i>'
+          '<i><s class="none"></s>无窗口</i>'
         : '<i><s style="background:#3D6B55"></s>适合</i>' +
           '<i><s style="background:#C0811A"></s>勉强</i>' +
           '<i><s style="background:#EBCFC9"></s>不宜</i>';
