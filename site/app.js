@@ -2914,24 +2914,54 @@
     var body = document.createElement('div');
     body.className = 'body';
     /* 首答分层：第一段是结论，其余整段折进「展开完整分析」。
-       textContent 全程走文本节点，折叠后的内容对脚本仍完整可查。 */
+       有 sections 时按段再折一层：理由默认可见，数字明细与依据各自收起，
+       一张卡片不再一次铺开十几屏字。 */
+    var sections = (notes && notes.sections) || null;
     var brief = text, rest = '';
     var pIdx = text.indexOf('\n\n');
-    if (pIdx > 0 && ((notes && notes.fold) || text.length > 180)) {
+    if (!sections && pIdx > 0 && ((notes && notes.fold) || text.length > 180)) {
       brief = text.slice(0, pIdx);
       rest = text.slice(pIdx + 2);
     }
     body.textContent = brief;
-    if (rest) {
+    if (sections && sections.length) {
       var det = document.createElement('details');
       det.className = 'qa-more';
       var sum = document.createElement('summary');
-      sum.textContent = '展开完整分析';
+      sum.textContent = '展开完整分析（' + sections.length + ' 段）';
       var dv = document.createElement('div');
       dv.className = 'qa-more-body';
-      dv.textContent = rest;
+      sections.forEach(function (sec, i) {
+        var blk, title = document.createElement('b'), txt = document.createElement('div');
+        txt.className = 'qa-sec-t';
+        txt.textContent = sec.body;
+        title.textContent = sec.title;
+        if (i === 0) {
+          /* 第一段（为什么这么判）不进二次折叠：结论下面直接能看到理由 */
+          blk = document.createElement('div');
+          blk.className = 'qa-sec';
+          blk.appendChild(title); blk.appendChild(txt);
+        } else {
+          blk = document.createElement('details');
+          blk.className = 'qa-sub';
+          var s2 = document.createElement('summary');
+          s2.textContent = sec.title;
+          blk.appendChild(s2); blk.appendChild(txt);
+        }
+        dv.appendChild(blk);
+      });
       det.appendChild(sum); det.appendChild(dv);
       body.appendChild(det);
+    } else if (rest) {
+      var det2 = document.createElement('details');
+      det2.className = 'qa-more';
+      var sum2 = document.createElement('summary');
+      sum2.textContent = '展开完整分析';
+      var dv2 = document.createElement('div');
+      dv2.className = 'qa-more-body';
+      dv2.textContent = rest;
+      det2.appendChild(sum2); det2.appendChild(dv2);
+      body.appendChild(det2);
     }
     d.appendChild(who); d.appendChild(body);
 
@@ -2941,21 +2971,22 @@
       var txt = document.createElement('span');
       txt.textContent = '依据：' + ((notes && notes.source) ? notes.source : '实时天气 + 本地规则引擎');
       line.appendChild(txt);
-      var b1 = document.createElement('button');
-      b1.type = 'button'; b1.textContent = '详情'; b1.setAttribute('data-act', 'basis');
+      var b0 = document.createElement('button');
+      b0.type = 'button'; b0.textContent = '依据库'; b0.setAttribute('data-act', 'lib');
       var b2 = document.createElement('button');
       b2.type = 'button'; b2.textContent = '纠错'; b2.setAttribute('data-act', 'fix');
-      line.appendChild(b1); line.appendChild(b2);
+      line.appendChild(b0); line.appendChild(b2);
       body.appendChild(line);
-      var sugs = SUG[lastIntent];
+      var sugs = (notes && notes.suggest) || SUG[lastIntent];
       /* 药剂追问按当前药种动态生成：不要出现「换成除草剂呢」这种
          当前已经就是除草剂的无效按钮。 */
-      if (lastIntent === 'chem' && qaContext.chem && qaContext.chem.type !== 'banned') {
+      if (lastIntent === 'chem' && !(notes && notes.suggest) && qaContext.chem && qaContext.chem.type !== 'banned') {
         var CHEM_LBL = { herbicide: '除草剂', insecticide: '杀虫剂', fungicide: '杀菌剂' };
         var curChem = qaContext.chem.type;
         var otherChem = ['herbicide', 'insecticide', 'fungicide'].filter(function (k) { return k !== curChem; });
-        sugs = ['换成' + CHEM_LBL[otherChem[0]] + '呢？', '换成' + CHEM_LBL[otherChem[1]] + '呢？',
-          '那明天呢？', '有露水能打吗？'];
+        sugs = qaContext.chem.scope === 'week'
+          ? ['那今天呢？', '换成' + CHEM_LBL[otherChem[0]] + '呢？', '有露水能打吗？', '这周雨量多少？']
+          : ['那哪天能打？', '换成' + CHEM_LBL[otherChem[0]] + '呢？', '有露水能打吗？', '几点风最小？'];
       }
       if (sugs && sugs.length) {
         var row = document.createElement('div');
@@ -2972,6 +3003,10 @@
 
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
+    if (role === 'bot' && withNote) {
+      qaContext.lastBrief = text;
+      qaContext.lastWhy = (notes && notes.sections && notes.sections[0]) ? notes.sections[0].body : '';
+    }
     return d;
   }
 
@@ -3033,6 +3068,57 @@
       $('basisBoundary').textContent =
         CONTENT.scope.boundaryNote + ' 结论只用于安排作业时间，不替代农药标签、剂量与安全间隔期要求。';
     }
+    renderChemBasis();
+  }
+
+  /**
+   * 「我的 → 施药依据库」
+   * -------------------------------------------------------------
+   * 对话里不再摊 15 份依据全文：判定要点留在回答里，原文与药剂档案
+   * 统一收到这一页。数据全部来自 chem.js，不在 HTML 里另抄一份，
+   * 免得以后改了口径两处不一致。
+   */
+  function renderChemBasis() {
+    var CH = window.TianZhiChem;
+    if (!CH) return;
+    var srcBox = $('chemSrcList');
+    if (srcBox) {
+      srcBox.innerHTML = CH.SOURCES.map(function (s) {
+        return '<div class="chem-src">' +
+          '<div class="chem-src-h"><b>' + esc(s.code) + '</b><span>' + esc(s.level) + '</span></div>' +
+          '<p>' + esc(s.point) + '</p>' +
+          '<div class="chem-src-m">' + esc(s.issuer) + ' · ' + esc(s.clause) +
+          (s.url ? ' · <a href="' + esc(s.url) + '" target="_blank" rel="noopener">原文</a>' : '') +
+          '</div></div>';
+      }).join('');
+    }
+    if ($('chemSrcCount')) $('chemSrcCount').textContent = CH.SOURCES.length;
+    if ($('chemSrcStat')) $('chemSrcStat').textContent = '查证 ' + CH.CHECKED + ' · 离线可查';
+    var prodBox = $('chemProdList');
+    if (prodBox) {
+      prodBox.innerHTML = CH.PRODUCTS.map(function (p) {
+        var warn = CH.warnOf ? CH.warnOf(p, '') : '';
+        return '<div class="chem-prod">' +
+          '<div class="chem-prod-h"><b>' + esc(p.name) + '</b><span>' + esc(p.mode) + '</span></div>' +
+          '<p>' + esc(p.what) + '</p>' +
+          '<p class="chem-prod-w">天气：' + esc(p.weather) + '</p>' +
+          (warn ? '<p class="chem-prod-n">' + esc(warn) + '</p>' : '') +
+          '</div>';
+      }).join('');
+    }
+    if ($('chemProdCount')) $('chemProdCount').textContent = CH.PRODUCTS.length;
+  }
+
+  /** 对话里的「依据库」按钮：跳到我的页，并把依据列表展开到位 */
+  function goBasisLib() {
+    closeBasis();
+    setView('mine');
+    setTimeout(function () {
+      var adv = $('chemSrcAdv');
+      if (adv) adv.open = true;
+      var card = $('chemBasisCard');
+      if (card && card.scrollIntoView) card.scrollIntoView({ block: 'start' });
+    }, 80);
   }
 
   function openBasis() {
@@ -3089,6 +3175,7 @@
       var b = e.target && e.target.closest ? e.target.closest('.an-line button') : null;
       if (!b) return;
       if (b.getAttribute('data-act') === 'basis') { openBasis(); return; }
+      if (b.getAttribute('data-act') === 'lib') { goBasisLib(); return; }
       if (b.getAttribute('data-act') === 'fix') openCorrectionForm(b);
     });
   }
@@ -3129,7 +3216,7 @@
   }
 
   /* 评审要求：能解释依据、能承认不确定、能理解追问、超范围诚实 */
-  var qaContext = { intent: null, chem: null };
+  var qaContext = { intent: null, chem: null, lastQ: '', lastBrief: '', lastWhy: '' };
   var lastIntent = '';
   var SUG = {
     spray: ['明天和后天哪天更好？', '几点风最小？', '我这里按什么标准打药？'],
@@ -3138,8 +3225,62 @@
     standard: ['为什么是这个时段？', '这个结论准不准？'],
     weather: ['日出日落几点？', '几点风最小？', '未来七天雨量多少？'],
     kb: ['按什么标准打药？'],
-    chem: ['换成除草剂呢？', '换成杀虫剂呢？', '那明天呢？', '有露水能打吗？']
+    chem: ['那哪天能打？', '有露水能打吗？', '换成杀虫剂呢？']
   };
+
+  /** 追问按钮跟着「这一轮问的时间范围」走，别一律推「那明天呢」 */
+  function chemSuggest(m) {
+    var LBL = { herbicide: '除草剂', insecticide: '杀虫剂', fungicide: '杀菌剂' };
+    var others = ['herbicide', 'insecticide', 'fungicide'].filter(function (k) { return k !== m.type; });
+    if (m.scope === 'week') {
+      return ['那今天呢？', '换成' + LBL[others[0]] + '呢？', '这周雨量多少？'];
+    }
+    return ['那哪天能打？', '有露水能打吗？', '换成' + LBL[others[0]] + '呢？'];
+  }
+
+  /**
+   * 每轮注入给大模型的会话上下文。
+   * -------------------------------------------------------------
+   * 为什么要有：LLM 只看到「待改写的一句话」时，很容易把用户的
+   * 「这周哪天」改写成「明天不能打」——因为句子里没有主语。
+   * 这里把地块、药种、时间范围、上一轮问答压成一段事实清单，
+   * 和 system prompt 一起发过去。清单里的数字全部来自规则引擎，
+   * 不是模型生成的，所以不会引入新的数字来源。
+   */
+  function buildTurnContext(plot, result) {
+    if (!result || !result.days || !result.days.length) return '';
+    var L = [];
+    var d0 = result.days[0];
+    L.push('地点：' + plot.name + (plot.place ? '（' + plot.place + '）' : '') +
+      '；作物：' + (CROP_NAME[plot.crop] || '冬小麦'));
+    var n = new Date();
+    L.push('现在：' + (n.getMonth() + 1) + '月' + n.getDate() + '日 ' +
+      pad2(n.getHours()) + ':' + pad2(n.getMinutes()));
+    L.push('属地阈值：风速 ≤ ' + RULES.spray.wind_max + ' m/s；气温 ' +
+      RULES.spray.temp_min + '–' + RULES.spray.temp_max + '℃；作业 ' +
+      RULES.spray.hours[0] + '–' + RULES.spray.hours[1] + ' 时；降雨概率 ≥ ' +
+      RULES.spray.prob_block + '% 关闭窗口');
+    var oks = result.days.filter(function (d) {
+      return d.spray.status === 'ok' && d.spray.windows.length;
+    }).map(function (d) {
+      var w = d.spray.windows.slice().sort(function (a, b) { return b.hours - a.hours; })[0];
+      return d.date.slice(5) + ' ' + pad2(w.start) + '–' + pad2(w.end);
+    });
+    L.push('未来七天通用可作业日：' + (oks.length ? oks.join('；') : '无'));
+    L.push('今天：' + (d0.spray.status === 'ok' ? '有窗口' : '无窗口：' + d0.spray.why) +
+      '；最低 ' + d0.tmin + '℃、最高 ' + d0.tmax + '℃');
+    if (qaContext.chem) {
+      var LBL = { herbicide: '除草剂', insecticide: '杀虫剂', fungicide: '杀菌剂' };
+      var sc = qaContext.chem.scope === 'week' ? '未来一周'
+        : (qaContext.chem.scope === 'day' ? '指定某天' : '现在');
+      L.push('上一轮药种：' + (LBL[qaContext.chem.type] || '未指定') +
+        (qaContext.chem.product ? '（' + qaContext.chem.product.name + '）' : '') +
+        '；上一轮问的时间范围：' + sc);
+    }
+    if (qaContext.lastQ) L.push('上一轮用户问：' + qaContext.lastQ);
+    if (qaContext.lastBrief) L.push('上一轮我答：' + qaContext.lastBrief.replace(/\n/g, ' / '));
+    return L.join('\n');
+  }
 
   /** 两天的窗口对比：回答"明天和后天哪天更好" */
   function compareDays(a, b, result) {
@@ -3217,6 +3358,20 @@
       if (/明天/.test(q)) idxs.push(1);
       if (/后天/.test(q)) idxs.push(2);
       if (idxs.length < 2) idxs = [1, 2];
+      /* 上一轮如果是除草剂/杀虫剂/杀菌剂，就按那个药种比，
+         否则会拿通用口径说「两天都能打」，把药种条件丢了。 */
+      var CT = qaContext.chem && qaContext.chem.type;
+      var CHm = window.TianZhiChem;
+      if (CT && CT !== 'generic' && CHm && CHm.compareDays) {
+        var cmp = CHm.compareDays(CT, {
+          result: result, raw: state.raw, rules: RULES, now: new Date()
+        }, idxs);
+        if (cmp) {
+          qaContext.intent = 'chem';
+          lastIntent = 'chem';
+          return cmp.brief;
+        }
+      }
       return compareDays(result.days[idxs[0]], result.days[idxs[1]], result);
     }
     if (/(未来七天|这周|一周).*(雨|降水)|雨量/.test(q)) {
@@ -3231,7 +3386,12 @@
       lastIntent = 'spray';
       return bestHourAnswer(result, plot);
     }
-    if (/为什么|依据|怎么判|怎么算|判定|口径|规则|阈值|凭什么/.test(q)) return CONTENT.chat.methodAnswer;
+    if (/为什么|依据|怎么判|怎么算|判定|口径|规则|阈值|凭什么/.test(q)) {
+      /* 上一轮有具体判定理由时先复述它，再讲通用口径：
+         「为什么」问的是刚才那条结论，不是想看一份说明书。 */
+      var lastWhy = qaContext.lastWhy;
+      return (lastWhy ? '上一轮是这么判的：\n' + lastWhy + '\n\n' : '') + CONTENT.chat.methodAnswer;
+    }
     if (/准不准|可靠|可信|置信|把握|有多准|准吗|会不会错/.test(q)) return CONTENT.chat.reliabilityAnswer;
     if (/节气|该忙什么|现在忙|农事安排/.test(q)) {
       // 问的是具体节气就答那一个，别一律拿"当前节气"顶回去
@@ -3291,6 +3451,8 @@
     if (!q) return;
     appendMsg('me', q);
     input.value = '';
+    /* 记下这一轮问句：下一轮注入上下文时，模型才知道「那」指的是什么 */
+    qaContext.lastQ = q;
 
     var plot = activePlot();
 
@@ -3327,28 +3489,39 @@
     // --- 第 0.5 步：药剂已定，判断「此时此地能不能施」---
     // 农户不问选药，只问选定的药在当前天气下能不能用。
     // 通用问答 AI 只能复述条文；这里把每条判据落到这块地的逐时数值上。
-    // 「哪天能打药」这类日期窗口问题仍交给规则层，不要抢。
+    // 关键：先由 chem.match 解析「时间范围 + 药种 + 话题」，
+    // 再决定交给 chem 还是通用规则层。「这周哪天能打草甘膦」必须由 chem 答，
+    // 因为通用层不认识草甘膦，也只会答「今天」。
     var CH = window.TianZhiChem;
     if (CH) {
       var chemM = CH.match(q, qaContext.chem);
-      var chemNow = /现在|今天|这会儿|此刻|能不能打|能打吗|可以打|想打|要打|准备打|能不能用/.test(q);
-      var chemDate = /哪天|未来|这周|一周|对比|更好/.test(q);
-      var chemFollow = qaContext.intent === 'chem' && /^(那|接着|再|然后|换|如果|要是)/.test(q);
-      var shouldChem = chemM.kind === 'banned' || chemM.type !== 'generic' ||
-        chemM.topic !== null || chemFollow ||
-        (chemNow && !chemDate && /打药|喷药|施药|药/.test(q));
+      var otherTask = /晾晒|晒|浇水|灌溉|墒|收割|收获/.test(q) &&
+        !/打药|喷药|施药|喷雾|用药|除草|杀虫|杀菌/.test(q);
+      /* 只要问的是喷雾作业，就交给 chem：它有逐时窗口、药剂阈值和两行结论，
+         通用规则层那段长段落不再抢这类问题，避免同一个问题两种排版。 */
+      var sprayWord = /打药|喷药|施药|喷雾|用药/.test(q);
+      var shouldChem = !otherTask && (
+        chemM.kind === 'banned' || !!chemM.product || chemM.topic !== null ||
+        chemM.type !== 'generic' || sprayWord ||
+        (chemM.isFollow && qaContext.intent === 'chem'));
       if (shouldChem) {
         qaContext.intent = 'chem';
         lastIntent = 'chem';
         var chemAns = CH.answer(chemM, {
           result: result, raw: state.raw, rules: RULES, plot: plot, now: new Date()
         });
-        qaContext.chem = { type: chemAns.type, dayIdx: chemAns.dayIdx || 0 };
-        /* 首屏恒为两行结论；逐项判定、依据文件与边界整段折进「展开完整分析」 */
-        appendMsg('bot', chemAns.brief + '\n\n' + chemAns.detail, true, {
-          source: chemAns.source, fold: true
-        });
-        return;
+        if (chemAns) {
+          /* prev 里存的是对象，不是 key：下一轮「那明天呢」要沿用整个药剂档案 */
+          qaContext.chem = {
+            type: chemAns.type, product: chemM.product || null,
+            dayIdx: chemAns.dayIdx || 0, scope: chemAns.scope || 'now', topic: chemM.topic
+          };
+          appendMsg('bot', chemAns.brief, true, {
+            source: chemAns.source, fold: true,
+            sections: chemAns.sections, suggest: chemSuggest(chemM)
+          });
+          return;
+        }
       }
     }
 
@@ -3387,7 +3560,7 @@
     // --- 第三步：规则与本地库都不认识，交给大模型分类 ---
     if (aiOn && LLM && LLM.isEnabled()) {
       typing = appendTyping();
-      LLM.classify(q).then(function (k) {
+      LLM.classify(q, { context: buildTurnContext(plot, result) }).then(function (k) {
         if (typing) typing.remove();
         qaContext.intent = (k && k !== 'out') ? k : null;
         respondWith(k, q, result, plot, capabilities);
@@ -3408,7 +3581,7 @@
     if (intent === 'out') {
       if (aiOn && LLM && LLM.isEnabled()) {
         var tp = appendTyping();
-        LLM.refuse(q, capabilities).then(function (txt) {
+        LLM.refuse(q, capabilities, { context: buildTurnContext(plot, result) }).then(function (txt) {
           tp.remove();
           appendMsg('bot', txt, true);
         }).catch(function () {
@@ -3439,7 +3612,9 @@
     var ty = appendTyping();
     LLM.refine(template, {
       place: plot.name + '（' + plot.place + '）',
-      crop: CROP_NAME[plot.crop]
+      crop: CROP_NAME[plot.crop],
+      question: q,
+      context: buildTurnContext(plot, result)
     }).then(function (nice) {
       ty.remove();
       appendMsg('bot', nice, true);
@@ -3595,6 +3770,7 @@
     if (name === 'mine') {
       renderStandard();
       fillRuleInputs();
+      renderChemBasis();
     }
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* file:// 下可能不允许 */ }
   }

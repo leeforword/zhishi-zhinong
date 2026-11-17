@@ -194,7 +194,8 @@
    * 意图识别：把用户的自然语言映射到已有分支。
    * 只返回一个枚举值，不生成任何内容。
    */
-  function classify(question) {
+  function classify(question, opts) {
+    opts = opts || {};
     var sys = '你是一个意图分类器。把用户关于农事的问题归到下列类别之一，' +
       '只输出类别英文代码，不要输出任何其他文字、标点或解释。\n' +
       'spray=打药/喷药/施药时机\n' +
@@ -202,11 +203,16 @@
       'harvest=晾晒/收获/收割\n' +
       'weather=天气/温度/降雨/风力查询\n' +
       'growth=长势/苗情/长得好不好\n' +
-      'out=其他一切（病虫害、施肥、价格、闲聊等）';
+      'out=其他一切（病虫害、施肥、价格、闲聊等）\n' +
+      '用户问题经常省略主语（「那哪天呢」「这药能打吗」），要结合会话上下文判断' +
+      '它接着问的是哪种作业、哪个时间范围；拿不准时按上一轮的作业类型归类。';
+
+    var user = (opts.context ? '【会话上下文】\n' + opts.context + '\n\n' : '') +
+      '【用户这一轮的问题】\n' + question;
 
     return chat([
       { role: 'system', content: sys },
-      { role: 'user', content: question }
+      { role: 'user', content: user }
     ], { temperature: 0, maxTokens: 8 }).then(function (raw) {
       var t = String(raw).toLowerCase().replace(/[^a-z]/g, '');
       for (var i = 0; i < INTENTS.length; i++) {
@@ -224,17 +230,23 @@
     opts = opts || {};
     var sys = '你是农业技术推广员，把下面的"结构化结论"改写成农户听得懂的口语。\n' +
       '硬性要求：\n' +
+      '0. 先看清楚用户这一轮问的是「现在」「某一天」还是「未来一周」，问的是哪种药。' +
+      '改写后必须仍然是同一个时间范围、同一种药，不许把「哪天能打」改写成「今天不能打」，' +
+      '也不许补一句用户没问的天气结论。\n' +
       '1. 所有数字必须原样保留，一个都不许改、不许新增、不许删。\n' +
       '2. 时间一律保持 24 小时制原样写法（如 10:00–14:00），不要改成"下午两点"。\n' +
-      '3. 不要添加任何原文没有的结论或建议。\n' +
+      '3. 不要添加任何原文没有的结论或建议；会话上下文只用来理解「那」「这药」指什么，' +
+      '不要把上下文里的数字搬进回答。\n' +
       '4. 不超过 120 字，不用 markdown，不用列表符号。\n' +
       '5. 语气朴实克制：开头直接给结论，不要称呼语、问候语、感叹句（禁用"乡亲们""注意啦""赶紧""大家好"），不用感叹号。\n' +
       '6. 保持"结论 → 关键数字 → 依据"的顺序，不要写成散文。\n' +
       '7. 别说"作为AI"之类的话。';
 
-    var user = '地点：' + (opts.place || '本地块') +
+    var user = (opts.context ? '【会话上下文】\n' + opts.context + '\n\n' : '') +
+      (opts.question ? '【用户这一轮问】\n' + opts.question + '\n\n' : '') +
+      '地点：' + (opts.place || '本地块') +
       '\n作物：' + (opts.crop || '冬小麦') +
-      '\n结构化结论：\n' + template;
+      '\n【待改写结论】\n' + template;
 
     return chat([
       { role: 'system', content: sys },
@@ -247,6 +259,16 @@
         var e2 = new Error('语气不合格，已拒绝');
         e2.raw = out;
         throw e2;
+      }
+      /* 时间范围/药种被换掉，是「答非所问」最常见的形态：
+         原文说的是除草剂窗口，改写后只剩「今天不能打药」，
+         数字没有新增，但问题对象变了——这种也算不合格。 */
+      var keep = (template.match(/除草剂|杀虫剂|杀菌剂|飘移|露水|结露|灌溉|晾晒|浇水/) || [])[0];
+      if (keep && out.indexOf(keep) < 0) {
+        stats.rejected++;
+        var e3 = new Error('问题对象被换掉，已拒绝');
+        e3.raw = out;
+        throw e3;
       }
       if (!check.ok) {
         stats.rejected++;
@@ -261,10 +283,14 @@
   }
 
   /** 超范围问题的口语化拒答（不含任何数字，天然安全） */
-  function refuse(question, capabilities) {
+  function refuse(question, capabilities, opts) {
+    opts = opts || {};
     var sys = '你是"知时智农"农事决策助手。用户问了一个你能力范围之外的问题，' +
-      '请礼貌说明你做不了，并简短提示你能做什么。不超过 60 字，不要编造任何数据。';
-    var user = '用户问：' + question + '\n你目前能做：' + capabilities;
+      '请礼貌说明你做不了，并简短提示你能做什么。不超过 60 字，不要编造任何数据。' +
+      '如果上下文显示用户其实是在追问上一轮的农事时机（时间范围、药种、露水、飘移），' +
+      '不要拒答，而是请他把上一轮的问题再说具体一点。';
+    var user = (opts.context ? '【会话上下文】\n' + opts.context + '\n\n' : '') +
+      '用户问：' + question + '\n你目前能做：' + capabilities;
     return chat([
       { role: 'system', content: sys },
       { role: 'user', content: user }

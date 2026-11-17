@@ -149,6 +149,19 @@
           sourceLabel: 'chem.js · 离线依据'
         });
       });
+      /* 药剂档案：农户直接说药名（草甘膦、苯磺隆…）时，离线也能命中 */
+      (CH.PRODUCTS || []).forEach(function (p) {
+        var warn = p.warn ? (p.warn.any || p.warn.wheat || p.warn.maize || '') : '';
+        push(list, {
+          id: 'chem-d:' + p.key,
+          type: '药剂档案',
+          title: p.name + ' · ' + p.mode,
+          text: p.what + ' ' + p.weather + (warn ? ' ' + warn : ''),
+          tags: '药剂 药名 档案 ' + p.name + ' ' + p.mode + ' ' + p.group,
+          source: '',
+          sourceLabel: 'chem.js · 只判天气条件，不推荐品种'
+        });
+      });
     }
 
     ENTRIES = list;

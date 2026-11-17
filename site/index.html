@@ -630,6 +630,16 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 .qa-more summary:before{content:"›";transition:transform .15s}
 .qa-more[open] summary:before{transform:rotate(90deg)}
 .qa-more-body{margin-top:6px;font-size:11.5px;color:var(--text-2);line-height:1.75}
+/* 展开层再分两层：理由直接看，明细与依据各自收起 */
+.qa-sec{margin-bottom:7px}
+.qa-sec > b{display:block;font-size:11.5px;color:var(--text);margin-bottom:3px}
+.qa-sec-t{white-space:pre-wrap;font-size:11.5px;color:var(--text-2);line-height:1.7}
+.qa-sub{border-top:1px dashed var(--border);padding-top:6px;margin-top:6px}
+.qa-sub summary{cursor:pointer;list-style:none;font-size:11px;color:var(--brand);font-weight:600;display:flex;align-items:center;gap:5px}
+.qa-sub summary::-webkit-details-marker{display:none}
+.qa-sub summary:after{content:"⌄";margin-left:auto;color:var(--text-3)}
+.qa-sub[open] summary:after{content:"⌃"}
+.qa-sub .qa-sec-t{margin-top:5px;font-size:11px;line-height:1.65}
 .msg.bot{align-self:flex-start;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:8px 11px;color:var(--text)}
 .msg.me{align-self:flex-end;background:var(--brand);color:#fff;border-radius:var(--r-md);padding:8px 11px}
 .msg.me .who{color:rgba(255,255,255,.7)}
@@ -1890,6 +1900,23 @@ html.zz-chat #zzBar{display:none!important}
 .basis-src div{display:flex;gap:8px;font-size:10.5px;color:var(--text-2);line-height:1.5}
 .basis-src i{font-style:normal;color:var(--text-3);flex:none;width:52px}
 .basis-note{font-size:11px;color:var(--text-3);line-height:1.65}
+/* ---------- 施药依据库（我的页） ---------- */
+.chem-src-list{display:grid;gap:8px}
+.chem-src{border:1px solid var(--border);border-radius:11px;padding:9px 11px;background:var(--surface-2)}
+.chem-src-h{display:flex;align-items:center;gap:8px}
+.chem-src-h b{font-size:11.5px;color:var(--brand-d);line-height:1.4}
+.chem-src-h span{font-size:9.5px;color:var(--text-3);border:1px solid var(--border);border-radius:5px;padding:1px 4px;flex:none}
+.chem-src p{font-size:11px;color:var(--text-2);line-height:1.65;margin:5px 0 0}
+.chem-src-m{font-size:10px;color:var(--text-3);line-height:1.5;margin-top:5px}
+.chem-src-m a{color:var(--brand);text-decoration:none}
+.chem-prod-list{display:grid;gap:8px}
+.chem-prod{border:1px solid var(--border);border-radius:11px;padding:9px 11px;background:var(--surface-2)}
+.chem-prod-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.chem-prod-h b{font-size:12px;color:var(--text)}
+.chem-prod-h span{font-size:10px;color:var(--brand-d)}
+.chem-prod p{font-size:11px;color:var(--text-2);line-height:1.6;margin:4px 0 0}
+.chem-prod-w{color:var(--text-3)}
+.chem-prod-n{color:#8A6220}
 .an-line{
   display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px;
   padding-top:7px;border-top:1px dashed var(--border);
@@ -2580,7 +2607,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           </span>
         </div>
         <div class="chat-line">
-          <span>只答农事时机：打药 / 浇水 / 晾晒 · 不答病虫害与药名</span>
+          <span>只答农事时机：打药 / 浇水 / 晾晒 · 说药名也行，但不推荐品种</span>
           <button class="link-btn" id="basisOpenChat" type="button">依据 ›</button>
         </div>
         <div class="qa-log" id="qaLog"></div>
@@ -2644,6 +2671,28 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
                 <button class="btn" id="setSaveRules">保存并重算</button>
                 <button class="btn gh" id="setResetRules">恢复按标准</button>
               </div>
+            </div>
+          </details>
+        </div>
+
+        <div class="sec-h"><h2>施药依据库</h2><span class="hint" id="chemSrcStat">离线可查</span></div>
+        <div class="card pad" id="chemBasisCard">
+          <div class="note">
+            对话里只给判定要点，原文与药剂档案统一放这里，不再一屏堆满条文。
+            依据编号、发布机构、条款与原文链接都可核对；链接需联网打开。
+          </div>
+          <details class="std-adv" id="chemSrcAdv">
+            <summary>依据文件（<span id="chemSrcCount">0</span> 份）</summary>
+            <div class="std-adv-body"><div class="chem-src-list" id="chemSrcList"></div></div>
+          </details>
+          <details class="std-adv" id="chemProdAdv">
+            <summary>药剂档案（<span id="chemProdCount">0</span> 种）</summary>
+            <div class="std-adv-body">
+              <div class="note" style="margin:0 0 10px">
+                只说明「这类药对天气敏感在哪」，不推荐品种、不给剂量与混配；
+                具体以你手上那瓶的标签和当地植保站意见为准。
+              </div>
+              <div class="chem-prod-list" id="chemProdList"></div>
             </div>
           </details>
         </div>

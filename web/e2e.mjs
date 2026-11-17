@@ -461,24 +461,27 @@ async function waitData(timeoutMs) {
     check(ans.length > 0, 'QA answer received');
     check(ans.indexOf('NaN') < 0 && ans.indexOf('undefined') < 0, 'answer has no NaN');
 
-    /* v5.2：药已定 → 首答两行结论，展开层给逐项判定与依据，追问可换药种/日期 */
+    /* v5.2：药已定 → 首答两行结论；展开层再分段折叠，依据原文移到「我的」 */
     const chemFirst = await ev(`(() => {
       const b = [...document.querySelectorAll('#qaLog .msg.bot')].pop();
       const det = b.querySelector('.qa-more');
       return { brief: b.querySelector('.body').childNodes[0].textContent,
-               hasMore: !!det, open: det ? det.open : null };
+               hasMore: !!det, open: det ? det.open : null,
+               subs: det ? det.querySelectorAll('.qa-sub').length : 0 };
     })()`);
-    check(/除草剂/.test(chemFirst.brief) && /现在.*(能|可以)打/.test(chemFirst.brief),
-      'chosen pesticide: verdict first: ' + chemFirst.brief.slice(0, 40));
+    check(/除草剂/.test(chemFirst.brief) && /未来 7 天/.test(chemFirst.brief),
+      'week question answers with a week window: ' + chemFirst.brief.slice(0, 40));
     check(chemFirst.brief.split('\n').length === 2 && chemFirst.brief.length <= 170,
       'first answer is two short lines: ' + chemFirst.brief.length + ' chars');
     check(chemFirst.hasMore && chemFirst.open === false, 'full analysis collapsed by default');
+    check(chemFirst.subs >= 2, 'analysis folds again inside: ' + chemFirst.subs + ' subsections');
     await ev("[...document.querySelectorAll('#qaLog .qa-more')].pop().querySelector('summary').click()");
     await sleep(180);
     const chemDetail = await ev("[...document.querySelectorAll('#qaLog .qa-more-body')].pop().textContent");
-    check(/依据文件/.test(chemDetail) && /NY\/T 1276/.test(chemDetail), 'expanded analysis cites authoritative files');
-    check(/https?:\/\//.test(chemDetail), 'expanded analysis has verifiable source URLs');
+    check(/依据 \d+ 份/.test(chemDetail) && /NY\/T 1276/.test(chemDetail), 'expanded analysis cites authoritative files');
+    check(!/https?:\/\//.test(chemDetail), 'chat no longer dumps source URLs');
     check(/不推荐药剂/.test(chemDetail), 'expanded analysis states capability boundary');
+    check(/原文链接在「我的 → 施药依据库」/.test(chemDetail), 'source list points to Mine page');
 
     async function sendQA(q) {
       await ev(`(function(){var i=document.getElementById('qaInput');i.value=${JSON.stringify(q)};document.getElementById('qaSend').click();})()`);
@@ -494,6 +497,10 @@ async function waitData(timeoutMs) {
     check(/明天/.test(dy) && /杀虫剂/.test(dy), 'follow-up keeps type and switches day: ' + dy.slice(0, 32));
     const dw = await sendQA('哪天能打药？');
     check(dw.length > 4 && !/^除草剂 ·/.test(dw), 'date-window question still goes to rule engine');
+    const nowAsk = await sendQA('现在能打除草剂吗？');
+    check(/除草剂/.test(nowAsk) && /现在/.test(nowAsk), 'now question still answered about now: ' + nowAsk.slice(0, 30));
+    const prodAsk = await sendQA('这周哪天能打草甘膦？');
+    check(/草甘膦/.test(prodAsk) && /未来 7 天/.test(prodAsk), 'named product answers about the product: ' + prodAsk.slice(0, 34));
 
     /* 聊天页视觉快照：收起所有展开层，首屏只留结论与推荐追问 */
     await ev("(function(){document.querySelectorAll('#qaLog .qa-more').forEach(function(d){d.open=false});var b=document.querySelector('button[data-view=\"chat\"]');if(b)b.click();})()");
@@ -630,6 +637,13 @@ async function waitData(timeoutMs) {
     await sleep(600);
     const mineOverflow = await ev("document.documentElement.scrollWidth - window.innerWidth");
     check(mineOverflow <= 2, 'project brief no overflow on mobile: ' + mineOverflow + 'px');
+    const lib = JSON.parse(await ev(`JSON.stringify({
+      src: document.querySelectorAll('#chemSrcList .chem-src').length,
+      links: document.querySelectorAll('#chemSrcList a').length,
+      prod: document.querySelectorAll('#chemProdList .chem-prod').length
+    })`));
+    check(lib.src >= 10 && lib.links >= 10, 'mine page lists sources with links: ' + lib.src);
+    check(lib.prod >= 10, 'mine page lists pesticide profiles: ' + lib.prod);
 
     /* ---------- 13 ---------- */
     /* v5 的关键交互：条带选日、任务切换、作业留痕、依据入口。

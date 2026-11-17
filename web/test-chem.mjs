@@ -171,13 +171,38 @@ check(/西南偏西|东北偏东/.test(a4.a.detail), '飘移话题给出这块�
 const a5 = ask('我要打百草枯', {}, 10);
 check(/不能施用/.test(a5.a.brief) && a5.a.type === 'banned', '禁药拦截不进入天气判定');
 
-console.log('\n===== 6. 展开层依据 =====');
-check(/依据文件/.test(a1.detail), '展开层含依据文件清单');
-check(/NY\/T 1276/.test(a1.detail), '展开层含国家标准');
-check(/https?:\/\//.test(a1.detail), '展开层含可核对链接');
+console.log('\n===== 6. 展开层：分层，不再堆全文 =====');
+check(/依据 \d+ 份/.test(a1.detail), '展开层给出依据份数与编号');
+check(/NY\/T 1276/.test(a1.detail), '展开层含国家标准编号');
+check(!/https?:\/\//.test(a1.detail), '对话里不再塞原文链接（改到「我的 → 施药依据库」）');
 check(/查证日期/.test(a1.detail), '展开层含查证日期');
 check(/边界/.test(a1.detail) && /不推荐药剂/.test(a1.detail), '展开层明确能力边界');
-check(a1.detail.length > 800, '展开层有实质内容，不是空壳');
+check(a1.detail.length > 300 && a1.detail.length < 1600, '展开层有实质内容，但不再一次铺开十几份全文');
+check(a1.sections.length >= 4 && a1.sections[1].title.indexOf('逐项判定') === 0,
+  '展开层分段：理由 / 逐项判定 / 药类 / 依据');
+check(/原文链接在「我的 → 施药依据库」/.test(a1.detail), '明确指向我的页的依据库');
+
+/* ---------------- 8. 回归：追问、药名、话题 ---------------- */
+console.log('\n===== 8. 追问与药名（回归）=====');
+const F = { type: 'herbicide', dayIdx: 1, scope: 'day' };
+const w1 = ask('那哪天能打？', {}, 18, F);
+check(w1.m.scope === 'week', '「那哪天能打」识别为未来一周，不再继承「明天」');
+check(/未来 7 天/.test(w1.a.brief) && !/明天不能打/.test(w1.a.brief), '不再答成「明天不能打」');
+check(w1.a.brief.split('\n').length === 2, '一周清单仍保持两行');
+const g = ask('这周哪天能打草甘膦？', {}, 18);
+check(g.m.product && g.m.product.key === 'glyphosate', '识别具体药名「草甘膦」');
+check(/草甘膦/.test(g.a.brief) && /灭生性/.test(g.a.brief), '答出草甘膦是灭生性，而不是通用「不能打」');
+check(g.m.scope === 'week', '「这周哪天」按一周处理，不是「现在」');
+check(g.a.sections.some(s => /草甘膦/.test(s.title) && /小麦/.test(s.body)),
+  '展开层给出草甘膦对小麦的定向要求');
+const dew2 = ask('有露水能打药吗？', { dew: h => h < 12 ? 11.2 : 8 }, 10);
+check(/^露水/.test(dew2.a.brief), '露水问题以「露水」开头作答');
+check(!/^露水[^\n]*降雨/.test(dew2.a.brief), '露水结论不被降雨顶掉');
+const dr = ask('风这么大会飘到邻田吗？', {}, 10);
+check(/^飘移/.test(dr.a.brief), '飘移问题以「飘移」开头作答');
+check(CH.match('换成杀虫剂呢？', {
+  type: 'herbicide', product: CH.PRODUCTS.filter(p => p.key === 'glyphosate')[0]
+}).product === null, '换药种后不再沿用草甘膦档案');
 
 /* ---------------- 7. 离线知识库索引 ---------------- */
 console.log('\n===== 7. 本地知识库 =====');
