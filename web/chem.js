@@ -1286,7 +1286,7 @@
             '，连续 ' + best.w.hours + ' 小时，均风 ' + best.w.avgWind + ' m/s。';
         }
         brief = label + ' · 未来 7 天有 ' + days.length + ' 天能打：' +
-          picks.join('、') + (days.length > picks.length ? ' 等' : '') + '。\n' + line2;
+          picks.join('、') + (days.length > picks.length ? '等 ' + days.length + ' 天' : '') + '。\n' + line2;
         evD = evaluate(type, Object.assign({}, baseCtx, { dayIdx: best.d.idx }));
       }
       if (!evD) return null;
