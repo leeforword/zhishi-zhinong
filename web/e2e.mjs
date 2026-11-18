@@ -486,13 +486,32 @@ async function waitData(timeoutMs) {
     const yForm = await sheetY();
     check(yForm < y0 - 120, 'drag up moves the sheet toward the form detent (px): ' + Math.round(yForm));
 
-    // 下拉到底：关闭弹窗
+    // 下拉到底：只停在「地图最大化」，**不能关窗**（关闭只能点左上角取消）
     await ev(`(function(){var g=document.getElementById('sheetGrab');
       function pe(t,y){g.dispatchEvent(new PointerEvent(t,{bubbles:true,clientY:y,clientX:180,pointerId:8}));}
       pe('pointerdown',120); for(var i=1;i<=8;i++) pe('pointermove',120+i*90); pe('pointerup',840);})()`);
     await sleep(600);
+    const yMap = await sheetY();
+    check(await ev("document.getElementById('plotMask').classList.contains('on')"),
+      'dragging the sheet to the bottom does NOT dismiss the modal');
+    check(Math.abs(yMap - (await ev('window.innerHeight')) * 0.74) < 6,
+      'sheet stops at the map detent instead of sliding away (px): ' + Math.round(yMap));
+    check(yMap < (await ev('window.innerHeight')) * 0.9,
+      'sheet never leaves the screen on a downward drag');
+
+    // 再来一次猛拉，仍然不关
+    await ev(`(function(){var g=document.getElementById('sheetGrab');
+      function pe(t,y){g.dispatchEvent(new PointerEvent(t,{bubbles:true,clientY:y,clientX:180,pointerId:9}));}
+      pe('pointerdown',200); for(var i=1;i<=6;i++) pe('pointermove',200+i*120); pe('pointerup',920);})()`);
+    await sleep(600);
+    check(await ev("document.getElementById('plotMask').classList.contains('on')"),
+      'a second hard downward fling still keeps the modal open');
+
+    // 只有左上角「取消」能关
+    await ev("document.getElementById('modalCancel').click();");
+    await sleep(400);
     check(!(await ev("document.getElementById('plotMask').classList.contains('on')")),
-      'dragging the sheet far down dismisses the modal');
+      'cancel button (top-left) closes the modal');
 
     await device(1600, 1200, false, 1);
     await sleep(300);

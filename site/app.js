@@ -2858,11 +2858,6 @@
     s.style.setProperty('--sheet-pad', y + 'px');   // 滚动区底部留白 = 抽屉挂到屏幕外的那一截
     updateMapWatermark();
   }
-  function sheetDismiss() {
-    var s = $('plotSheet');
-    if (s) { s.classList.remove('dragging'); s.style.setProperty('--sheet-y', sheetVh() + 'px'); }
-    setTimeout(closeModal, 240);
-  }
 
   /**
    * 抽屉手势：整块可拖（高德/微信那种手感），但绝不抢表单的活。
@@ -2871,6 +2866,8 @@
    *  - 输入框 / 按钮 / 下拉 / 折叠标题一律不接管，点就是点，输入就是输入；
    *  - 表单展开（form 档）时内容优先滚动，只有滚到顶再往下拉才收起抽屉；
    *  - 把手与标题栏始终可拖，也是键盘（方向键）能操作的入口。
+   *  - 拖到底只停在「地图最大化」，**不会关窗**：新增/编辑地块里可能有填了一半的内容，
+   *    关闭只由左上角「取消」触发，避免一个下拉手势把输入全丢掉。
    */
   function bindSheetDrag() {
     var sheet = $('plotSheet');
@@ -2911,10 +2908,12 @@
         if (ae && sheet.contains(ae) && ae.blur) ae.blur();
       }
       if (ev && ev.cancelable) ev.preventDefault();
-      var vh = sheetVh(), ny = st.startY + dy;
-      var top = detentPx('form'), max = vh * 0.98;
-      if (ny < top) ny = top + (ny - top) * 0.28;      // 顶部橡皮筋
-      if (ny > max) ny = max + (ny - max) * 0.2;       // 底部橡皮筋
+      var ny = st.startY + dy;
+      var top = detentPx('form'), max = detentPx('map');
+      if (ny < top) ny = top + (ny - top) * 0.28;                  // 顶部橡皮筋
+      /* 底部只到「地图最大化」为止：再往下拉给一点点回弹手感（最多 24px），
+         松手回到 map 档，绝不继续下移、更不关窗 */
+      if (ny > max) ny = max + Math.min((ny - max) * 0.15, 24);
       SHEET.y = ny;
       sheet.style.setProperty('--sheet-y', ny + 'px');
       var now = Date.now(), dt = now - st.lastT;
@@ -2925,8 +2924,6 @@
       var g2 = st; st = null;
       if (!g2.active) return;
       sheet.classList.remove('dragging');
-      var vh = sheetVh();
-      if (SHEET.y > vh * 0.84 || (SHEET.y > vh * 0.74 && g2.v > 0.5)) { sheetDismiss(); return; }
       var order = ['form', 'peek', 'map'], best = 'peek', bd = Infinity, i, d;
       for (i = 0; i < order.length; i++) {
         d = Math.abs(SHEET.y - detentPx(order[i]));
@@ -2935,6 +2932,7 @@
       /* 甩动优先于距离：快速上推直接跳上一档 */
       if (g2.v < -0.6) best = (SHEET.y < detentPx('peek')) ? 'form' : 'peek';
       else if (g2.v > 0.6) best = (SHEET.y < detentPx('map')) ? 'peek' : 'map';
+      if (best === 'map' && SHEET.y > detentPx('map')) best = 'map';   // 到底就停，不越界
       setSheetDetent(best);
     }
     function cancel() {
@@ -3961,29 +3959,12 @@
   if ($('modalCancel')) $('modalCancel').onclick = closeModal;
   if ($('modalSave')) $('modalSave').onclick = formSave;
   if ($('modalSave2')) $('modalSave2').onclick = formSave;
-  /* 点遮罩空白处关闭弹窗
+  /* 关闭只能点左上角「取消」
      -------------------------------------------------------------
-     注意：不能简单用 click 判断。用户拖拽地图时，鼠标按下在地图上、
-     松开可能落在遮罩上，浏览器仍会派发一个 click 到遮罩，
-     导致"拖一下地图弹窗就消失了"。
-     所以要求 mousedown 和 mouseup 都落在遮罩本身才关闭。
+     不提供「点遮罩空白处关闭」：地图拖动、手势回弹、误触空白都会让一次
+     填了一半的新增地块凭空消失，而这里没有草稿恢复。桌面端同样只留「取消」。
+     以前那段 mousedown/mouseup 双判定（防止拖地图误关）因此整体删除。
   */
-  var maskDownOnSelf = false;
-  $('plotMask').addEventListener('mousedown', function (e) {
-    maskDownOnSelf = (e.target === $('plotMask'));
-  });
-  $('plotMask').addEventListener('mouseup', function (e) {
-    if (maskDownOnSelf && e.target === $('plotMask')) closeModal();
-    maskDownOnSelf = false;
-  });
-  // 触摸设备同理
-  $('plotMask').addEventListener('touchstart', function (e) {
-    maskDownOnSelf = (e.target === $('plotMask'));
-  }, { passive: true });
-  $('plotMask').addEventListener('touchend', function (e) {
-    if (maskDownOnSelf && e.target === $('plotMask')) closeModal();
-    maskDownOnSelf = false;
-  });
   $('fSearchBtn').onclick = formSearch;
   $('fLoc').addEventListener('keydown', function (e) { if (e.key === 'Enter') formSearch(); });
   $('fGeoBtn').onclick = formGeo;
