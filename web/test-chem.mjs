@@ -163,7 +163,10 @@ briefOK('夜间', '现在能打除草剂吗？', {}, 20, null, /不能打/);
 briefOK('露水', '有露水能打药吗？', { dew: h => h < 12 ? 11.2 : 8 }, 10, null, /结露/);
 briefOK('低温除草', '降温了还能打除草剂吗？', { tmin: 1, temp: () => 6 }, 10, null, /不能打/);
 const a2 = ask('那明天呢？', { wind: (h, di) => di === 0 ? 6.7 : 2 }, 20, { type: 'herbicide', dayIdx: 0 });
-check(/明天/.test(a2.a.brief) && a2.a.type === 'herbicide', '追问明天：保持药种、换日期');
+/* 不要断言「明天」两个字：fmtDate 按真实日期算，跑测试的日期一过就会变成「今天」 */
+check(a2.m.dayIdx === 1 && a2.m.scope === 'day' &&
+  a2.a.type === 'herbicide' && a2.a.dayIdx === 1,
+  '追问明天：保持药种、只换日期');
 const a3 = ask('换成杀虫剂呢？', {}, 10, { type: 'herbicide', dayIdx: 0 });
 check(a3.a.type === 'insecticide' && /杀虫剂/.test(a3.a.brief), '追问换药种后按新类型重算');
 const a4 = ask('飘到邻田怎么办？', {}, 10);

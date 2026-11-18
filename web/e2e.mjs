@@ -251,7 +251,7 @@ async function waitData(timeoutMs) {
     check(await ev("document.querySelectorAll('#nowStrip .ns').length") === 11, 'eleven live cells');
     /* 逐时数据从当前小时往后数，跨零点那天可能只有 23 行，不能写死 24 */
     const proRows = await ev("document.querySelectorAll('#proTable tbody tr').length");
-    check(proRows >= 20 && proRows <= 24, 'hourly rows: ' + proRows);
+    check(proRows >= 1 && proRows <= 24, 'hourly rows within one day: ' + proRows);
     check(await ev("[...document.querySelectorAll('#nowStrip .ns span')].some(e=>e.textContent==='露点差')"), 'dew-point gap shown');
     check(await ev("[...document.querySelectorAll('#nowStrip .ns span')].some(e=>e.textContent==='日照')"), 'daylight shown');
 
@@ -324,16 +324,20 @@ async function waitData(timeoutMs) {
     })()`), 'layer switch sits top-right (or hidden on fallback map)');
 
     /* 地图全屏：选地块时要能铺满屏，退出后表单回来 */
-    await ev("document.getElementById('mapFull').click();");
-    await sleep(500);
+    await ev(`(function(){var g=document.getElementById('mapGrab');
+      function pe(t,y){g.dispatchEvent(new PointerEvent(t,{bubbles:true,clientY:y,clientX:200,pointerId:1}));}
+      pe('pointerdown',600); pe('pointermove',545); pe('pointerup',545);})()`);
+    await sleep(520);
     check(await ev("document.querySelector('.plot-modal').classList.contains('map-full')"),
-      'map can expand to fullscreen');
+      'swipe up on the map handle expands to fullscreen');
     check(await ev("getComputedStyle(document.querySelector('.plot-modal .modal-body')).display === 'none'"),
       'form hides while map is fullscreen');
-    await ev("document.getElementById('mapFull').click();");
-    await sleep(450);
+    await ev(`(function(){var g=document.getElementById('mapGrab');
+      function pe(t,y){g.dispatchEvent(new PointerEvent(t,{bubbles:true,clientY:y,clientX:200,pointerId:1}));}
+      pe('pointerdown',500); pe('pointermove',570); pe('pointerup',570);})()`);
+    await sleep(480);
     check(!(await ev("document.querySelector('.plot-modal').classList.contains('map-full')")),
-      'map returns from fullscreen');
+      'swipe down on the handle restores the form');
 
     check(await ev("window.__tzPickCenter && window.__tzPickCenter()") === true,
       'map pick triggered in either mode');

@@ -213,7 +213,7 @@
     var bandFrom = RULES.spray.hours[0], bandTo = RULES.spray.hours[1];
     p.push('<rect x="' + x(bandFrom).toFixed(1) + '" y="' + TP + '" width="' +
       (x(bandTo) - x(bandFrom)).toFixed(1) + '" height="' + ih +
-      '" fill="rgba(61,107,85,.09)" rx="3"/>');
+      '" fill="rgba(14,107,74,.09)" rx="3"/>');
 
     // 降雨概率：底部细条，超过 50% 变红。比再加一条折线更不抢视线。
     hours.forEach(function (h) {
@@ -244,7 +244,7 @@
       area += ' L' + x(hours[hours.length - 1].hour).toFixed(1) + ',' + (TP + ih) +
         ' L' + x(hours[0].hour).toFixed(1) + ',' + (TP + ih) + ' Z';
       p.push('<path d="' + area + '" fill="url(#windGrad)"/>');
-      p.push('<path d="' + line + '" fill="none" stroke="#3D6B55" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+      p.push('<path d="' + line + '" fill="none" stroke="#0E6B4A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
     }
 
     // 阈值线
@@ -260,7 +260,7 @@
     hours.forEach(function (h) {
       var ok = h.wind <= RULES.spray.wind_max;
       p.push('<circle cx="' + x(h.hour).toFixed(1) + '" cy="' + y(h.wind).toFixed(1) + '" r="2.4" fill="' +
-        (ok ? '#3D6B55' : '#BE4A3C') + '" stroke="#fff" stroke-width="1"/>');
+        (ok ? '#0E6B4A' : '#BE4A3C') + '" stroke="#fff" stroke-width="1"/>');
     });
 
     // 横轴：0/6/12/18/24，固定刻度，避免"只有 23 时"的图看起来没画完
@@ -273,8 +273,8 @@
 
     return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '">' +
       '<defs><linearGradient id="windGrad" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0%" stop-color="#3D6B55" stop-opacity=".22"/>' +
-      '<stop offset="100%" stop-color="#3D6B55" stop-opacity=".02"/></linearGradient></defs>' +
+      '<stop offset="0%" stop-color="#0E6B4A" stop-opacity=".22"/>' +
+      '<stop offset="100%" stop-color="#0E6B4A" stop-opacity=".02"/></linearGradient></defs>' +
       p.join('') + '</svg>';
   }
 
@@ -356,7 +356,7 @@
     }
     /* 作业温度带 */
     p.push('<rect x="' + L + '" y="' + y(hi).toFixed(1) + '" width="' + iw + '" height="' +
-      (y(lo) - y(hi)).toFixed(1) + '" fill="rgba(61,107,85,.10)" rx="3"/>');
+      (y(lo) - y(hi)).toFixed(1) + '" fill="rgba(14,107,74,.10)" rx="3"/>');
     var line = '', started = false;
     hours.forEach(function (h, i) {
       if (temps[i] === null) { started = false; return; }
@@ -367,7 +367,7 @@
     hours.forEach(function (h, i) {
       if (temps[i] === null) return;
       var t = temps[i];
-      var col = (t >= lo && t <= hi) ? '#3D6B55' : (t < lo ? '#255677' : '#BE4A3C');
+      var col = (t >= lo && t <= hi) ? '#0E6B4A' : (t < lo ? '#255677' : '#BE4A3C');
       p.push('<circle cx="' + x(h.hour).toFixed(1) + '" cy="' + y(t).toFixed(1) + '" r="2.4" fill="' + col + '" stroke="#fff" stroke-width="1"/>');
     });
     [0, 6, 12, 18, 24].forEach(function (h, i3) {
@@ -395,7 +395,7 @@
     hours.forEach(function (h) {
       if (h.dir === null || h.dir === undefined) return;
       var over = h.wind > lim;
-      var col = over ? '#BE4A3C' : '#3D6B55';
+      var col = over ? '#BE4A3C' : '#0E6B4A';
       var len = Math.max(7, (h.wind / Math.max(maxW, lim)) * lenMax);
       /* 气象风向是「来向」；雾滴飘向 = 来向 + 180°。屏幕坐标：北 = 上 */
       var to = (h.dir + 180) * Math.PI / 180;
@@ -1258,8 +1258,8 @@
           whenLeft: Math.round(hoursUntil(d.date, w2.start) / 24) + ' 天后',
           /* 结论说「今天不能打」，右侧大号时间和下面四项数值却来自未来，
              不写清楚就会被读成今天的实况。 */
-          fromNote: '右边的时段和下面四项，都是 ' + rel + ' ' + d.date.slice(5).replace('-', '/') +
-            ' 那个窗口的预报值，不是今天的'
+          fromNote: '下面四项是「' + rel + ' ' + d.date.slice(5).replace('-', '/') +
+            ' 这个窗口」的预报，不是今天的实况'
         };
       }
     }
@@ -1449,9 +1449,9 @@
        挂着一个用不上的「勉强」色块，会让人以为漏判了一档。 */
     if ($('wkLegend')) {
       $('wkLegend').innerHTML = task === 'spray'
-        ? '<i><s style="background:#3D6B55"></s>可作业</i>' +
+        ? '<i><s style="background:#0E6B4A"></s>可作业</i>' +
           '<i><s class="none"></s>无窗口</i>'
-        : '<i><s style="background:#3D6B55"></s>适合</i>' +
+        : '<i><s style="background:#0E6B4A"></s>适合</i>' +
           '<i><s style="background:#C0811A"></s>勉强</i>' +
           '<i><s style="background:#EBCFC9"></s>不宜</i>';
     }
@@ -1483,7 +1483,9 @@
       }
 
       return '<button type="button" class="wk' + (d.date === sel ? ' sel' : '') +
-          (inner ? ' has' : '') + '" data-date="' + d.date + '">' +
+          (inner ? ' has' : '') +
+          (task === 'spray' && !inner && d.spray.blocked ? ' st-rain' : '') +
+          '" data-date="' + d.date + '">' +
         '<span class="wk-dow"><b>' + (isToday ? '今天' : d.dow) + '</b>' +
           (dt.getMonth() + 1) + '/' + dt.getDate() + '</span>' +
         '<span class="wk-slot">' + inner + '</span>' +
@@ -2522,11 +2524,7 @@
 
     $('layerRoad').onclick = function () { setMapLayer('road'); };
     $('layerSat').onclick = function () { setMapLayer('sat'); };
-    if ($('mapFull')) {
-      $('mapFull').onclick = function () {
-        setMapFull(!document.querySelector('.plot-modal').classList.contains('map-full'));
-      };
-    }
+    bindMapGrab();
 
     // 预加载 SDK：打开弹窗时就后台开始拉取，
     // 这样用户点"展开地图"时基本已经就绪（避免首屏多等 1-2 秒）
@@ -2813,8 +2811,16 @@
     var modal = document.querySelector('.plot-modal');
     if (!modal) return;
     modal.classList.toggle('map-full', !!on);
-    var btn = $('mapFull');
-    if (btn) btn.textContent = on ? '收起' : '全屏';
+    var g = $('mapGrab');
+    if (g) g.setAttribute('aria-label', on ? '下拉收起地图' : '上拉全屏地图');
+    if (!MAP.instance && MAP.failed) {
+      /* 降级成本地示意图时没有 resize 这种能力，必须按新高度重画，
+         否则地图只占上面一小条、下面全是空白。 */
+      setTimeout(function () {
+        try { renderFallbackMap(pickSel()); } catch (e) { /* 忽略 */ }
+      }, 200);
+      return;
+    }
     if (!MAP.instance) return;
     setTimeout(function () {
       try {
@@ -2826,6 +2832,43 @@
         if (on && form.lat) drawMarker(form.lat, form.lon);
       } catch (e) { /* 地图未就绪时忽略 */ }
     }, 160);
+  }
+
+  /**
+   * 地图把手：上拉展开、下拉收起、轻点切换。
+   * 用 pointer 事件而不是 click，手机上才有"拽"的手感；
+   * 阈值 30px，避免地图本身的小幅拖动误触。
+   */
+  function bindMapGrab() {
+    var g = $('mapGrab');
+    if (!g || g.__bound) return;
+    g.__bound = true;
+    var y0 = null, moved = 0;
+
+    function isFull() {
+      var m = document.querySelector('.plot-modal');
+      return !!(m && m.classList.contains('map-full'));
+    }
+    g.addEventListener('pointerdown', function (e) {
+      y0 = e.clientY; moved = 0;
+      try { g.setPointerCapture(e.pointerId); } catch (err) { /* 旧浏览器忽略 */ }
+    });
+    g.addEventListener('pointermove', function (e) {
+      if (y0 === null) return;
+      moved = e.clientY - y0;
+    });
+    function end() {
+      if (y0 === null) return;
+      var dy = moved; y0 = null;
+      if (dy <= -30) { if (!isFull()) setMapFull(true); }
+      else if (dy >= 30) { if (isFull()) setMapFull(false); }
+      else if (Math.abs(dy) < 8) setMapFull(!isFull());
+    }
+    g.addEventListener('pointerup', end);
+    g.addEventListener('pointercancel', function () { y0 = null; });
+    g.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMapFull(!isFull()); }
+    });
   }
 
   function showFormResults(list) {
