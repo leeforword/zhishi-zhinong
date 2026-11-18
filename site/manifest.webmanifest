@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "打药窗 · 农事决策助手",
-  "short_name": "打药窗",
+  "name": "农时窗 · 农事决策助手",
+  "short_name": "农时窗",
   "description": "把天气预报翻译成能执行的农事决定：未来 7 天哪天几点适合打药、要不要浇水、能不能晾晒。面向华北平原冬小麦与夏玉米种植。",
   "lang": "zh-CN",
   "dir": "ltr",
@@ -52,7 +52,7 @@
       "sizes": "1600x1200",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "桌面端：最佳打药窗口 + 未来七天 + 今日判读"
+      "label": "桌面端：最佳农时窗口 + 未来七天 + 今日判读"
     },
     {
       "src": "screenshots/12-mobile-iphone.png",

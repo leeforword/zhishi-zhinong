@@ -1,5 +1,5 @@
 /* =============================================================
-   打药窗 · 逻辑层
+   农时窗 · 逻辑层
    -------------------------------------------------------------
    纯函数，不依赖 DOM，浏览器与 Node 均可运行。
    浏览器：<script src="logic.js"> 后通过 window.TianZhi 访问
@@ -397,7 +397,7 @@
           })
         });
       } catch (e) {
-        console.warn('[打药窗] 灌溉模型失败，退回雨量法：', e.message);
+        console.warn('[农时窗] 灌溉模型失败，退回雨量法：', e.message);
       }
     }
 
@@ -663,7 +663,7 @@
         result.days.forEach(function (d) {
           if (reasons.indexOf(d.spray.why) < 0) reasons.push(d.spray.why);
         });
-        return tag + '未来一周没有合适的打药窗口。\n\n主要原因：\n' +
+        return tag + '未来一周没有合适的农时窗口。\n\n主要原因：\n' +
           reasons.slice(0, 2).map(function (x) { return '· ' + x; }).join('\n') +
           '\n\n建议再等等天气，或问问当地农技员。';
       }
@@ -1030,7 +1030,7 @@
   function describeConsensus(cmp) {
     if (!cmp) return '';
     if (cmp.level === 'consensus') {
-      if (cmp.majority === 'no') return '各气象模式一致认为本周没有合适的打药窗口。';
+      if (cmp.majority === 'no') return '各气象模式一致认为本周没有合适的农时窗口。';
       if (cmp.sameDate) return '各气象模式结论一致，最佳日期相同。';
       return '各气象模式都认为本周有可作业窗口，但具体日期存在差异。';
     }

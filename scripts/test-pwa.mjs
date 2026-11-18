@@ -233,7 +233,7 @@ try {
   await sleep(3500);
 
   const title = await ev('document.title');
-  check(/打药窗/.test(title), 'title rendered', title);
+  check(/农时窗/.test(title), 'title rendered', title);
   check(await ev('!!document.querySelector(".sidebar")'), 'app shell mounted');
   check(await ev('!!document.querySelector("link[rel=manifest]")'), 'manifest link present');
   check(await ev('document.documentElement.classList.contains("zz-browser")'),
@@ -297,9 +297,9 @@ try {
 
   const offlineTitle = await ev('document.title');
   const offlineBrand = await ev(
-    '(document.body && document.body.innerText || "").indexOf("打药窗") >= 0'
+    '(document.body && document.body.innerText || "").indexOf("农时窗") >= 0'
   );
-  check(/打药窗/.test(offlineTitle), 'page opens while offline', offlineTitle);
+  check(/农时窗/.test(offlineTitle), 'page opens while offline', offlineTitle);
   check(offlineBrand === true, 'shell content rendered offline');
 
   const offlineMsg = await ev(

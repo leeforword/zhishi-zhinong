@@ -7,9 +7,14 @@
  *   PNG 的结构其实很简单（签名 + IHDR + IDAT + IEND），
  *   Node 内置 zlib 就能压缩，所以这里手写了一个约 60 行的编码器。
  *
- * 图形设计：
+* 图形设计（v6.1「农时窗」）：
  *   底：亮翡翠 → 深翡翠的对角渐变（呼应品牌主色 #0E6B4A / 深色 #0A4F37）
- *   标：白色「窗」框 + 左上格一滴水（药液）——「打药窗」，与界面左上角品牌图形完全一致
+ *   标：白色「窗」框 + 十字格 + 左上格**一轮日出与地平线**——
+ *       「窗」是产品核心（那一小段时间窗口），日出＝看天时下地，
+ *       比原来那滴药液更能覆盖打药 / 灌溉 / 晾晒三件事。
+ *
+ * 变体：`--variant=sun|wheat|drop`（默认 sun）。换方向时不必改代码，
+ *       生成到 web/icons-alt/ 对比即可：ICON_OUT=web/icons-alt node scripts/make-icons.mjs --variant=wheat
  *
  * 采样方式：
  *   4×4 超采样（每像素 16 个样本）做抗锯齿，不需要任何图形库。
@@ -29,7 +34,10 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
-const OUT = path.join(ROOT, 'web', 'icons');
+const OUT = process.env.ICON_OUT
+  ? path.resolve(ROOT, process.env.ICON_OUT)
+  : path.join(ROOT, 'web', 'icons');
+const VARIANT = (process.argv.find((a) => a.startsWith('--variant=')) || '').split('=')[1] || 'sun';
 
 /* ============================================================
    一、最小 PNG 编码器
@@ -172,9 +180,10 @@ function droplet(x, y, cx, ccy, R) {
 }
 
 /**
- * 「打药窗」图形（单位坐标），scale 用于缩到 maskable 安全区
+ * 「农时窗」图形（单位坐标），scale 用于缩到 maskable 安全区
  *   - 外框：圆角「窗」框（边框 + 十字格条）
- *   - 左上格：一滴药液
+ *   - 左上格：日出（太阳圆盘 + 地平线）
+ *   - 变体 wheat：换成麦穗；drop：保留旧版药滴，便于回滚
  */
 function inGlyph(u, v, scale) {
   const x = (u - 0.5) / scale + 0.5;
@@ -193,10 +202,28 @@ function inGlyph(u, v, scale) {
   const vbar = outer && Math.abs(x - cx) <= bw / 2;
   const hbar = outer && Math.abs(y - cy) <= bw / 2;
 
-  // 左上格中心 ≈ (0.357, 0.357)，水滴整体落在格内、不碰边框
-  const drop = droplet(x, y, 0.345, 0.375, 0.055);
+  /* 左上格内部：x 0.245–0.469、y 0.245–0.469，图形别碰边框 */
+  let mark = false;
+  if (VARIANT === 'wheat') {
+    mark = inCapsule(x, y, 0.357, 0.446, 0.357, 0.286, 0.010);
+    for (let i = 0; i < 3; i++) {
+      const gy = 0.300 + i * 0.044;
+      mark = mark ||
+        inEllipse(x, y, 0.335, gy, 0.026, 0.012, -0.62) ||
+        inEllipse(x, y, 0.379, gy, 0.026, 0.012, 0.62);
+    }
+  } else if (VARIANT === 'drop') {
+    mark = droplet(x, y, 0.345, 0.375, 0.055);
+  } else {
+    /* 日出：半个太阳压在地平线上（经典「日出」剪影）。
+       用实心半圆 + 圆头横条，比「整圆 + 细线」在小尺寸下更不容易糊成一团。 */
+    const barY = 0.386, R2 = 0.064;
+    const dome = (y <= barY) && Math.hypot(x - 0.357, y - barY) <= R2;
+    const bar = inCapsule(x, y, 0.297, barY, 0.417, barY, 0.011);
+    mark = dome || bar;
+  }
 
-  return border || vbar || hbar || drop;
+  return border || vbar || hbar || mark;
 }
 
 /**
@@ -247,7 +274,7 @@ function drawIcon(size, rounded, glyphScale) {
    五、矢量版（favicon.svg，浏览器标签页用）
    ============================================================ */
 const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <title>打药窗</title>
+  <title>农时窗</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
       <stop offset="0" stop-color="#1FB98A"/>
@@ -259,7 +286,18 @@ const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width
     <rect x="82" y="82" width="348" height="348" rx="70" fill="none" stroke-width="44"/>
     <rect x="240" y="126" width="32" height="260" stroke="none"/>
     <rect x="126" y="240" width="260" height="32" stroke="none"/>
-    <path stroke="none" d="M177 138.8 L149 192 A28 28 0 0 0 205 192 Z"/>
+    ${VARIANT === 'wheat'
+      ? '<rect x="177" y="146" width="11" height="82" rx="5.5" stroke="none"/>' +
+        '<ellipse cx="166" cy="154" rx="13" ry="6" transform="rotate(-35 166 154)" stroke="none"/>' +
+        '<ellipse cx="189" cy="154" rx="13" ry="6" transform="rotate(35 189 154)" stroke="none"/>' +
+        '<ellipse cx="166" cy="176" rx="13" ry="6" transform="rotate(-35 166 176)" stroke="none"/>' +
+        '<ellipse cx="189" cy="176" rx="13" ry="6" transform="rotate(35 189 176)" stroke="none"/>' +
+        '<ellipse cx="166" cy="198" rx="13" ry="6" transform="rotate(-35 166 198)" stroke="none"/>' +
+        '<ellipse cx="189" cy="198" rx="13" ry="6" transform="rotate(35 189 198)" stroke="none"/>'
+      : VARIANT === 'drop'
+        ? '<path stroke="none" d="M177 138.8 L149 192 A28 28 0 0 0 205 192 Z"/>'
+        : '<path d="M150 198 A33 33 0 0 1 216 198 Z" stroke="none"/>' +
+          '<rect x="152" y="192" width="62" height="12" rx="6" stroke="none"/>'}
   </g>
 </svg>
 `;

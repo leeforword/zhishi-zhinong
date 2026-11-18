@@ -2090,7 +2090,7 @@
       $('fHint').className = 'hint warn';
       $('fHint').textContent = '已选地点：' + fine.label +
         '（高德定位服务鉴权失败，暂时只能到乡镇）';
-      if (window.console) console.warn('[打药窗] 高德逆地理编码失败：' + fine.error);
+      if (window.console) console.warn('[农时窗] 高德逆地理编码失败：' + fine.error);
     }
   }
 
@@ -2354,7 +2354,7 @@
       syncBoundaryZoom();
       MAP.instance.on('zoomend', syncBoundaryZoom);
     } catch (e) {
-      console.warn('[打药窗] 本地边界绘制失败：', e.message);
+      console.warn('[农时窗] 本地边界绘制失败：', e.message);
     }
   }
 
@@ -2479,7 +2479,7 @@
       // 容器尺寸变化后通知地图重绘
       setTimeout(function () { if (MAP.instance) MAP.instance.resize(); }, 60);
     }).catch(function (err) {
-      console.warn('[打药窗] 高德地图不可用，已降级：', err.message);
+      console.warn('[农时窗] 高德地图不可用，已降级：', err.message);
       MAP.failed = true;
       updateMapMode();
       renderFallbackMap(sel);
@@ -2500,7 +2500,7 @@
     loadAMap().catch(function (err) {
       MAP.failed = true;
       updateMapMode();
-      console.warn('[打药窗] 高德 SDK 预加载失败：', err.message);
+      console.warn('[农时窗] 高德 SDK 预加载失败：', err.message);
     });
   }
 
@@ -3161,7 +3161,7 @@
     d.className = 'msg ' + role;
     var who = document.createElement('div');
     who.className = 'who';
-    who.textContent = (role === 'me') ? '我' : '打药窗';
+    who.textContent = (role === 'me') ? '我' : '农时窗';
     var body = document.createElement('div');
     body.className = 'body';
     /* 首答分层：第一段是结论，其余整段折进「展开完整分析」。
@@ -3297,7 +3297,7 @@
   function renderBasis() {
     if ($('basisRules') && CONTENT && CONTENT.rules) {
       // 只列四条主干规则，口径细节留在参赛说明书里
-      var keep = ['打药窗口', '灌溉建议', '晾晒 / 入库', '结论置信度'];
+      var keep = ['农时窗口', '灌溉建议', '晾晒 / 入库', '结论置信度'];
       var list = CONTENT.rules.filter(function (r) { return keep.indexOf(r.title) >= 0; });
       $('basisRules').innerHTML = list.map(function (r) {
         return '<div class="basis-rule"><b>' + esc(r.title) + '</b>' +
@@ -3734,7 +3734,7 @@
     var log = $('qaLog');
     var d = document.createElement('div');
     d.className = 'msg bot typing-wrap';
-    d.innerHTML = '<div class="who">打药窗</div><div class="typing"><i></i><i></i><i></i></div>';
+    d.innerHTML = '<div class="who">农时窗</div><div class="typing"><i></i><i></i><i></i></div>';
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
     return d;
@@ -3960,7 +3960,7 @@
       if (err && /数字不一致/.test(err.message || '')) {
         appendMsg('bot', template, true);
         if (err.extra && err.extra.length) {
-          console.warn('[打药窗] 大模型改写出现新数字，已拦截:', err.extra);
+          console.warn('[农时窗] 大模型改写出现新数字，已拦截:', err.extra);
         }
       } else {
         appendMsg('bot', template, true);
