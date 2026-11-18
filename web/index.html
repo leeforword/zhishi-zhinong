@@ -210,7 +210,7 @@ button{font-family:inherit}
 /* 地块列表 */
 .plots{display:flex;flex-direction:column;gap:1px}
 .plot{
-  display:block;padding:7px 8px;border-radius:var(--r-sm);cursor:pointer;
+  display:block;padding:9px 8px;border-radius:var(--r-sm);cursor:pointer;
   position:relative;transition:background .12s;
   border:1px solid transparent;
 }
@@ -1940,6 +1940,19 @@ html.zz-chat #zzBar{display:none!important}
 .std-mode button{border:0;background:transparent;font:inherit;font-size:11px;color:var(--text-2);padding:5px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
 .std-mode button.on{background:var(--surface-solid);color:var(--brand);font-weight:600;box-shadow:0 1px 3px rgba(20,30,24,.08)}
 .std-grid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+
+/* 关键四项：一眼看完「能不能打」，其余 3 项（最短窗口/结露/日落收工）收进折叠层 */
+.std-key{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;
+  background:var(--border);border:1px solid var(--border);border-radius:15px;overflow:hidden}
+.std-key-i{background:var(--surface-solid);padding:11px 13px;min-width:0}
+.std-key-i span{display:block;font-size:10.5px;color:var(--text-3)}
+.std-key-i b{display:block;margin-top:2px;font-size:18px;line-height:1.22;color:var(--text);
+  font-variant-numeric:tabular-nums;letter-spacing:-.015em}
+.std-key-i b i{font-style:normal;font-size:10.5px;font-weight:500;color:var(--text-3);margin-left:3px;letter-spacing:0}
+@media (min-width:760px){ .std-key{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.std-sub{font-size:10.5px;font-weight:600;letter-spacing:.06em;color:var(--text-3);margin:16px 0 8px}
+.std-sub:first-child{margin-top:0}
+.nw{white-space:nowrap}
 .std-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:2px 8px;align-items:center;background:var(--surface-solid);padding:9px 11px}
 .std-k{grid-row:1;grid-column:1;font-size:11.5px;color:var(--text-2)}
 .std-v{grid-row:1;grid-column:2;font-size:13px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
@@ -2287,12 +2300,6 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 .d-metric i{display:block;font-style:normal;font-size:10px;margin-top:2px;line-height:1.3}
 .d-metric i.ok{color:#0A6B43}.d-metric i.warn{color:#9A5306}.d-metric i.bad{color:#A62A20}
 
-.d-actions{display:flex;gap:8px;padding:14px 18px 0 20px;flex-wrap:wrap}
-.d-actions .btn{font-size:12.5px;padding:8px 16px}
-.d-log{padding:8px 20px 0;font-size:10.5px;color:var(--text-3);line-height:1.6}
-.d-log b{color:var(--text-2);font-weight:600}
-.d-log button{border:0;background:none;font:inherit;font-size:10.5px;color:var(--brand);  cursor:pointer;padding:0 2px}
-
 /* 决策卡插画：不再是一张贴在右下角的方图，改成右侧一层会淡出的底纹。
    理由：角上的方块与按钮、留痕行挤在一起，夜里那张月亮图尤其突兀；
    做成边缘融化的浅色底纹后，既有天气氛围，又不抢数字与按钮。
@@ -2418,9 +2425,6 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
     margin:10px 14px 0 16px;padding-top:10px}
   .d-metric:nth-child(odd){padding-left:0;border-left:0}
   .d-metric:nth-child(n+3){border-top:1px dashed var(--border);padding-top:10px}
-  .d-actions{padding:12px 14px 0 16px}
-  .d-actions .btn{flex:1;min-width:0}
-  .d-log{padding:8px 16px 0}
   .week{padding:10px 10px 8px}
   .week-strip{grid-template-columns:repeat(7,minmax(0,1fr));border-radius:8px}
   .wk{padding:8px 2px 9px}
@@ -2571,11 +2575,6 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
         <div class="d-from" id="dFrom" style="display:none"></div>
         <div class="d-metrics" id="dMetrics"></div>
 
-        <div class="d-actions">
-          <button class="btn" id="dLogBtn" type="button">干完了 · 记一笔</button>
-          <button class="btn gh" id="dBasisBtn" type="button">为什么是这个时间</button>
-        </div>
-        <div class="d-log" id="dLogLine"></div>
         <img class="d-art" id="dArt" alt="" loading="lazy">
       </section>
 
@@ -2787,12 +2786,21 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
             新增地块
           </button>
           <div class="note" style="margin-top:12px">
-            在地图上点选位置，地名按<b>最小行政地名或具体地点</b>显示（村庄、乡镇、学校、园区都可能），不强行归到某个村。
-            点地块右侧的笔可改名称 / 作物 / 面积，× 可删除。地块信息只存在本机，不上传服务器。
+            点地块右侧的笔改名称 / 作物 / 面积，× 删除；选中哪块，决策与问答就按哪块算。
           </div>
+          <details class="std-adv" style="margin-top:10px">
+            <summary>地名怎么取 · 数据存在哪</summary>
+            <div class="std-adv-body">
+              <p class="std-src-note" style="margin:0">
+                在地图上点选位置后，地名按<b>最小行政地名或具体地点</b>显示（村庄、乡镇、学校、园区都可能），
+                不强行归到某个村；点错就再点一次地图。地块、阈值与设置都存在浏览器本地，
+                换手机或清缓存会丢，重要地块建议截图留一份。
+              </p>
+            </div>
+          </details>
         </div>
 
-        <div class="sec-h"><h2>作业标准</h2><span class="hint">按地块属地自动套用河北省现行文件 · 不用自己调</span></div>
+        <div class="sec-h"><h2>作业标准</h2><span class="hint">按属地自动套用 · 不用自己调</span></div>
         <div class="card pad">
           <div id="stdBox"><div class="skel" style="height:150px"></div></div>
 
@@ -2831,9 +2839,8 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 
         <div class="sec-h"><h2>施药依据库</h2><span class="hint" id="chemSrcStat">离线可查</span></div>
         <div class="card pad" id="chemBasisCard">
-          <div class="note">
-            对话里只给判定要点，原文与药剂档案统一放这里，不再一屏堆满条文。
-            依据编号、发布机构、条款与原文链接都可核对；链接需联网打开。
+          <div class="note" style="margin:0">
+            对话里只给要点，原文与药剂档案都放这里；编号、机构、条款与原文链接都可核对。
           </div>
           <details class="std-adv" id="chemSrcAdv">
             <summary>依据文件（<span id="chemSrcCount">0</span> 份）</summary>
@@ -2851,7 +2858,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           </details>
         </div>
 
-        <div class="sec-h"><h2>关于</h2><span class="hint">v5.8</span></div>
+        <div class="sec-h"><h2>关于</h2><span class="hint">v5.10</span></div>
         <div class="disc">
           <b>打药窗 · 华北平原冬小麦 / 夏玉米农事时机助手</b>
           <p>气象 和风天气 + Open-Meteo · 地图 高德 · 标准 河北省 / 市级公开文件</p>

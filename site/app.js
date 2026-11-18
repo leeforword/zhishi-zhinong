@@ -1379,40 +1379,6 @@
           (m.j ? '<i class="' + (m.cls || '') + '">' + esc(m.j) + '</i>' : '') + '</div>';
       }).join('');
     }
-
-    renderLogLine(task);
-  }
-
-  /* ---- 作业记录：本机留痕，用来回答"上次打药是几天前" ---- */
-  function loadLogs() {
-    try { return JSON.parse(localStorage.getItem('tz_logs') || '[]'); } catch (e) { return []; }
-  }
-  function saveLogs(list) {
-    try { localStorage.setItem('tz_logs', JSON.stringify(list.slice(-40))); } catch (e) {}
-  }
-  function renderLogLine(task) {
-    var line = $('dLogLine');
-    if (!line) return;
-    var logs = loadLogs().filter(function (x) { return x.task === task; });
-    var names = { spray: '打药', irrigation: '灌溉', harvest: '晾晒' };
-    if (!logs.length) {
-      line.innerHTML = '<b>' + names[task] + '</b> 还没有记录，干完点一下左边的按钮。';
-      return;
-    }
-    var last = logs[logs.length - 1];
-    var d0 = new Date(last.date + 'T00:00:00');
-    var days = Math.round((new Date(new Date().toDateString()) - new Date(d0.toDateString())) / 86400000);
-    var when = days <= 0 ? '今天' : (days === 1 ? '昨天' : days + ' 天前');
-    line.innerHTML = '<b>上次' + names[task] + '</b> ' + when + '（' + last.date.slice(5).replace('-', '/') + '）' +
-      ' · 记录只存在这台设备' +
-      ' <button type="button" id="dLogUndo">撤销</button>';
-    var u = $('dLogUndo');
-    if (u) u.onclick = function () {
-      var all = loadLogs();
-      all.splice(all.lastIndexOf(last), 1);
-      saveLogs(all);
-      renderLogLine(task);
-    };
   }
 
   /* =========================================================
@@ -1563,30 +1529,6 @@
           }
         };
       });
-    }
-    if ($('dLogBtn') && !$('dLogBtn').__bound) {
-      $('dLogBtn').__bound = true;
-      $('dLogBtn').onclick = function () {
-        var task = state.task || 'spray';
-        var logs = loadLogs();
-        logs.push({ task: task, date: todayStr(), at: new Date().toISOString() });
-        saveLogs(logs);
-        renderLogLine(task);
-        toast('已记下：' + todayStr().slice(5).replace('-', '/') + ' ' +
-          ({ spray: '打药', irrigation: '灌溉', harvest: '晾晒' })[task]);
-      };
-    }
-    if ($('dBasisBtn') && !$('dBasisBtn').__bound) {
-      $('dBasisBtn').__bound = true;
-      $('dBasisBtn').onclick = function () {
-        var p = $('basisPanel');
-        if (p) {
-          p.open = true;
-          if (p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-          openBasis();
-        }
-      };
     }
   }
 
@@ -3526,7 +3468,7 @@
    * 药剂判定的唯一出口：ask 与 respondWith 都走这里，
    * 保证「同一类问法」永远是同一种排版与同一套数字。
    */
-  function answerChem(m, result, plot) {
+  function answerChem(m, result, plot, q) {
     var CH = window.TianZhiChem;
     if (!CH) return false;
     var ans = CH.answer(m, {
@@ -3540,10 +3482,33 @@
       type: ans.type, product: m.product || null,
       dayIdx: ans.dayIdx || 0, scope: ans.scope || 'now', topic: m.topic
     };
-    appendMsg('bot', ans.brief, true, {
-      source: ans.source, fold: true, verdict: true,
-      sections: ans.sections, suggest: chemSuggest(m)
-    });
+
+    function show(text) {
+      appendMsg('bot', text, true, {
+        source: ans.source, fold: true, verdict: true,
+        sections: ans.sections, suggest: chemSuggest(m)
+      });
+    }
+
+    /* 施药结论是这块产品的核心回答，也该享受润色：
+       但只改两行结论的表达，数字/时间点/药种全部由 refine() 的校验兜住，
+       校验不过就退回 chem 原文，用户看到的数字永远是规则引擎算的。 */
+    if (aiOn && LLM && LLM.isEnabled() && String(ans.brief).length <= 260) {
+      var tp = appendTyping();
+      LLM.refine(ans.brief, {
+        place: plot.name + '（' + plot.place + '）',
+        crop: CROP_NAME[plot.crop],
+        question: q || qaContext.lastQ || '',
+        context: buildTurnContext(plot, result)
+      }).then(function (nice) {
+        tp.remove(); show(nice);
+      }, function () {
+        tp.remove(); show(ans.brief);
+      });
+      return true;
+    }
+
+    show(ans.brief);
     return true;
   }
 
@@ -3746,6 +3711,19 @@
     tag.textContent = aiOn ? 'AI 增强' : '纯规则引擎';
   }
 
+  /* 没有 key 时把用户送到「我的 → 高级：安装与模型设置」，别让人自己找 */
+  function goMineAiSetup() {
+    var tab = document.querySelector('.tabbar button[data-view="mine"]');
+    if (tab) tab.click();
+    setTimeout(function () {
+      var adv = $('aboutAdv');
+      if (adv) adv.open = true;
+      var body = adv && adv.querySelector('.std-adv-body');
+      if (body && body.scrollIntoView) body.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (window.innerWidth >= 900 && $('aiKey')) $('aiKey').focus();
+    }, 280);
+  }
+
   /**
    * 问答主流程
    *   1. 规则引擎先判断意图（命中就用引擎答案，数字绝对可靠）
@@ -3834,7 +3812,7 @@
         chemM.kind === 'banned' || !!chemM.product || chemM.topic !== null ||
         chemM.type !== 'generic' || sprayWord ||
         (chemM.isFollow && qaContext.intent === 'chem'));
-      if (shouldChem && answerChem(chemM, result, plot)) return;
+      if (shouldChem && answerChem(chemM, result, plot, q)) return;
     }
 
     // --- 第一步：规则层意图 ---
@@ -3915,7 +3893,7 @@
     /* 大模型把问题归到 spray 时，仍然交给 chem 出结论：
        以前这里会退回逻辑层的长段落，同一个「哪天能打」出现两种排版。 */
     if (intent === 'spray' && window.TianZhiChem) {
-      if (answerChem(window.TianZhiChem.match(q, qaContext.chem), result, plot)) return;
+      if (answerChem(window.TianZhiChem.match(q, qaContext.chem), result, plot, q)) return;
     }
 
     // 关键：答案由规则引擎产出，数字全部来自实时数据
@@ -3975,7 +3953,12 @@
   // 示例问题由 content.js 动态渲染，点击走 #qaChips 上的事件委托
   // （见 renderContentLayer，不要在这里逐个绑定，否则渲染后按钮是死的）
   $('aiToggle').onclick = function () {
-    if (!LLM || !LLM.hasKey()) { toast('未配置大模型 key，当前为纯规则模式'); return; }
+    if (!LLM || !LLM.hasKey()) {
+      /* 光说「未配置」没用：直接把用户送到该填 key 的那一屏 */
+      toast('还没配 key，带你去填一下（只存本机）');
+      goMineAiSetup();
+      return;
+    }
     aiOn = !aiOn;
     LLM.setEnabled(aiOn);
     renderAiToggle();
@@ -4120,6 +4103,17 @@
     }).join('') + '</div>';
   }
 
+  /* 作业标准卡的可视重点：只放「决定能不能打」的四个数，其余收进折叠层 */
+  function stdKeyHtml(p) {
+    var w = (Math.round(Number(p.wind_max) * 10) / 10).toFixed(1);
+    return '<div class="std-key">' +
+      '<div class="std-key-i"><span>风速上限</span><b>≤ ' + w + '<i>m/s</i></b></div>' +
+      '<div class="std-key-i"><span>气温区间</span><b>' + p.temp_min + '–' + p.temp_max + '<i>℃</i></b></div>' +
+      '<div class="std-key-i"><span>作业时段</span><b>' + pad2(p.hours_start) + '–' + pad2(p.hours_end) + '<i>时</i></b></div>' +
+      '<div class="std-key-i"><span>当日降水</span><b>≤ ' + p.rain_day_max + '<i>mm</i></b></div>' +
+      '</div>';
+  }
+
   function renderStandard() {
     var box = $('stdBox');
     if (!box) return;
@@ -4137,18 +4131,33 @@
     var title = auto
       ? '按' + (e.cityName || '河北省') + '现行文件执行'
       : '手动阈值（已脱离属地标准）';
+    /* 查证日期不能再被拆行（"2026-11-16" 断成 16 单独一行很难看） */
     var sub = auto
-      ? (e.label + ' · 文件查证 ' + STD.CHECKED + (e.stricter ? ' · ' + e.stricter : ''))
-      : '滑轴里的数字优先。建议先切回「按标准」看一遍，再决定是否真的需要更严或更宽。';
+      ? esc(e.label) + ' · <span class="nw">文件查证 ' + esc(STD.CHECKED) + '</span>' +
+        (e.stricter ? ' · ' + esc(e.stricter) : '')
+      : esc('滑轴里的数字优先。建议先切回「按标准」看一遍，再决定是否真的需要更严或更宽。');
 
     var html = '<div class="std-head">' +
-      '<div class="std-head-l"><b>' + esc(title) + '</b><span>' + esc(sub) + '</span></div>' +
+      '<div class="std-head-l"><b>' + esc(title) + '</b><span>' + sub + '</span></div>' +
       '<div class="std-mode">' +
       '<button data-std-mode="auto" class="' + (auto ? 'on' : '') + '">按标准</button>' +
       '<button data-std-mode="manual" class="' + (auto ? '' : 'on') + '">手动</button>' +
       '</div></div>';
 
-    html += auto ? STD.limitsHtml(city) : manualLimitsHtml();
+    html += auto ? stdKeyHtml(e.patch) : stdKeyHtml({
+      wind_max: T.RULES.spray.wind_max,
+      temp_min: T.RULES.spray.temp_min,
+      temp_max: T.RULES.spray.temp_max,
+      hours_start: T.RULES.spray.hours[0],
+      hours_end: T.RULES.spray.hours[1],
+      rain_day_max: T.RULES.spray.rain_day_max
+    });
+
+    /* 7 行阈值是核对用的，不是每天要看的：默认收起，点开才展开
+       （含最短窗口 / 结露 / 日落收工三项判据） */
+    html += '<details class="std-adv" style="margin-top:12px">' +
+      '<summary>全部 7 项阈值（含结露与日落收工）</summary>' +
+      '<div class="std-adv-body">' + (auto ? STD.limitsHtml(city) : manualLimitsHtml()) + '</div></details>';
 
     /* 依据文件清单很长（13 份 + 链接），默认展开会把「我的」撑成几屏，
        收进折叠层：要看原文的再点开，日常只看上面的生效阈值。 */
@@ -4160,20 +4169,23 @@
         '<div class="std-adv-body">' + srcHtml + '</div></details>';
     }
 
+    /* 11 市收录、原文摘录、口径说明：都是「要较真才看」的内容，
+       合并成一层，别让三行折叠标题把卡片撑散 */
     html += '<details class="std-adv" style="margin-top:12px">' +
-      '<summary>河北省 11 市收录情况（含未检索到的市）</summary>' +
-      '<div class="std-adv-body">' + STD.coverageHtml() + '</div></details>';
-
-    html += '<details class="std-adv">' +
-      '<summary>原文摘录（可逐条核对）</summary>' +
-      '<div class="std-adv-body">' + STD.quotesHtml(city) + '</div></details>';
-
-    html += '<div class="std-src-note">标准只约束气象条件，不替代农药标签与当地农技部门意见。' +
+      '<summary>更多核对：11 市收录 · 原文摘录 · 口径说明</summary>' +
+      '<div class="std-adv-body">' +
+      '<div class="std-sub">河北省 11 市收录情况</div>' + STD.coverageHtml() +
+      '<div class="std-sub">原文摘录（可逐条核对）</div>' + STD.quotesHtml(city) +
+      '<div class="std-sub">口径说明</div>' +
+      '<p class="std-src-note" style="margin-top:0">' +
       '县级文件多为转发省级，未逐县收录；市级未检索到公开文件、或仅有非标准技术口径的，按省级执行。' +
-      '每行右侧标注该字段最严的来源；气温上下限来自不同文件时，标上限来源（超上限更危险）。' +
-      '作业时段是文件口径的上限，实际每天还会按日落再收紧（例如日落 17:03 → 15 时收工），' +
-      '收工时刻在这两天的卡片与逐时表里都会写出来。' +
-      '如你们县有更严要求，可在下方手动校准。</div>';
+      '每行右侧标注该字段最严的来源；气温上下限来自不同文件时标上限来源（超上限更危险）。' +
+      '作业时段是文件口径的上限，实际每天还会按日落再收紧，收工时刻写在决策卡与逐时表里。' +
+      '</p>' +
+      '</div></details>';
+
+    html += '<p class="std-src-note">标准只约束气象条件，不替代农药标签与当地农技部门意见。' +
+      '你们县有更严要求时，用下方「手动校准」。</p>';
 
     box.innerHTML = html;
   }
@@ -4301,6 +4313,18 @@
 
   function renderAiStatus() {
     var st = S ? S.aiStatus() : { ok: false, text: '未配置' };
+    /* 省成本也省疑问：直接告诉用户这次会话调了几次、退回模板几次 */
+    var L = window.TianZhiLLM;
+    if (L && st.ok) {
+      var g = L.getStats();
+      var bits = [];
+      if (g.ok) bits.push('本次已润色 ' + g.ok + ' 条');
+      if (g.rejected) bits.push(g.rejected + ' 条回退模板');
+      if (g.promptTokens + g.completionTokens) {
+        bits.push('用量 ' + (g.promptTokens + g.completionTokens) + ' tokens');
+      }
+      if (bits.length) st.text = st.text + ' · ' + bits.join(' · ');
+    }
     if ($('aiState')) $('aiState').textContent = st.text;
     if ($('chatSub')) {
       $('chatSub').textContent = st.ok

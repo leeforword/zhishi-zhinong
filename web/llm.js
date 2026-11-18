@@ -35,10 +35,13 @@
     proxyUrl: '',
     key: '',
     model: 'deepseek-chat',
-    timeout: CFG.timeoutMs || 9000
+    timeout: CFG.llmTimeoutMs || CFG.timeoutMs || 12000
   };
 
-  var stats = { calls: 0, ok: 0, fallback: 0, rejected: 0, lastError: null };
+  var stats = {
+    calls: 0, ok: 0, fallback: 0, rejected: 0, lastError: null,
+    promptTokens: 0, completionTokens: 0, ms: 0
+  };
   var enabled = false;
 
   function readRuntime() {
@@ -56,7 +59,7 @@
     RT.key = ai.key || '';
     RT.endpoint = ai.endpoint || 'https://api.deepseek.com/chat/completions';
     RT.model = ai.model || 'deepseek-chat';
-    RT.timeout = CFG.timeoutMs || 9000;
+    RT.timeout = CFG.llmTimeoutMs || CFG.timeoutMs || 12000;
 
     enabled = (RT.mode === 'proxy' && !!RT.proxyUrl) || (RT.mode === 'direct' && !!RT.key);
     return RT;
@@ -79,15 +82,51 @@
   function getStats() { return stats; }
 
   /* ---------------- 底层请求 ---------------- */
+
+  /* 同一个问句重问（点两次预设、切回来再问）不该再烧一次 token */
+  var CACHE_MAX = 24;
+  var cache = new Map();
+  function ckey(messages, opts) {
+    return (opts.temperature || 0) + '|' + (opts.maxTokens || 0) + '|' +
+      messages.map(function (m) { return m.role + ':' + m.content; }).join('\u0001');
+  }
+
+  function post(url, headers, body, ms) {
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, ms);
+    return fetch(url, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: headers,
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      clearTimeout(timer);
+      if (!r.ok) {
+        var e = new Error('HTTP ' + r.status);
+        e.status = r.status;
+        throw e;
+      }
+      return r.json();
+    }, function (e) {
+      clearTimeout(timer);
+      throw e;
+    });
+  }
+
+  /* 限流/超时/网络抖动值得再试一次；401/400 这类重试也没用 */
+  function retryable(e) {
+    if (!e) return false;
+    if (e.status === 429 || e.status >= 500) return true;
+    return e.name === 'AbortError' || e.name === 'TypeError';
+  }
+
   function chat(messages, opts) {
     opts = opts || {};
     if (!enabled) return Promise.reject(new Error('LLM 未启用'));
     if (!navigator.onLine) return Promise.reject(new Error('离线'));
 
-    var ctrl = new AbortController();
-    var timer = setTimeout(function () { ctrl.abort(); }, opts.timeout || RT.timeout);
-    stats.calls++;
-    stats.lastError = null;
+    var k = ckey(messages, opts);
+    if (cache.has(k)) return Promise.resolve(cache.get(k));
 
     var url, headers, body;
 
@@ -102,7 +141,7 @@
         maxTokens: opts.maxTokens || 320
       };
     } else {
-      /* 直连：仅限本地开发。公开部署绝不要用这个模式。 */
+      /* 直连：key 在前端（自用/演示），公开部署要么配中转、要么别开 */
       url = RT.endpoint;
       headers = {
         'Content-Type': 'application/json',
@@ -117,28 +156,36 @@
       };
     }
 
-    return fetch(url, {
-      method: 'POST',
-      signal: ctrl.signal,
-      headers: headers,
-      body: JSON.stringify(body)
-    }).then(function (r) {
-      clearTimeout(timer);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
+    var t0 = Date.now();
+    stats.calls++;
+    stats.lastError = null;
+
+    var run = function () { return post(url, headers, body, opts.timeout || RT.timeout); };
+
+    return run().catch(function (e) {
+      if (!retryable(e)) throw e;
+      return run();
     }).then(function (j) {
       // 中转回的是 {content}，直连回的是 OpenAI 结构，两种都认
-      if (typeof j.content === 'string') return j.content.trim();
-      if (j.choices && j.choices[0] && j.choices[0].message) {
-        return String(j.choices[0].message.content || '').trim();
+      var out = null;
+      if (typeof j.content === 'string') out = j.content.trim();
+      else if (j.choices && j.choices[0] && j.choices[0].message) {
+        out = String(j.choices[0].message.content || '').trim();
       }
-      if (j.error) throw new Error(String(j.error));
-      throw new Error('返回结构异常');
-    }, function (e) {
-      clearTimeout(timer);
-      throw e;
+      if (!out) {
+        if (j.error && j.error.message) throw new Error(String(j.error.message));
+        throw new Error('返回结构异常');
+      }
+      if (j.usage) {
+        stats.promptTokens += j.usage.prompt_tokens || 0;
+        stats.completionTokens += j.usage.completion_tokens || 0;
+      }
+      stats.ms = Date.now() - t0;
+      if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
+      cache.set(k, out);
+      return out;
     }).catch(function (e) {
-      stats.lastError = e.message;
+      stats.lastError = e && e.name === 'AbortError' ? '超时' : (e && e.message) || '请求失败';
       throw e;
     });
   }
@@ -218,7 +265,7 @@
     return chat([
       { role: 'system', content: sys },
       { role: 'user', content: user }
-    ], { temperature: 0, maxTokens: 8 }).then(function (raw) {
+    ], { temperature: 0, maxTokens: 6 }).then(function (raw) {
       var t = String(raw).toLowerCase().replace(/[^a-z]/g, '');
       for (var i = 0; i < INTENTS.length; i++) {
         if (t.indexOf(INTENTS[i]) === 0) return INTENTS[i];
@@ -233,21 +280,16 @@
    */
   function refine(template, opts) {
     opts = opts || {};
-    var sys = '你是农业技术推广员，把下面的"结构化结论"改写成农户听得懂的口语。\n' +
-      '硬性要求：\n' +
-      '0. 先看清楚用户这一轮问的是「现在」「某一天」还是「未来一周」，问的是哪种药。' +
-      '改写后必须仍然是同一个时间范围、同一种药，不许把「哪天能打」改写成「今天不能打」，' +
-      '也不许补一句用户没问的天气结论。\n' +
-      '1. 所有数字必须原样保留，一个都不许改、不许新增、不许删。\n' +
-      '2. 时间一律保持 24 小时制原样写法（如 10:00–14:00），不要改成"下午两点"。\n' +
-      '3. 不要添加任何原文没有的结论或建议；会话上下文只用来理解「那」「这药」指什么，' +
-      '不要把上下文里的数字搬进回答。\n' +
-      '4. 不超过 120 字，不用 markdown，不用列表符号。\n' +
-      '5. 语气朴实克制：开头直接给结论，不要称呼语、问候语、感叹句（禁用"乡亲们""注意啦""赶紧""大家好"），不用感叹号。\n' +
-      '6. 保持"结论 → 关键数字 → 依据"的顺序，不要写成散文。\n' +
-      '7. 别说"作为AI"之类的话。\n' +
-      '8. 原文里每个时间点（如 11/22 11:00–15:00）都必须原样出现，一个都不能丢——' +
-      '农户是照着这几个时间点下地的。\n' +
+    var sys = '你是"打药窗"的农事顾问，负责把已经算好的结构化结论，改写成县农技员在电话里会说的话。\n' +
+      '你只改表达，不改事实；下面每条都硬性，违反任何一条系统会直接丢弃你的输出。\n' +
+      '1. 时间范围与作业/药剂对象必须与原文完全一致：原文是"未来 7 天"就写未来 7 天，是"除草剂"就写除草剂，' +
+      '绝不能变成"今天不能打"，也不能补一句用户没问的天气结论。\n' +
+      '2. 所有数字、日期、时间点（如 11/22 11:00–15:00）原样保留：不新增、不改写、不省略、不换算成"下午三点"。\n' +
+      '3. 第一句给结论（能不能干 / 哪天能干），第二句给关键数字或原因；总长不超过 90 字、最多 2 句。\n' +
+      '4. 不用 markdown、不用列表、不用"首先/其次"；不称呼、不感叹、不营销（禁用"乡亲们""注意啦""赶紧""抓紧""！"）。\n' +
+      '5. 不添加原文没有的建议（不说"建议加助剂""可以混配""换个药"），不谈药剂品种、剂量与价格。\n' +
+      '6. 不复述用户的问题，不说"根据您的问题""作为 AI"。\n' +
+      '7. 口语但克制：像农技站的人讲清楚，不像广告，也不像文件。\n' +
       '示例：\n' +
       '原文：除草剂 · 明天不能打。\n低温药害：当日最低温 0℃ ≤ 2℃；下一次窗口 11/23 12:00–15:00。\n' +
       '改写：明天除草剂打不了，最低温 0℃ 已经到药害线；下一个窗口是 11/23 12:00–15:00。\n' +
@@ -282,6 +324,13 @@
         e3.raw = out;
         throw e3;
       }
+      /* 原文只说「未来 7 天」，改写却凭空多出「今天/明天」——同样是换了时间范围 */
+      if (/今天|明天|后天/.test(out) && !/今天|明天|后天/.test(template)) {
+        stats.rejected++;
+        var e5 = new Error('凭空多出日期，已拒绝');
+        e5.raw = out;
+        throw e5;
+      }
       if (!check.ok) {
         stats.rejected++;
         var err = new Error('数字不一致，已拒绝');
@@ -301,8 +350,23 @@
         throw e4;
       }
       stats.ok++;
-      return out;
+      return shapeLines(out, template);
     });
+  }
+
+  /**
+   * 首答版式是「结论一行 + 细节一行」，模型常把两句并成一行。
+   * 这里按第一个句号补回换行，保证两行结构不被润色破坏；
+   * 只在原文本来多行、输出还没换行时动手，不改任何字。
+   */
+  function shapeLines(out, template) {
+    if (!out || out.indexOf('\n') >= 0) return out;
+    if ((String(template).match(/\n/g) || []).length < 1) return out;
+    var i = out.indexOf('。');
+    if (i > 6 && i < out.length - 6) {
+      return out.slice(0, i + 1) + '\n' + out.slice(i + 1).replace(/^[，,、\s]+/, '');
+    }
+    return out;
   }
 
   /** 超范围问题的口语化拒答（不含任何数字，天然安全） */

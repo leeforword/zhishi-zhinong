@@ -73,12 +73,29 @@ check('index.html 已移除 config.local.js 引用', !html.includes('config.loca
 /* ---- 2. 其余脚本 ---- */
 for (const f of JS_FILES) copy(f);
 
-/* ---- 3. config.js：把 key 相关的安全处理再做一遍兜底 ---- */
+/* ---- 3. config.js：默认剥掉 key，把安全处理再做一遍兜底 ----
+   key 一律不落仓库：公网产物默认是 deepseekKey:'' + enableLLM:false。
+   只有构建环境里显式给了 DEEPSEEK_KEY（GitHub Actions secret / 本机环境变量）
+   才注入 —— 这等于站点主人明确选择「前端带 key」，key 会随 JS 一起公开，
+   只适合自用演示，别配给会外传的站点。 */
 let cfg = fs.readFileSync(path.join(WEB, 'config.js'), 'utf8');
 cfg = cfg.replace(/deepseekKey:\s*'[^']*'/, "deepseekKey: ''");
 cfg = cfg.replace(/enableLLM:\s*true/, 'enableLLM: false');
+
+const ENV_KEY = String(process.env.DEEPSEEK_KEY || '').trim();
+if (ENV_KEY) {
+  cfg = cfg.replace(/deepseekKey:\s*''/, "deepseekKey: '" + ENV_KEY + "'");
+  cfg = cfg.replace(/enableLLM:\s*false/, 'enableLLM: true');
+  console.log('  · 已按 DEEPSEEK_KEY 注入大模型 key（前端可见，仅限自用演示）');
+} else {
+  console.log('  · 未提供 DEEPSEEK_KEY：公网产物为纯规则引擎，AI 默认关');
+}
 fs.writeFileSync(path.join(OUT, 'config.js'), cfg, 'utf8');
 copied++;
+check(
+  ENV_KEY ? cfg.includes("deepseekKey: '" + ENV_KEY + "'") : !/deepseekKey:\s*'sk-/.test(cfg),
+  ENV_KEY ? 'DEEPSEEK_KEY 已按环境变量注入' : '公网 config.js 不含明文 key'
+);
 
 /* ---- 4. Service Worker：写入构建号，让每次发布都是新缓存 ---- */
 const buildId = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
@@ -174,8 +191,13 @@ function walk(dir, out = []) {
 }
 const outFiles = walk(OUT);
 const textFiles = outFiles.filter((f) => /\.(js|html|json|webmanifest|txt)$/.test(f));
-const leaked = textFiles.filter((f) => /sk-[a-zA-Z0-9]{20,}/.test(fs.readFileSync(f, 'utf8')));
-check('产物里没有 DeepSeek key', leaked.length === 0, leaked.map((f) => path.relative(OUT, f)).join(', '));
+const leaked = textFiles.filter((f) => {
+  const hit = /sk-[a-zA-Z0-9]{20,}/.test(fs.readFileSync(f, 'utf8'));
+  /* 只有显式给了 DEEPSEEK_KEY 时，config.js 才允许带 key（站点主人自己选的） */
+  return hit && !(ENV_KEY && path.basename(f) === 'config.js');
+});
+check(ENV_KEY ? '除 config.js 外产物没有 key' : '产物里没有 DeepSeek key',
+  leaked.length === 0, leaked.map((f) => path.relative(OUT, f)).join(', '));
 
 /* 3.2 manifest 合法且图标齐全 */
 let manifest = null;

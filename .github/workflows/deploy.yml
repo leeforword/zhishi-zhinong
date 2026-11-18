@@ -42,9 +42,15 @@ jobs:
         run: node web/test-logic.mjs
 
       # 生成 site/。脚本自带自检：
-      # 产物里只要有 DeepSeek key、或者 Service Worker 预缓存清单对不上，
-      # 这里就会直接失败，不会把坏的东西发出去。
+      # 产物里只要有 DeepSeek key（除非显式传了 DEEPSEEK_KEY）、
+      # 或者 Service Worker 预缓存清单对不上，这里就会直接失败，不会把坏的东西发出去。
+      #
+      # 可选：仓库 Settings → Secrets and variables → Actions 里加一个
+      # DEEPSEEK_KEY，构建才会把 key 注入前端、让线上也开 AI 润色。
+      # 不配也没关系：线上是纯规则引擎，结论与数字完全一样。
       - name: 构建静态站点
+        env:
+          DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_KEY }}
         run: node scripts/build-site.mjs
 
       - name: 配置 Pages

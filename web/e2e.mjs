@@ -578,6 +578,9 @@ async function waitData(timeoutMs) {
     await send('Page.navigate', { url: PAGE_URL });
     await sleep(2000);
     await waitData();
+    /* 端到端测试不依赖外部大模型：先关掉 AI，回答就是确定的模板文本。
+       真实润色路径见 .build/qa-shots/probe-ai2.mjs，别把测试绑在别人的 API 可用性上。 */
+    await ev("(function(){var b=document.getElementById('aiToggle');if(b&&b.textContent.trim()==='开')b.click();})()");
     const n0 = await ev("document.querySelectorAll('#qaLog .msg').length");
     await ev("document.querySelectorAll('.chip-btn')[0].click();");
     let ans = '';
@@ -833,22 +836,16 @@ async function waitData(timeoutMs) {
     const wkFont = await ev("parseFloat(getComputedStyle(document.querySelector('#weekStrip .wk-dow b')).fontSize)");
     check(wkFont >= 12.5, 'day labels are readable on mobile/desktop: ' + wkFont + 'px');
 
-    await ev("localStorage.removeItem('tz_logs')");
-    await ev("document.getElementById('dLogBtn').click();");
-    await sleep(220);
-    check(await ev("JSON.parse(localStorage.getItem('tz_logs')||'[]').length") >= 1,
-      'work log written to this device');
-    check(await ev("document.getElementById('dLogLine').textContent.indexOf('上次打药') >= 0"),
-      'decision card shows last-work history');
-    await ev("document.getElementById('dLogUndo').click();");
-    await sleep(180);
-    check(await ev("document.getElementById('dLogLine').textContent.indexOf('还没有记录') >= 0"),
-      'work log can be undone');
-
-    await ev("document.getElementById('basisPanel').open=false;document.getElementById('dBasisBtn').click();");
-    await sleep(350);
+    /* v5.10：决策卡上的「干完了·记一笔 / 为什么是这个时间」两个按钮连同留痕行已移除，
+       依据仍在 L3「数据与依据」里（#basisPanel）——删按钮不能把出口也删了 */
+    check(await ev("!document.getElementById('dLogBtn') && !document.getElementById('dLogLine')"),
+      'decision card no longer carries the log / why buttons');
+    check(await ev("!!document.getElementById('basisPanel')"),
+      'evidence panel still reachable from the decision page');
+    await ev("(function(){var p=document.getElementById('basisPanel');if(p)p.open=true;})()");
+    await sleep(300);
     check(await ev("document.getElementById('basisPanel').open === true"),
-      '"why this time" opens the evidence layer');
+      'evidence layer opens from the decision page');
     check(await ev("document.querySelectorAll('#nowStrip .ns').length") === 11,
       'evidence layer shows live values after opening');
     check(pageErrors.length === 0, 'no JS error in v5 interactions');
