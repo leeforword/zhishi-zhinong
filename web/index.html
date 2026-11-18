@@ -2378,9 +2378,11 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 .wk.st-rain .wk-slot:after{background:#E0BC84}
 .wk.sel:not(.has) .wk-slot:after{background:#C9D3C6}
 .wk-fill{position:absolute;top:0;height:100%;border-radius:4px;background:var(--brand)}
-.wk.sel .wk-fill{background:var(--brand)}
-.wk-fill.warn{background:var(--warn)}
-.wk-fill.bad{background:#E8B4AC}
+  /* 选中格只把「中性/可作业」的块提成品牌绿；warn/bad 是状态色，
+     不能被选中态刷掉——否则会出现「绿块 + 该浇」这种自相矛盾 */
+  .wk.sel .wk-fill:not(.warn):not(.bad){background:var(--brand)}
+  .wk-fill.warn{background:var(--warn)}
+  .wk-fill.bad{background:#E8B4AC}
 .wk-note{display:block;font-size:11px;color:#6F7872;font-variant-numeric:tabular-nums;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wk.has .wk-note{color:var(--brand-d);font-weight:600}

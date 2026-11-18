@@ -273,8 +273,23 @@ async function waitData(timeoutMs) {
     await sleep(400);
     const irrTxt = await ev("document.getElementById('dWord').textContent");
     check(sprayTxt !== irrTxt, 'task switch changes verdict: ' + irrTxt);
-    check(await ev("document.getElementById('wkSub').textContent.indexOf('灌溉') >= 0"),
-      'week strip follows task');
+    check(await ev("document.getElementById('wkTitle').textContent === '哪天该浇水'"),
+      'week strip title follows task');
+
+    /* 灌溉条带不能说打药的话：卡片说「该安排浇水了」，格子写「勉强」就是自相矛盾；
+       顺带锁住「选中格把状态色刷成品牌绿」的旧 bug（绿块 + 该浇）。 */
+    const wkWords = await ev("[...document.querySelectorAll('#weekStrip .wk-note')].map(function(n){return n.textContent.trim();})");
+    check(wkWords.length === 7 && wkWords.every(function (w) { return ['该浇', '无需浇', '不宜浇'].indexOf(w) >= 0; }),
+      'irrigation strip words: ' + wkWords.join('/'));
+    check(await ev(`[...document.querySelectorAll('#weekStrip .wk')].every(function(b){
+      var n=b.querySelector('.wk-note').textContent.trim();
+      var f=b.querySelector('.wk-fill'); if(!f) return n!=='该浇';
+      var bg=getComputedStyle(f).backgroundColor;
+      if(n==='该浇') return bg==='rgb(168, 90, 8)';
+      if(n==='无需浇') return bg!=='rgb(168, 90, 8)';
+      return true;})`), 'irrigation cell colour matches its label');
+    check(await ev("document.getElementById('wkLegend').textContent.indexOf('无需浇') >= 0"),
+      'irrigation legend uses 无需浇/该浇/不宜浇');
 
     await ev("document.querySelector('#dTabs [data-task=\"harvest\"]').click();");
     await sleep(400);

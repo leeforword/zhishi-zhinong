@@ -1411,23 +1411,39 @@
     }
     var sel = state.chartDay;
     var names = { spray: '打药', irrigation: '灌溉', harvest: '晾晒' };
-    if ($('wkTitle')) $('wkTitle').textContent = names[task] + '的窗口分布';
+    /* 三种作业的「状态词」必须各说各的：
+       打药说窗口，灌溉只说该不该浇——把灌溉的 warn 写成「勉强」，
+       就会和决策卡的「该安排浇水了」打架（用户当场就指出来了）。
+       bad 在灌溉里是「有雨/封冻，别浇」，晾晒里是「不宜」。 */
+    var WORD = {
+      irrigation: { ok: '无需浇', warn: '该浇', bad: '不宜浇' },
+      harvest: { ok: '适合', warn: '勉强', bad: '不宜' }
+    };
+    var TITLE = {
+      spray: '打药的窗口分布',
+      irrigation: '哪天该浇水',
+      harvest: '哪天真适合晾晒'
+    };
+    if ($('wkTitle')) $('wkTitle').textContent = TITLE[task] || (names[task] + '的窗口分布');
     if ($('wkSub')) {
       $('wkSub').textContent = task === 'spray'
         ? '色块是当天可作业的时段，位置对应钟点'
-        : '整格颜色代表当天是否适合' + names[task];
+        : (task === 'irrigation' ? '整格颜色 = 当天该不该浇，点一格看墒情与定额' : '整格颜色代表当天是否适合晾晒');
     }
     /* 这行原先由已删除的「今日判读」卡写入，v5 后一直空着 */
     if ($('weekRainNote')) $('weekRainNote').textContent = '一周累计雨量 ' + result.weekRain + ' mm';
     /* 图例必须跟当前任务一致：打药只有「可作业 / 无窗口」两态，
        挂着一个用不上的「勉强」色块，会让人以为漏判了一档。 */
     if ($('wkLegend')) {
-      $('wkLegend').innerHTML = task === 'spray'
-        ? '<i><s style="background:#0E6B4A"></s>可作业</i>' +
-          '<i><s class="none"></s>无窗口</i>'
-        : '<i><s style="background:#0E6B4A"></s>适合</i>' +
-          '<i><s style="background:#C0811A"></s>勉强</i>' +
-          '<i><s style="background:#EBCFC9"></s>不宜</i>';
+      if (task === 'spray') {
+        $('wkLegend').innerHTML = '<i><s style="background:#0E6B4A"></s>可作业</i>' +
+          '<i><s class="none"></s>无窗口</i>';
+      } else {
+        var wd = WORD[task];
+        $('wkLegend').innerHTML = '<i><s style="background:#0E6B4A"></s>' + wd.ok + '</i>' +
+          '<i><s style="background:#C0811A"></s>' + wd.warn + '</i>' +
+          '<i><s style="background:#EBCFC9"></s>' + wd.bad + '</i>';
+      }
     }
 
     strip.innerHTML = result.days.map(function (d, i) {
@@ -1453,7 +1469,7 @@
         var st = item.status;
         var cls = st === 'ok' ? '' : (st === 'warn' ? ' warn' : ' bad');
         inner = '<div class="wk-fill' + cls + '" style="left:0;width:100%"></div>';
-        note = st === 'ok' ? '可以' : (st === 'warn' ? '勉强' : '不宜');
+        note = (WORD[task] || WORD.harvest)[st] || '—';
       }
 
       return '<button type="button" class="wk' + (d.date === sel ? ' sel' : '') +
@@ -1495,11 +1511,13 @@
         ['日落 / 收工', (d.sunset || '—') + ' / ' + d.spray.hours[1] + ' 时']
       ];
     } else if (task === 'irrigation') {
+      /* 灌溉的日详情要给「看墒、看期、看定额」，雨量只是其中一条判据 */
+      var iq = item.quota || { flood: ['—', '—'] };
       cells = [
-        ['当日降水', d.dayRain + ' mm'],
-        ['降雨概率', d.dayProb + '%'],
-        ['最高气温', d.tmax + '℃'],
-        ['7 天累计', result.weekRain + ' mm']
+        ['墒情（估算）', (item.sm == null ? '—' : item.sm + '%') + (item.thr ? ' / 下限 ' + item.thr + '%' : '')],
+        ['生育期', (item.stage || '—') + (item.critical ? '（临界期）' : '')],
+        ['建议定额', iq.flood.join('–') + ' 方/亩'],
+        ['日耗水', (item.etc == null ? '—' : item.etc + ' mm')]
       ];
     } else {
       cells = [
