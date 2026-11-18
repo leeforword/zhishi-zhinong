@@ -1,5 +1,5 @@
 /* =============================================================
-   知时智农 · Service Worker
+   打药窗 · Service Worker
    -------------------------------------------------------------
    只做两件事：让 App 能被「安装」到手机桌面，以及断网时界面还能打开。
 
@@ -64,7 +64,7 @@ const SHELL = [
 const OFFLINE_HTML = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>离线 · 知时智农</title>
+<title>离线 · 打药窗</title>
 <style>
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
        font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;

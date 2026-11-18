@@ -2122,7 +2122,7 @@
       $('fHint').className = 'hint warn';
       $('fHint').textContent = '已选地点：' + fine.label +
         '（高德定位服务鉴权失败，暂时只能到乡镇）';
-      if (window.console) console.warn('[知时智农] 高德逆地理编码失败：' + fine.error);
+      if (window.console) console.warn('[打药窗] 高德逆地理编码失败：' + fine.error);
     }
   }
 
@@ -2386,7 +2386,7 @@
       syncBoundaryZoom();
       MAP.instance.on('zoomend', syncBoundaryZoom);
     } catch (e) {
-      console.warn('[知时智农] 本地边界绘制失败：', e.message);
+      console.warn('[打药窗] 本地边界绘制失败：', e.message);
     }
   }
 
@@ -2511,7 +2511,7 @@
       // 容器尺寸变化后通知地图重绘
       setTimeout(function () { if (MAP.instance) MAP.instance.resize(); }, 60);
     }).catch(function (err) {
-      console.warn('[知时智农] 高德地图不可用，已降级：', err.message);
+      console.warn('[打药窗] 高德地图不可用，已降级：', err.message);
       MAP.failed = true;
       updateMapMode();
       renderFallbackMap(sel);
@@ -2524,14 +2524,14 @@
 
     $('layerRoad').onclick = function () { setMapLayer('road'); };
     $('layerSat').onclick = function () { setMapLayer('sat'); };
-    bindMapGrab();
+    bindSheetDrag();
 
     // 预加载 SDK：打开弹窗时就后台开始拉取，
     // 这样用户点"展开地图"时基本已经就绪（避免首屏多等 1-2 秒）
     loadAMap().catch(function (err) {
       MAP.failed = true;
       updateMapMode();
-      console.warn('[知时智农] 高德 SDK 预加载失败：', err.message);
+      console.warn('[打药窗] 高德 SDK 预加载失败：', err.message);
     });
   }
 
@@ -2762,7 +2762,7 @@
     $('fResults').innerHTML = '';
     var body0 = document.querySelector('.plot-modal .modal-body');
     if (body0) body0.scrollTop = 0;
-    setMapFull(false);
+    SHEET.detent = 'peek';
 
     var base = plot || activePlot();
     form = { lat: base.lat, lon: base.lon, place: base.place, results: [] };
@@ -2777,17 +2777,17 @@
       $('fHint').textContent = '已选地点：' + $('fHint').textContent.replace('已选地点：', '') + '（默认沿用当前地块，可修改）';
     }
 
-    /* 地图常驻弹窗上半屏，不再有「展开/收起」：
-       这个工具的核心动作就是在地图上点自己的地，藏起来等于让人多按一次。
-       表单放在地图下方独立滚动，键盘弹起时只压缩表单区，地图不会被挡。 */
+    /* 手机：地图铺满整屏 + 表单抽屉默认停在 peek（地图为主，看得见自己的地）。
+       桌面：卡片布局，setSheetDetent 会移除位移，地图在上、表单在下。 */
     bindMapStage();
     mapCenterOn(base.lon, base.lat, plot ? 13 : 12);
     lockBody(true);
     $('plotMask').classList.add('on');
-    // 展开后需要重绘地图（此时容器才有真实尺寸）
+    // 弹窗出现后才有真实尺寸：重绘地图，并把抽屉落到默认档位
     setTimeout(function () {
       renderMap({ lat: base.lat, lon: base.lon });
       if (MAP.instance) MAP.instance.resize();
+      setSheetDetent('peek', false);
     }, 80);
     /* 手机端不自动聚焦名称：弹窗一开就弹键盘，会把地图挡掉一半，
        而这一步真正要做的是先在地图上点自己的地。桌面端保留聚焦方便直接输入。 */
@@ -2798,77 +2798,96 @@
 
   function closeModal() {
     $('plotMask').classList.remove('on');
-    setMapFull(false);
+    SHEET.detent = 'peek';
+    var s = $('plotSheet');
+    if (s) { s.classList.remove('dragging'); s.style.removeProperty('--sheet-y'); }
     lockBody(false);
     state.editing = null;
   }
 
   /**
-   * 地图全屏：选地块时把地图铺满屏，能看清田块与道路；
-   * 退出后表单回到原位。进入时顺手放大到村组级（≥14 级）。
+   * 高德式底部抽屉：手机上是「地图铺满 + 可拖拽表单抽屉」。
+   * 抽屉贴底，用 --sheet-y（距顶的位移，px）在三个档位间移动：
+   *   form 表单展开 / peek 默认（地图为主）/ map 地图最大化；
+   * 继续下拉超过阈值则关闭。桌面端不启用（卡片布局，--sheet-y 被移除）。
    */
-  function setMapFull(on) {
-    var modal = document.querySelector('.plot-modal');
-    if (!modal) return;
-    modal.classList.toggle('map-full', !!on);
-    var g = $('mapGrab');
-    if (g) g.setAttribute('aria-label', on ? '下拉收起地图' : '上拉全屏地图');
-    if (!MAP.instance && MAP.failed) {
-      /* 降级成本地示意图时没有 resize 这种能力，必须按新高度重画，
-         否则地图只占上面一小条、下面全是空白。 */
-      setTimeout(function () {
-        try { renderFallbackMap(pickSel()); } catch (e) { /* 忽略 */ }
-      }, 200);
-      return;
-    }
-    if (!MAP.instance) return;
-    setTimeout(function () {
-      try {
-        MAP.instance.resize();
-        if (on && form.lon) {
-          var z = MAP.instance.getZoom ? MAP.instance.getZoom() : 14;
-          mapCenterOn(form.lon, form.lat, Math.max(z || 0, 14));
-        }
-        if (on && form.lat) drawMarker(form.lat, form.lon);
-      } catch (e) { /* 地图未就绪时忽略 */ }
-    }, 160);
+  var SHEET = { detent: 'peek', y: 0 };
+  function isSheetMobile() {
+    return window.matchMedia && window.matchMedia('(max-width:640px)').matches;
+  }
+  function detentPx(name) {
+    var vh = window.innerHeight || 640;
+    if (name === 'form') return Math.round(vh * 0.06);
+    if (name === 'map') return Math.round(vh * 0.66);
+    return Math.round(vh * 0.42);              // peek
+  }
+  function setSheetDetent(name, animate) {
+    SHEET.detent = name;
+    var s = $('plotSheet');
+    if (!s) return;
+    if (!isSheetMobile()) { s.style.removeProperty('--sheet-y'); SHEET.y = 0; return; }
+    var y = detentPx(name); SHEET.y = y;
+    if (animate !== false) s.classList.remove('dragging');
+    s.style.setProperty('--sheet-y', y + 'px');
+  }
+  function sheetDismiss() {
+    var s = $('plotSheet');
+    var vh = window.innerHeight || 640;
+    if (s) { s.classList.remove('dragging'); s.style.setProperty('--sheet-y', vh + 'px'); }
+    setTimeout(closeModal, 240);
   }
 
   /**
-   * 地图把手：上拉展开、下拉收起、轻点切换。
-   * 用 pointer 事件而不是 click，手机上才有"拽"的手感；
-   * 阈值 30px，避免地图本身的小幅拖动误触。
+   * 抽屉把手：pointer 事件跟随手指，松手按位置 + 速度吸附到最近档位，
+   * 下拉过界关闭。这才是"拽"的手感，而不是点一下切换。
    */
-  function bindMapGrab() {
-    var g = $('mapGrab');
+  function bindSheetDrag() {
+    var g = $('sheetGrab');
     if (!g || g.__bound) return;
     g.__bound = true;
-    var y0 = null, moved = 0;
+    var s = null, y0 = null, startY = 0, lastY = 0, lastT = 0, v = 0;
 
-    function isFull() {
-      var m = document.querySelector('.plot-modal');
-      return !!(m && m.classList.contains('map-full'));
-    }
-    g.addEventListener('pointerdown', function (e) {
-      y0 = e.clientY; moved = 0;
+    function down(e) {
+      if (!isSheetMobile()) return;
+      s = $('plotSheet'); if (!s) return;
+      y0 = e.clientY; startY = SHEET.y; v = 0; lastY = e.clientY; lastT = Date.now();
       try { g.setPointerCapture(e.pointerId); } catch (err) { /* 旧浏览器忽略 */ }
-    });
-    g.addEventListener('pointermove', function (e) {
-      if (y0 === null) return;
-      moved = e.clientY - y0;
-    });
-    function end() {
-      if (y0 === null) return;
-      var dy = moved; y0 = null;
-      if (dy <= -30) { if (!isFull()) setMapFull(true); }
-      else if (dy >= 30) { if (isFull()) setMapFull(false); }
-      else if (Math.abs(dy) < 8) setMapFull(!isFull());
+      s.classList.add('dragging');
     }
-    g.addEventListener('pointerup', end);
-    g.addEventListener('pointercancel', function () { y0 = null; });
+    function move(e) {
+      if (y0 === null || !s) return;
+      var ny = startY + (e.clientY - y0);
+      var top = detentPx('form'), vh = window.innerHeight || 640, max = vh * 0.9;
+      if (ny < top) ny = top + (ny - top) * 0.28;          // 顶部橡皮筋
+      if (ny > max) ny = max + (ny - max) * 0.2;           // 底部橡皮筋
+      SHEET.y = ny; s.style.setProperty('--sheet-y', ny + 'px');
+      var now = Date.now(), dt = now - lastT;
+      if (dt > 0) { v = (e.clientY - lastY) / dt; lastY = e.clientY; lastT = now; }
+    }
+    function up() {
+      if (y0 === null || !s) return;
+      s.classList.remove('dragging');
+      var vh = window.innerHeight || 640;
+      if (SHEET.y > vh * 0.84 || (SHEET.y > vh * 0.76 && v > 0.35)) { y0 = null; sheetDismiss(); return; }
+      var order = ['form', 'peek', 'map'], best = 'peek', bd = Infinity, i, d;
+      for (i = 0; i < order.length; i++) { d = Math.abs(SHEET.y - detentPx(order[i])); if (d < bd) { bd = d; best = order[i]; } }
+      if (v < -0.6) best = (SHEET.y < detentPx('peek')) ? 'form' : 'peek';
+      else if (v > 0.6) best = (SHEET.y < detentPx('map')) ? 'peek' : 'map';
+      setSheetDetent(best);
+      y0 = null;
+    }
+    g.addEventListener('pointerdown', down);
+    g.addEventListener('pointermove', move);
+    g.addEventListener('pointerup', up);
+    g.addEventListener('pointercancel', function () { if (s) { s.classList.remove('dragging'); setSheetDetent(SHEET.detent); } y0 = null; });
     g.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMapFull(!isFull()); }
+      if (!isSheetMobile()) return;
+      var order = ['map', 'peek', 'form'], idx = order.indexOf(SHEET.detent);
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSheetDetent(order[Math.min(order.length - 1, idx + 1)]); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); setSheetDetent(order[Math.max(0, idx - 1)]); }
     });
+    // 旋转/缩放后按当前档位重新落位
+    window.addEventListener('resize', function () { if ($('plotMask').classList.contains('on')) setSheetDetent(SHEET.detent, false); });
   }
 
   function showFormResults(list) {
@@ -3019,7 +3038,7 @@
     d.className = 'msg ' + role;
     var who = document.createElement('div');
     who.className = 'who';
-    who.textContent = (role === 'me') ? '我' : '知时智农';
+    who.textContent = (role === 'me') ? '我' : '打药窗';
     var body = document.createElement('div');
     body.className = 'body';
     /* 首答分层：第一段是结论，其余整段折进「展开完整分析」。
@@ -3555,7 +3574,7 @@
     var log = $('qaLog');
     var d = document.createElement('div');
     d.className = 'msg bot typing-wrap';
-    d.innerHTML = '<div class="who">知时智农</div><div class="typing"><i></i><i></i><i></i></div>';
+    d.innerHTML = '<div class="who">打药窗</div><div class="typing"><i></i><i></i><i></i></div>';
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
     return d;
@@ -3768,7 +3787,7 @@
       if (err && /数字不一致/.test(err.message || '')) {
         appendMsg('bot', template, true);
         if (err.extra && err.extra.length) {
-          console.warn('[知时智农] 大模型改写出现新数字，已拦截:', err.extra);
+          console.warn('[打药窗] 大模型改写出现新数字，已拦截:', err.extra);
         }
       } else {
         appendMsg('bot', template, true);

@@ -8,8 +8,8 @@
  *   Node 内置 zlib 就能压缩，所以这里手写了一个约 60 行的编码器。
  *
  * 图形设计：
- *   底：蓝 → 绿的对角渐变（蓝＝天空/水，绿＝田野，呼应「知时」与「智农」）
- *   标：白色幼苗（一根茎 + 左右两片叶），与界面左上角的品牌图形完全一致
+ *   底：亮翡翠 → 深翡翠的对角渐变（呼应品牌主色 #0E6B4A / 深色 #0A4F37）
+ *   标：白色「窗」框 + 左上格一滴水（药液）——「打药窗」，与界面左上角品牌图形完全一致
  *
  * 采样方式：
  *   4×4 超采样（每像素 16 个样本）做抗锯齿，不需要任何图形库。
@@ -120,8 +120,8 @@ function inCapsule(u, v, x1, y1, x2, y2, rad) {
    三、配色
    ============================================================ */
 
-const C_TOP = [37, 99, 235];    // #2563eb 品牌蓝
-const C_BOT = [22, 163, 74];    // #16a34a 田野绿
+const C_TOP = [31, 185, 138];   // 亮翡翠（上）
+const C_BOT = [11, 79, 55];     // 深翡翠 #0A4F37（下）
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 function mix(c1, c2, t) {
@@ -142,22 +142,62 @@ function bgColor(u, v) {
    四、绘制
    ============================================================ */
 
-/** 幼苗图形（单位坐标），scale 用于缩到 maskable 安全区 */
+const SS = 4;          // 超采样倍数
+const SAMPLES = SS * SS;
+
+/** 圆角矩形内部（显式边界版，用于画窗框） */
+function rrBox(x, y, x0, y0, x1, y1, rad) {
+  if (x < x0 || x > x1 || y < y0 || y > y1) return false;
+  const dx = Math.max(x0 + rad - x, 0, x - (x1 - rad));
+  const dy = Math.max(y0 + rad - y, 0, y - (y1 - rad));
+  return dx * dx + dy * dy <= rad * rad;
+}
+
+/** 三角形内部（同侧法） */
+function tri(px, py, ax, ay, bx, by, cx2, cy2) {
+  const d1 = (px - bx) * (ay - by) - (py - by) * (ax - bx);
+  const d2 = (px - cx2) * (by - cy2) - (py - cy2) * (bx - cx2);
+  const d3 = (px - ax) * (cy2 - ay) - (py - ay) * (cx2 - ax);
+  const neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+  const pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+  return !(neg && pos);
+}
+
+/** 水滴：以圆为体、尖角在上；三角底边正好落在圆的左右极点上 → 轮廓平滑无缝 */
+function droplet(x, y, cx, ccy, R) {
+  const body = Math.hypot(x - cx, y - ccy) <= R;
+  const apexY = ccy - 1.9 * R;
+  const tip = tri(x, y, cx, apexY, cx - R, ccy, cx + R, ccy);
+  return body || tip;
+}
+
+/**
+ * 「打药窗」图形（单位坐标），scale 用于缩到 maskable 安全区
+ *   - 外框：圆角「窗」框（边框 + 十字格条）
+ *   - 左上格：一滴药液
+ */
 function inGlyph(u, v, scale) {
-  // 先把坐标变换到以中心为原点、按 scale 缩放后的坐标系
   const x = (u - 0.5) / scale + 0.5;
   const y = (v - 0.5) / scale + 0.5;
 
-  // 茎：从 y=0.815 到 y=0.335，宽 0.054
-  if (inCapsule(x, y, 0.5, 0.815, 0.5, 0.335, 0.027)) return true;
-  // 左右两片叶，关于茎对称，叶片上翘 38°
-  if (inEllipse(x, y, 0.650, 0.402, 0.156, 0.075, -0.663)) return true;
-  if (inEllipse(x, y, 0.350, 0.402, 0.156, 0.075, 0.663)) return true;
-  return false;
-}
+  const L = 0.16, R = 0.84, T = 0.16, B = 0.84; // 窗框外沿
+  const rad = 0.16;                              // 外圆角
+  const t = 0.085;                               // 边框厚度
+  const bw = 0.062;                              // 十字格条宽度
 
-const SS = 4;          // 超采样倍数
-const SAMPLES = SS * SS;
+  const outer = rrBox(x, y, L, T, R, B, rad);
+  const inner = rrBox(x, y, L + t, T + t, R - t, B - t, rad * 0.55);
+  const border = outer && !inner;
+
+  const cx = (L + R) / 2, cy = (T + B) / 2;
+  const vbar = outer && Math.abs(x - cx) <= bw / 2;
+  const hbar = outer && Math.abs(y - cy) <= bw / 2;
+
+  // 左上格中心 ≈ (0.357, 0.357)，水滴整体落在格内、不碰边框
+  const drop = droplet(x, y, 0.345, 0.375, 0.055);
+
+  return border || vbar || hbar || drop;
+}
 
 /**
  * @param {number} size     边长
@@ -207,18 +247,19 @@ function drawIcon(size, rounded, glyphScale) {
    五、矢量版（favicon.svg，浏览器标签页用）
    ============================================================ */
 const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <title>知时智农</title>
+  <title>打药窗</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0" stop-color="#2563eb"/>
-      <stop offset="1" stop-color="#16a34a"/>
+      <stop offset="0" stop-color="#1FB98A"/>
+      <stop offset="1" stop-color="#0A4F37"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="115" ry="115" fill="url(#bg)"/>
-  <g fill="#ffffff">
-    <rect x="243" y="171" width="26" height="246" rx="13" ry="13"/>
-    <ellipse cx="333" cy="206" rx="80" ry="38" transform="rotate(-38 333 206)"/>
-    <ellipse cx="179" cy="206" rx="80" ry="38" transform="rotate(38 179 206)"/>
+  <g fill="#ffffff" stroke="#ffffff">
+    <rect x="82" y="82" width="348" height="348" rx="70" fill="none" stroke-width="44"/>
+    <rect x="240" y="126" width="32" height="260" stroke="none"/>
+    <rect x="126" y="240" width="260" height="32" stroke="none"/>
+    <path stroke="none" d="M177 138.8 L149 192 A28 28 0 0 0 205 192 Z"/>
   </g>
 </svg>
 `;

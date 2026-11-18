@@ -3,28 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-<title>知时智农 · 农事决策控制台</title>
+<title>打药窗 · 农事决策控制台</title>
 <meta name="description" content="把天气预报翻译成能执行的农事决定：未来 7 天哪天几点适合打药、要不要浇水、能不能晾晒。华北平原冬小麦 / 夏玉米农事决策助手。">
 
 <!-- ========== 可安装到手机桌面（PWA） ========== -->
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#e6efe9">
-<meta property="og:title" content="知时智农 · 农事时机问答智能体">
+<meta property="og:title" content="打药窗 · 农事时机问答智能体">
 <meta property="og:description" content="一屏回答这件活今天能不能干、几点干。判定由本地规则引擎按实时气象与属地作业标准算出。">
 <meta property="og:image" content="img/share-cover.webp">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-<meta name="application-name" content="知时智农">
+<meta name="application-name" content="打药窗">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="知时智农">
+<meta name="apple-mobile-web-app-title" content="打药窗">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="format-detection" content="telephone=no">
 <style>
 /* ============================================================
-   知时智农 · 现代 SaaS 控制台
+   打药窗 · 现代 SaaS 控制台
    -------------------------------------------------------------
    设计语言：Linear / Vercel / Stripe 一类专业工具
      · 中性浅灰底 + 白色表面 + 1px 边框 + 极轻阴影
@@ -33,17 +33,18 @@
    不追求装饰，追求"每个元素都有理由"。
    ============================================================ */
 :root{
-  /* v5.7 高对比配色：底色收暖、卡片纯白、正文近墨绿黑，
-     主色从灰绿提到深翡翠绿，状态色拉开明度差，避免"灰灰白白"。 */
+  /* v5.8 半透明玻璃 + 高对比文字：卡片是浮在彩色农场底图上的磨砂玻璃，
+     文字/描边仍保持 v5.7 的高对比，避免回到"灰灰白白"。 */
   --bg:#EFF3EC;
-  --surface:#FFFFFF;
-  --surface-solid:#FFFFFF;
+  --surface:rgba(255,255,255,.66);       /* 大面板：玻璃 */
+  --surface-solid:rgba(255,255,255,.84); /* 控件/子块：更实一档的乳白 */
+  --glass-edge:rgba(255,255,255,.55);    /* 玻璃高光描边 */
   --surface-2:#F3F7F0;
   --border:#CFD9CB;
   --border-strong:#B3C1AE;
   --text:#0E1712;
   --text-2:#3B493F;
-  --text-3:#5F6D65;
+  --text-3:#52605A;   /* 三级文字：比 v5.7 再深一档，玻璃底上仍清晰 */
   --brand:#0E6B4A;
   --brand-weak:#E0F1E7;
   --brand-d:#0A4F37;   /* 深一档的品牌色：标题/链接用；缺了它 var() 会失效并回退成浏览器默认蓝 */
@@ -111,13 +112,14 @@ body{
 .bg-blobs{
   position:absolute;inset:-20%;
   background:
-    radial-gradient(46% 42% at 10% 4%,  rgba(37,99,235,.52), transparent 60%),
-    radial-gradient(44% 40% at 90% 2%,  rgba(249,168,37,.50), transparent 62%),
-    radial-gradient(52% 48% at 80% 44%, rgba(22,163,74,.40), transparent 64%),
-    radial-gradient(48% 44% at 6% 66%,  rgba(56,189,248,.40), transparent 62%),
-    radial-gradient(44% 42% at 48% 99%, rgba(16,163,74,.34), transparent 60%),
-    linear-gradient(158deg,#dbe6ff 0%,#d8f5e6 44%,#fff1dd 100%);
-  filter:blur(4px) saturate(118%);
+    radial-gradient(46% 42% at 10% 4%,  rgba(37,99,235,.60), transparent 60%),
+    radial-gradient(44% 40% at 90% 2%,  rgba(249,168,37,.58), transparent 62%),
+    radial-gradient(52% 48% at 80% 44%, rgba(22,163,74,.50), transparent 64%),
+    radial-gradient(48% 44% at 6% 66%,  rgba(56,189,248,.50), transparent 62%),
+    radial-gradient(44% 42% at 48% 99%, rgba(16,163,74,.42), transparent 60%),
+    radial-gradient(40% 38% at 96% 82%, rgba(168,85,247,.34), transparent 60%),
+    linear-gradient(158deg,#d7e4ff 0%,#cdeede 44%,#ffeccb 100%);
+  filter:blur(2px) saturate(168%);
   animation:drift 34s ease-in-out infinite alternate;
 }
 @keyframes drift{
@@ -134,16 +136,14 @@ body{
   mask-image:radial-gradient(120% 90% at 50% 0%, #000 14%, rgba(0,0,0,.5) 60%, transparent 100%);
   -webkit-mask-image:radial-gradient(120% 90% at 50% 0%, #000 14%, rgba(0,0,0,.5) 60%, transparent 100%);
 }
-/* 白色渐隐：顶部（页头/标题区）保留背景色，内容区逐步变白 */
+/* 白色渐隐：只极轻地压一下顶部，让彩色底图能透进玻璃卡片（玻璃靠底图着色才成立） */
 .bg-veil{
   position:absolute;inset:0;
   background:linear-gradient(180deg,
-    rgba(255,255,255,.06) 0%,
-    rgba(255,255,255,.24) 110px,
-    rgba(255,255,255,.58) 210px,
-    rgba(255,255,255,.80) 320px,
-    rgba(255,255,255,.90) 460px,
-    rgba(255,255,255,.93) 100%);
+    rgba(255,255,255,.16) 0%,
+    rgba(255,255,255,.06) 150px,
+    rgba(255,255,255,.02) 320px,
+    rgba(255,255,255,0) 100%);
 }
 @media (prefers-reduced-motion:reduce){
   .bg-blobs{animation:none}
@@ -179,10 +179,10 @@ button{font-family:inherit}
 
 /* ---------- 侧栏 ---------- */
 .sidebar{
-  background:rgba(255,255,255,.82);
-  backdrop-filter:blur(14px);
-  -webkit-backdrop-filter:blur(14px);
-  border-right:1px solid var(--border);
+  background:rgba(255,255,255,.72);
+  -webkit-backdrop-filter:blur(18px) saturate(170%);backdrop-filter:blur(18px) saturate(170%);
+  border-right:1px solid var(--glass-edge);
+  box-shadow:1px 0 0 rgba(255,255,255,.6),8px 0 28px rgba(18,28,22,.06);
   display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
 }
 .brand{
@@ -1149,13 +1149,17 @@ html.zz-chat #zzBar{display:none!important}
 }
 
 /* ============================================================
-   v2 设计语言（对齐《知时智农-浅色UI原型 v2》）
+   v2 设计语言（对齐《打药窗-浅色UI原型 v2》）
    ============================================================ */
 /* ---- 区块标题 ---- */
 .sec-h{display:flex;align-items:baseline;gap:9px;margin:22px 2px 10px}
 .sec-h h2{flex:none;white-space:nowrap;font-size:16.5px;font-weight:600;letter-spacing:-.01em;margin:0;color:var(--text)}
 .sec-h .hint{min-width:0;font-size:11.5px;line-height:1.5;color:var(--text-3)}
 .sec-h .act{margin-left:auto;flex:none}
+/* 直接落在彩色底图上的文字：加一层极淡白色光晕，保证玻璃底图变艳后仍清晰 */
+.sec-h h2,.sec-h .hint,.hint,.crumb .k,.crumb .v,.wk-note,.foot{
+  text-shadow:0 1px 0 rgba(255,255,255,.85),0 0 6px rgba(255,255,255,.55);
+}
 
 /* ---- 天象头 ---- */
 .sky{position:relative;margin:12px 0 0;border-radius:22px;overflow:hidden;
@@ -1191,8 +1195,9 @@ html.zz-chat #zzBar{display:none!important}
 
 /* ---- 适配度卡 ---- */
 .gauge-card{position:relative;z-index:2;margin:10px 0 0;padding:16px 18px;
-  background:var(--surface-solid);border:1px solid var(--border);border-radius:18px;
-  box-shadow:var(--shadow-md);display:flex;gap:18px;align-items:center}
+  background:var(--surface);border:1px solid var(--glass-edge);border-radius:18px;
+  -webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
+  box-shadow:var(--shadow-md),inset 0 1px 0 rgba(255,255,255,.7);display:flex;gap:18px;align-items:center}
 .vb-wrap{flex:0 0 auto;min-width:150px;max-width:190px;padding-right:18px;
   border-right:1px solid var(--border);display:flex;flex-direction:column;gap:5px}
 .vb{font-size:18px;font-weight:600;line-height:1.3;letter-spacing:-.01em;color:var(--brand-d)}
@@ -1211,11 +1216,14 @@ html.zz-chat #zzBar{display:none!important}
 .gfill{display:block;height:100%;border-radius:99px;background:var(--brand);transition:width .34s cubic-bezier(.2,.8,.2,1)}
 
 /* ---- 详情卡（置信度/倒计时/推演） ---- */
-.detail-card{margin:10px 0 0;background:var(--surface-solid);border:1px solid var(--border);
-  border-radius:18px;box-shadow:var(--shadow);padding:14px}
+.detail-card{margin:10px 0 0;background:var(--surface);border:1px solid var(--glass-edge);
+  border-radius:18px;-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
+  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.7);padding:14px}
 
-/* ---- 通用卡片换成大圆角 ---- */
-.card{border-radius:18px;border-color:var(--border);background:var(--surface-solid);box-shadow:var(--shadow)}
+/* ---- 通用卡片换成大圆角（玻璃：半透明白 + 模糊 + 顶部高光描边） ---- */
+.card{border-radius:18px;border-color:var(--glass-edge);background:var(--surface);
+  -webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
+  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.7)}
 .card-head{padding:13px 15px}
 .card-body{padding:14px 15px}
 .card-title{font-size:13.5px;font-weight:600;color:var(--text)}
@@ -1234,8 +1242,9 @@ html.zz-chat #zzBar{display:none!important}
 .plot-sec,.plot-grid{display:none}
 
 /* ---- 图表容器 ---- */
-.cbox{background:var(--surface-solid);border:1px solid var(--border);border-radius:18px;
-  box-shadow:var(--shadow);padding:14px}
+.cbox{background:var(--surface);border:1px solid var(--glass-edge);border-radius:18px;
+  -webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
+  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.7);padding:14px}
 .cbox-h{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .cbox-h b{font-size:13.5px;font-weight:600;color:var(--text)}
 .cbox-h span{font-size:11px;color:var(--text-3)}
@@ -1245,8 +1254,8 @@ html.zz-chat #zzBar{display:none!important}
 .cbox-h .lg i s.dash{background:none;border-top:2px dashed currentColor;height:0}
 
 /* ---- 顶栏 / 底栏换肤 ---- */
-.topbar{background:rgba(255,255,255,.94);border-bottom-color:var(--border);box-shadow:0 1px 0 rgba(14,23,18,.04)}
-.tabbar{background:rgba(255,255,255,.96);border-top-color:var(--border)}
+.topbar{background:rgba(255,255,255,.80);border-bottom-color:var(--glass-edge);box-shadow:0 1px 0 rgba(14,23,18,.04)}
+.tabbar{background:rgba(255,255,255,.80);border-top-color:var(--glass-edge)}
 .icon-btn{background:var(--surface-solid);border-color:var(--border);border-radius:10px}
 .btn{background:var(--brand);border-color:var(--brand);color:#fff;border-radius:10px}
 .btn:hover{background:#0A4F37;border-color:#0A4F37}
@@ -1267,8 +1276,10 @@ html.zz-chat #zzBar{display:none!important}
 .chart-scroll svg.chart{width:100%;height:auto;display:block}
 
 /* ---- 节气条 ---- */
-.jq-strip{margin:10px 0 0;padding:12px 16px 6px;background:var(--surface-solid);
-  border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}
+.jq-strip{margin:10px 0 0;padding:12px 16px 6px;background:var(--surface);
+  border:1px solid var(--glass-edge);border-radius:18px;
+  -webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
+  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.7)}
 .jq-head{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
 .jq-head b{font-size:15px;font-weight:600;color:var(--text)}
 .jq-head span{font-size:11.5px;color:var(--text-3)}
@@ -1308,8 +1319,9 @@ html.zz-chat #zzBar{display:none!important}
 /* ---- 我的：列表 + 滑轴（对齐原型） ---- */
 .home-top{display:flex;align-items:center;gap:9px;margin:0 0 10px}
 .btn-sm{height:32px;padding:0 12px;font-size:12px;border-radius:9px}
-.mine-list{background:var(--surface-solid);border:1px solid var(--border);border-radius:18px;
-  overflow:hidden;box-shadow:var(--shadow)}
+.mine-list{background:var(--surface);border:1px solid var(--glass-edge);border-radius:18px;
+  -webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
+  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.7);overflow:hidden}
 .mrow{display:flex;align-items:center;gap:11px;width:100%;padding:12px 16px;
   border:0;border-bottom:1px solid var(--border);text-align:left;background:none;color:inherit}
 .mrow:last-child{border-bottom:none}
@@ -1392,9 +1404,10 @@ html.zz-chat #zzBar{display:none!important}
 @media (max-width:640px){
   .tabbar{
     display:flex;position:fixed;left:0;right:0;bottom:0;z-index:130;
-    background:rgba(255,255,255,.95);
-    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
-    border-top:1px solid var(--border);
+    background:rgba(255,255,255,.74);
+    -webkit-backdrop-filter:blur(18px) saturate(170%);backdrop-filter:blur(18px) saturate(170%);
+    border-top:1px solid var(--glass-edge);
+    box-shadow:0 -1px 0 rgba(255,255,255,.6),0 -8px 24px rgba(18,28,22,.08);
     padding-bottom:env(safe-area-inset-bottom,0px);
   }
   .tabbar button{
@@ -1442,7 +1455,7 @@ html.zz-chat #zzBar{display:none!important}
     /* flex 默认 align-items:stretch，而按钮有固定 52px 高，会在 62px 的内容区里
        顶部对齐——下面白空 10px，看着就是"上下不居中"。显式居中即可。 */
     align-items:center;
-    background:rgba(255,255,255,.96);
+    background:rgba(255,255,255,.80);
     -webkit-backdrop-filter:blur(24px) saturate(180%);
     backdrop-filter:blur(24px) saturate(180%);
     box-shadow:0 10px 30px rgba(14,23,18,.16),0 2px 6px rgba(14,23,18,.06);
@@ -1570,7 +1583,7 @@ html.zz-chat #zzBar{display:none!important}
 
 
 /* ============================================================
-   新增地块：地图常驻上半，表单在下（微信选点那种分层）
+   新增地块：手机=地图铺满 + 高德式可拖拽底部抽屉；桌面=地图在上、表单在下的卡片
    ============================================================ */
 .modal.plot-modal{max-width:560px}
 .modal.plot-modal .modal-head{
@@ -1588,6 +1601,7 @@ html.zz-chat #zzBar{display:none!important}
 .pm-save{color:var(--brand);font-weight:600;text-align:right}
 
 .modal.plot-modal::before{display:none}
+/* 桌面：地图作为卡片上半，抽屉就是普通内容，把手隐藏 */
 .plot-map{
   position:relative;display:flex;flex-direction:column;flex:none;
   height:clamp(200px,34vh,320px);
@@ -1595,28 +1609,58 @@ html.zz-chat #zzBar{display:none!important}
 }
 .plot-map .map-stage{flex:1;height:auto;min-height:0}
 .plot-map .map-read{flex:none}
+.plot-sheet{position:static;display:flex;flex-direction:column;min-height:0;flex:1}
+.plot-sheet .modal-body{flex:1;min-height:0;overflow-y:auto}
+.sheet-grab{display:none}
 
+/* ---------- 手机：地图铺满整屏，表单是浮在地图上的可拖拽抽屉 ---------- */
 @media (max-width:640px){
   .modal.plot-modal{
     width:100%;max-width:100%;height:100dvh;max-height:100dvh;
-    border:0;border-radius:0;
+    border:0;border-radius:0;overflow:hidden;
     animation:plotIn .28s cubic-bezier(.22,1,.36,1) both;
   }
-  @keyframes plotIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes plotIn{from{opacity:0}to{opacity:1}}
+  /* 地图变成全屏背景层 */
+  .plot-map{
+    position:absolute;inset:0;height:auto;flex:none;border-bottom:0;background:#eef2e4;
+  }
+  .plot-map .map-stage{position:absolute;inset:0}
+  /* 已选点的小浮标，落在地图左上角，抽屉盖住时仍可见 */
+  .plot-map .map-read{
+    position:absolute;left:10px;top:calc(40px + env(safe-area-inset-top,0px));flex:none;
+    max-width:calc(100% - 100px);padding:6px 10px;border-radius:12px;
+    background:rgba(255,255,255,.86);-webkit-backdrop-filter:blur(10px) saturate(160%);backdrop-filter:blur(10px) saturate(160%);
+    border:1px solid var(--glass-edge);box-shadow:var(--shadow-sm);font-size:11.5px;
+  }
+  /* 抽屉：贴底，高度 92dvh，靠 --sheet-y 上下移动 */
+  .plot-sheet{
+    position:absolute;left:0;right:0;bottom:0;height:92dvh;
+    display:flex;flex-direction:column;min-height:0;border-radius:22px 22px 0 0;
+    background:rgba(255,255,255,.86);
+    -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
+    box-shadow:0 -16px 48px rgba(18,28,22,.22),inset 0 1px 0 rgba(255,255,255,.85);
+    transform:translateY(var(--sheet-y,42dvh));
+    transition:transform .32s cubic-bezier(.22,1,.36,1);will-change:transform;
+  }
+  .plot-sheet.dragging{transition:none}
+  .sheet-grab{
+    display:flex;align-items:center;justify-content:center;height:26px;flex:none;
+    border:0;background:transparent;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;
+  }
+  .sheet-grab .grabber{width:42px;height:5px;border-radius:99px;background:rgba(17,24,39,.28);
+    transition:width .15s,background .15s}
+  .sheet-grab:active{cursor:grabbing}
+  .sheet-grab:active .grabber{width:54px;background:rgba(17,24,39,.4)}
   .modal.plot-modal .modal-head{
-    padding:calc(6px + env(safe-area-inset-top,0px)) 10px 6px;
-    border-bottom:1px solid var(--border);
-    background:rgba(255,255,255,.9);
-    -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+    padding:6px 10px;flex:none;border-bottom:1px solid var(--border);background:transparent;
+    -webkit-backdrop-filter:none;backdrop-filter:none;
   }
   .modal.plot-modal .modal-head h3{font-size:16px}
   .pm-tx{font-size:15px;min-width:56px}
-  /* 固定 px 而不是 vh：键盘弹起会压缩视口，用 vh 的话地图会被压成一条 */
-  .plot-map{height:232px}
   .modal.plot-modal .modal-body{
-    padding:12px 14px 8px;
-    /* 底部要留够：滚到最后一条附近地点时，列表边框不能被弹窗边缘切掉 */
-    padding-bottom:calc(30px + env(safe-area-inset-bottom,0px));
+    flex:1;min-height:0;overflow-y:auto;
+    padding:12px 14px 8px;padding-bottom:calc(30px + env(safe-area-inset-bottom,0px));
   }
   .modal.plot-modal .nearby-list{margin-bottom:6px}
 }
@@ -1625,21 +1669,7 @@ html.zz-chat #zzBar{display:none!important}
 .plot-save-row{padding:14px 0 2px}
 .plot-save-row .btn{width:100%}
 
-/* ---------- 新增地块（v5.7）：上拉手势 + 位置摘要 + 分组表单 ---------- */
-.map-grab{position:absolute;left:50%;bottom:32px;transform:translateX(-50%);z-index:6;
-  width:80px;height:30px;border:0;background:transparent;padding:0;
-  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;
-  cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent}
-.map-grab:before{content:"";width:0;height:0;
-  border-left:5px solid transparent;border-right:5px solid transparent;
-  border-bottom:6px solid rgba(14,23,18,.38);transition:transform .2s}
-.plot-modal.map-full .map-grab:before{transform:rotate(180deg)}
-.map-grab-pill{width:54px;height:6px;border-radius:3px;background:rgba(14,23,18,.42);
-  box-shadow:0 1px 0 rgba(255,255,255,.85),0 2px 6px rgba(14,23,18,.18);transition:background .15s,width .15s}
-.map-grab:active{cursor:grabbing}
-.map-grab:active .map-grab-pill{background:rgba(14,23,18,.5);width:54px}
-.plot-modal.map-full .map-grab{bottom:36px}
-
+/* ---------- 位置摘要 + 分组表单 ---------- */
 .fmini{display:flex;align-items:center;gap:9px;padding:9px 11px;margin:0 0 14px;
   background:var(--brand-weak);border:1px solid var(--border);border-radius:12px}
 .fmini-pin{width:26px;height:26px;border-radius:50%;background:var(--surface-solid);color:var(--brand-d);
@@ -1667,15 +1697,6 @@ html.zz-chat #zzBar{display:none!important}
 .nearby[open] > summary:after{content:"⌃"}
 .nearby .nearby-search{margin-top:2px}
 
-.plot-modal.map-full{height:100dvh;max-height:100dvh}
-.plot-modal.map-full .plot-map{height:calc(100dvh - 52px)}
-.plot-modal.map-full .modal-body{display:none}
-.plot-modal.map-full .map-read{padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))}
-@media (min-width:641px){
-  .plot-modal.map-full{height:92vh;max-height:92vh}
-  .plot-modal.map-full .plot-map{height:calc(92vh - 52px)}
-}
-
 /* ============================================================
    地块弹窗：iOS 底部抽屉（手机）/ 放大卡片（桌面）
    ============================================================ */
@@ -1692,7 +1713,7 @@ html.zz-chat #zzBar{display:none!important}
   .modal{
     width:100%;max-width:100%;max-height:92dvh;
     border-radius:28px 28px 0 0;border-bottom:0;
-    background:rgba(255,255,255,.9);
+    background:rgba(255,255,255,.82);
     -webkit-backdrop-filter:blur(30px) saturate(190%);
     backdrop-filter:blur(30px) saturate(190%);
     box-shadow:0 -20px 56px rgba(18,28,22,.3),inset 0 1px 0 rgba(255,255,255,.9);
@@ -1804,7 +1825,8 @@ html.zz-chat #zzBar{display:none!important}
   border:1px solid var(--border);border-radius:99px;padding:4px 12px;cursor:pointer}
 .an-form>div button:first-child{background:var(--brand);color:#fff;border-color:var(--brand)}
 /* ---- 作品说明（说明书） ---- */
-.proj-item{border:1px solid var(--border);border-radius:16px;background:var(--surface-solid);
+.proj-item{border:1px solid var(--glass-edge);border-radius:16px;background:var(--surface);
+  -webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
   margin-bottom:8px;overflow:hidden}
 .proj-item[open]{box-shadow:var(--shadow-md)}
 .proj-item summary{display:flex;align-items:center;gap:11px;padding:12px 14px;
@@ -2396,13 +2418,14 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <div class="brand-mark">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 20V9"/><path d="M12 12c0-3 2.2-5.4 5-5.4 0 3-2.2 5.4-5 5.4z"/>
-          <path d="M12 15c0-2.6-1.9-4.7-4.3-4.7 0 2.6 1.9 4.7 4.3 4.7z"/>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/>
+          <path d="M12 4.6v14.8M4.6 12h14.8"/>
+          <path d="M8 5.4c-1 1.7-2 2.7-2 3.7a2 2 0 0 0 4 0c0-1-1-2-2-3.7z" fill="currentColor" stroke="none"/>
         </svg>
       </div>
       <div>
-        <div class="brand-name">知时智农</div>
+        <div class="brand-name">打药窗</div>
         <div class="brand-sub">农事时机问答智能体</div>
       </div>
       <button class="drawer-close" id="drawerClose" aria-label="关闭地块列表">
@@ -2795,9 +2818,9 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           </details>
         </div>
 
-        <div class="sec-h"><h2>关于</h2><span class="hint">v5.2</span></div>
+        <div class="sec-h"><h2>关于</h2><span class="hint">v5.8</span></div>
         <div class="disc">
-          <b>知时智农 · 华北平原冬小麦 / 夏玉米农事时机助手</b>
+          <b>打药窗 · 华北平原冬小麦 / 夏玉米农事时机助手</b>
           <p>气象 和风天气 + Open-Meteo · 地图 高德 · 标准 河北省 / 市级公开文件</p>
           <p>建议仅供参考，以当地农技部门意见与农药标签为准。地块、阈值与纠错记录只存本机，不上传。</p>
         </div>
@@ -2806,7 +2829,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           <summary>高级：安装与模型设置</summary>
           <div class="std-adv-body">
             <div class="mine-list">
-              <a class="mrow apk-row" id="apkRow" href="download/zhishi-zhinong.apk" download="知时智农.apk">
+              <a class="mrow apk-row" id="apkRow" href="download/zhishi-zhinong.apk" download="打药窗.apk">
                 <span class="mic">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M6 10h12v7a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-7Z"/><path d="M8 10 6.5 6.5M16 10l1.5-3.5"/><path d="M9.5 14h.01M14.5 14h.01"/>
@@ -2884,13 +2907,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 <!-- ================= 地块弹窗 ================= -->
 <div class="mask" id="plotMask">
   <div class="modal plot-modal">
-    <div class="modal-head">
-      <button class="pm-tx" id="modalCancel" type="button">取消</button>
-      <h3 id="modalTitle">新增地块</h3>
-      <button class="pm-tx pm-save" id="modalSave" type="button">保存</button>
-    </div>
-
-    <!-- 地图常驻上半屏：这个工具的核心动作就是"在地图上点自己的地" -->
+    <!-- 地图铺满整屏（手机）：核心动作是在地图上点自己的地；表单是浮在地图上的可拖拽抽屉 -->
     <div class="plot-map">
       <div class="map-stage" id="mapStage">
         <div id="amapBox" style="position:absolute;inset:0"></div>
@@ -2900,17 +2917,24 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           <button class="layer-btn" id="layerSat" type="button">卫星</button>
         </div>
       </div>
-      <div class="map-read">
+      <div class="map-read" id="mapReadBar">
         <span id="mapRead">点击地图选点</span>
         <span id="mapCoord" style="color:var(--text-3)">—</span>
       </div>
-      <!-- 上拉全屏 / 下拉收起：手机用户直接拽这条把手，不用找按钮 -->
-      <button class="map-grab" id="mapGrab" type="button" aria-label="上拉全屏，下拉收起">
-        <span class="map-grab-pill" aria-hidden="true"></span>
-      </button>
     </div>
 
-    <div class="modal-body">
+    <!-- 高德式底部抽屉：拽顶部把手上拉展开表单、下拉收起地图，继续下拉关闭 -->
+    <div class="plot-sheet" id="plotSheet">
+      <button class="sheet-grab" id="sheetGrab" type="button" aria-label="上拉展开表单，下拉收起，继续下拉关闭">
+        <span class="grabber" aria-hidden="true"></span>
+      </button>
+      <div class="modal-head">
+        <button class="pm-tx" id="modalCancel" type="button">取消</button>
+        <h3 id="modalTitle">新增地块</h3>
+        <button class="pm-tx pm-save" id="modalSave" type="button">保存</button>
+      </div>
+
+      <div class="modal-body">
       <!-- 已选位置常驻在表单顶部：滚到哪都知道现在选的是哪儿 -->
       <div class="fmini">
         <span class="fmini-pin" aria-hidden="true">
@@ -2971,7 +2995,8 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
         <button class="btn btn-primary" id="modalSave2" type="button">保存地块</button>
       </div>
 
-    </div>
+      </div><!-- /modal-body -->
+    </div><!-- /plot-sheet -->
   </div>
 </div>
 

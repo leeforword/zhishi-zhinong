@@ -1,15 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <title>知时智农</title>
+  <title>打药窗</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0" stop-color="#2563eb"/>
-      <stop offset="1" stop-color="#16a34a"/>
+      <stop offset="0" stop-color="#1FB98A"/>
+      <stop offset="1" stop-color="#0A4F37"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="115" ry="115" fill="url(#bg)"/>
-  <g fill="#ffffff">
-    <rect x="243" y="171" width="26" height="246" rx="13" ry="13"/>
-    <ellipse cx="333" cy="206" rx="80" ry="38" transform="rotate(-38 333 206)"/>
-    <ellipse cx="179" cy="206" rx="80" ry="38" transform="rotate(38 179 206)"/>
+  <g fill="#ffffff" stroke="#ffffff">
+    <rect x="82" y="82" width="348" height="348" rx="70" fill="none" stroke-width="44"/>
+    <rect x="240" y="126" width="32" height="260" stroke="none"/>
+    <rect x="126" y="240" width="260" height="32" stroke="none"/>
+    <path stroke="none" d="M177 138.8 L149 192 A28 28 0 0 0 205 192 Z"/>
   </g>
 </svg>

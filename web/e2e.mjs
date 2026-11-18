@@ -288,9 +288,9 @@ async function waitData(timeoutMs) {
     // 预设城市按钮必须已移除
     check(await ev("!document.getElementById('presetChips')"), 'preset city chips removed');
 
-    // 名称已改为知时智农
-    check(/知时智农/.test(await ev("document.querySelector('.brand-name').textContent")), 'brand renamed to 知时智农');
-    check(/知时智农/.test(await ev("document.title")), 'document title renamed');
+    // 名称已改为打药窗
+    check(/打药窗/.test(await ev("document.querySelector('.brand-name').textContent")), 'brand renamed to 打药窗');
+    check(/打药窗/.test(await ev("document.title")), 'document title renamed');
 
     /* ---------- 5 ---------- */
     console.log('\n== 5. add plot ==');
@@ -323,21 +323,17 @@ async function waitData(timeoutMs) {
       return (r.top - s.top) < 60 && (s.right - r.right) < 60;
     })()`), 'layer switch sits top-right (or hidden on fallback map)');
 
-    /* 地图全屏：选地块时要能铺满屏，退出后表单回来 */
-    await ev(`(function(){var g=document.getElementById('mapGrab');
-      function pe(t,y){g.dispatchEvent(new PointerEvent(t,{bubbles:true,clientY:y,clientX:200,pointerId:1}));}
-      pe('pointerdown',600); pe('pointermove',545); pe('pointerup',545);})()`);
-    await sleep(520);
-    check(await ev("document.querySelector('.plot-modal').classList.contains('map-full')"),
-      'swipe up on the map handle expands to fullscreen');
-    check(await ev("getComputedStyle(document.querySelector('.plot-modal .modal-body')).display === 'none'"),
-      'form hides while map is fullscreen');
-    await ev(`(function(){var g=document.getElementById('mapGrab');
-      function pe(t,y){g.dispatchEvent(new PointerEvent(t,{bubbles:true,clientY:y,clientX:200,pointerId:1}));}
-      pe('pointerdown',500); pe('pointermove',570); pe('pointerup',570);})()`);
-    await sleep(480);
-    check(!(await ev("document.querySelector('.plot-modal').classList.contains('map-full')")),
-      'swipe down on the handle restores the form');
+    /* 桌面：地图在上、表单在下，抽屉静态（拖拽只在手机生效） */
+    check(await ev("!!document.getElementById('plotSheet') && !!document.getElementById('sheetGrab')"),
+      'plot sheet + grab handle present');
+    check(await ev(`(function(){
+      var s = document.getElementById('plotSheet');
+      return getComputedStyle(s).position === 'static';
+    })()`), 'sheet is static card on desktop (no mobile detents)');
+    check(await ev(`(function(){
+      var s = document.getElementById('plotSheet');
+      return !s.style.getPropertyValue('--sheet-y');
+    })()`), 'no --sheet-y offset on desktop');
 
     check(await ev("window.__tzPickCenter && window.__tzPickCenter()") === true,
       'map pick triggered in either mode');
@@ -406,6 +402,40 @@ async function waitData(timeoutMs) {
     await sleep(900);
     check(await ev("document.getElementById('plotMask').classList.contains('on')"), 'modal still open after map drag');
     await ev("document.getElementById('modalCancel').click();");
+    await sleep(300);
+
+    /* ---------- 5c：手机高德式抽屉（拖拽跟手、吸附、下拉关闭） ---------- */
+    console.log('\n== 5c. mobile draggable sheet ==');
+    await device(390, 844, true, 2);
+    await sleep(300);
+    await ev("document.getElementById('addPlotBtn').click();");
+    await sleep(1200);
+    const sheetY = () => ev(`(function(){var s=document.getElementById('plotSheet');
+      return parseFloat(getComputedStyle(s).getPropertyValue('--sheet-y'))||0;})()`);
+    const y0 = await sheetY();
+    check(y0 > 200 && y0 < 500, 'sheet rests at peek on open (px): ' + Math.round(y0));
+    check(await ev("getComputedStyle(document.getElementById('plotSheet')).position === 'absolute'"),
+      'sheet is an overlay on mobile');
+    check(await ev(`(function(){var m=document.getElementById('mapStage').getBoundingClientRect();
+      return m.height > window.innerHeight * 0.8;})()`), 'map fills the screen behind the sheet');
+
+    // 上拉：抽屉跟手上移，吸附到 form（位移变小）
+    await ev(`(function(){var g=document.getElementById('sheetGrab');
+      function pe(t,y){g.dispatchEvent(new PointerEvent(t,{bubbles:true,clientY:y,clientX:180,pointerId:7}));}
+      pe('pointerdown',600); for(var i=1;i<=6;i++) pe('pointermove',600-i*55); pe('pointerup',270);})()`);
+    await sleep(420);
+    const yForm = await sheetY();
+    check(yForm < y0 - 120, 'drag up moves the sheet toward the form detent (px): ' + Math.round(yForm));
+
+    // 下拉到底：关闭弹窗
+    await ev(`(function(){var g=document.getElementById('sheetGrab');
+      function pe(t,y){g.dispatchEvent(new PointerEvent(t,{bubbles:true,clientY:y,clientX:180,pointerId:8}));}
+      pe('pointerdown',120); for(var i=1;i<=8;i++) pe('pointermove',120+i*90); pe('pointerup',840);})()`);
+    await sleep(600);
+    check(!(await ev("document.getElementById('plotMask').classList.contains('on')")),
+      'dragging the sheet far down dismisses the modal');
+
+    await device(1600, 1200, false, 1);
     await sleep(300);
 
     /* ---------- 6 ---------- */
