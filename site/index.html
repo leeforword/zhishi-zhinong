@@ -1615,8 +1615,15 @@ html.zz-chat #zzBar{display:none!important}
 
 /* ---------- 手机：地图铺满整屏，表单是浮在地图上的可拖拽抽屉 ---------- */
 @media (max-width:640px){
+  /* 键盘弹起时 iOS 不会缩「布局视口」，只缩「视觉视口」（visualViewport）：
+     用实时高度把弹窗钉在可视区里，否则底部抽屉会被键盘顶出屏幕、内容与水印错位。
+     --vvh / --vv-top 由 app.js 的 syncViewport() 写入。 */
+  #plotMask{
+    top:var(--vv-top,0px);bottom:auto;height:var(--vvh,100dvh);
+    align-items:stretch;padding:0;
+  }
   .modal.plot-modal{
-    width:100%;max-width:100%;height:100dvh;max-height:100dvh;
+    width:100%;max-width:100%;height:100%;max-height:100%;
     border:0;border-radius:0;overflow:hidden;
     animation:plotIn .28s cubic-bezier(.22,1,.36,1) both;
   }
@@ -1624,26 +1631,49 @@ html.zz-chat #zzBar{display:none!important}
   /* 地图变成全屏背景层 */
   .plot-map{
     position:absolute;inset:0;height:auto;flex:none;border-bottom:0;background:#eef2e4;
+    overflow:clip;
   }
-  .plot-map .map-stage{position:absolute;inset:0}
+  /* contain:paint 让地图成为一个独立的绘制层：任何绝对定位的子元素（含高德水印）
+     都只能画在这一层里，绝不可能溢出到抽屉/表单上方 */
+  .plot-map .map-stage{position:absolute;inset:0;overflow:clip;contain:paint;isolation:isolate}
+  /* 高德会在地图容器上写死初始像素尺寸；键盘弹起/抽屉移动后容器变矮，
+     写死的高度会让水印停在旧位置「浮」在表单上。强制跟随容器。 */
+  .plot-modal .amap-container{width:100%!important;height:100%!important}
+  /* 水印合规保留：锚到「抽屉上沿」的可见地图条里，既不被抽屉盖住，也不会透过玻璃浮在表单上 */
+  .plot-modal .amap-logo,
+  .plot-modal .amap-copyright{
+    position:absolute!important;top:auto!important;z-index:6;
+    bottom:var(--wm-bottom,8px)!important;
+    opacity:.9!important;pointer-events:none;
+    background:rgba(255,255,255,.78);border-radius:6px;padding:1px 5px;line-height:1.45;
+  }
+  .plot-modal .amap-logo{left:8px!important;right:auto!important}
+  .plot-modal .amap-copyright{left:auto!important;right:8px!important;font-size:10px!important}
   /* 已选点的小浮标，落在地图左上角，抽屉盖住时仍可见 */
   .plot-map .map-read{
     position:absolute;left:10px;top:calc(40px + env(safe-area-inset-top,0px));flex:none;
     max-width:calc(100% - 100px);padding:6px 10px;border-radius:12px;
     background:rgba(255,255,255,.86);-webkit-backdrop-filter:blur(10px) saturate(160%);backdrop-filter:blur(10px) saturate(160%);
     border:1px solid var(--glass-edge);box-shadow:var(--shadow-sm);font-size:11.5px;
+    transition:opacity .2s,transform .2s;
   }
-  /* 抽屉：贴底，高度 92dvh，靠 --sheet-y 上下移动 */
+  /* 地图条太窄（表单已展开）时收起浮标：抽屉顶部的位置摘要已经说清同一件事 */
+  .plot-modal.map-tight .map-read{opacity:0;transform:translateY(-6px);pointer-events:none}
+  /* 抽屉：整屏高，靠 --sheet-y 上下移动；可见高度 = 100% − 位移，
+     这样抽屉底边永远贴着屏幕底（不会有一截被裁掉、最后一个按钮点不到）。
+     --sheet-pad 把多出来的那截补成滚动区底部留白，滚到底时正好停在屏幕底。 */
   .plot-sheet{
-    position:absolute;left:0;right:0;bottom:0;height:92dvh;
+    position:absolute;left:0;right:0;bottom:0;height:100%;
     display:flex;flex-direction:column;min-height:0;border-radius:22px 22px 0 0;
     background:rgba(255,255,255,.86);
     -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
     box-shadow:0 -16px 48px rgba(18,28,22,.22),inset 0 1px 0 rgba(255,255,255,.85);
-    transform:translateY(var(--sheet-y,42dvh));
+    transform:translateY(var(--sheet-y,50%));
     transition:transform .32s cubic-bezier(.22,1,.36,1);will-change:transform;
+    touch-action:pan-y;                     /* 内容可正常滚动；拖拽由 JS 在 no-passive 里接管 */
   }
-  .plot-sheet.dragging{transition:none}
+  .plot-sheet.dragging{transition:none;user-select:none;-webkit-user-select:none}
+  .plot-sheet.dragging *{cursor:grabbing}
   .sheet-grab{
     display:flex;align-items:center;justify-content:center;height:26px;flex:none;
     border:0;background:transparent;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;
@@ -1660,7 +1690,10 @@ html.zz-chat #zzBar{display:none!important}
   .pm-tx{font-size:15px;min-width:56px}
   .modal.plot-modal .modal-body{
     flex:1;min-height:0;overflow-y:auto;
-    padding:12px 14px 8px;padding-bottom:calc(30px + env(safe-area-inset-bottom,0px));
+    overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+    scroll-padding-bottom:24px;
+    padding:12px 14px 8px;
+    padding-bottom:calc(30px + env(safe-area-inset-bottom,0px) + var(--sheet-pad,0px));
   }
   .modal.plot-modal .nearby-list{margin-bottom:6px}
 }
@@ -2975,7 +3008,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
             <button class="btn" id="fSearchBtn" type="button">检索</button>
           </div>
           <div class="preset-chips" id="presetChips"></div>
-          <div id="fResults"></div>
+          <div id="fResults" data-nodrag></div>
         </div>
 
         <!-- 附近地点默认收起：地图点选是主路径，POI 列表是兜底 -->
@@ -2984,7 +3017,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           <div class="nearby-search">
             <input class="field" id="nearbyKw" placeholder="搜地点：村委会 / 农资店 / 学校…" autocomplete="off">
           </div>
-          <div class="nearby-list" id="nearbyList">
+          <div class="nearby-list" id="nearbyList" data-nodrag>
             <div class="nearby-empty">选好位置后，这里会列出周边 1 公里内的地点</div>
           </div>
         </details>

@@ -2525,6 +2525,7 @@
     $('layerRoad').onclick = function () { setMapLayer('road'); };
     $('layerSat').onclick = function () { setMapLayer('sat'); };
     bindSheetDrag();
+    bindViewport();
 
     // 预加载 SDK：打开弹窗时就后台开始拉取，
     // 这样用户点"展开地图"时基本已经就绪（避免首屏多等 1-2 秒）
@@ -2780,6 +2781,8 @@
     /* 手机：地图铺满整屏 + 表单抽屉默认停在 peek（地图为主，看得见自己的地）。
        桌面：卡片布局，setSheetDetent 会移除位移，地图在上、表单在下。 */
     bindMapStage();
+    bindViewport();          // 先量一次可视视口：抽屉档位、水印锚点都按它算
+    syncViewport();
     mapCenterOn(base.lon, base.lat, plot ? 13 : 12);
     lockBody(true);
     $('plotMask').classList.add('on');
@@ -2788,6 +2791,7 @@
       renderMap({ lat: base.lat, lon: base.lon });
       if (MAP.instance) MAP.instance.resize();
       setSheetDetent('peek', false);
+      updateMapWatermark();
     }, 80);
     /* 手机端不自动聚焦名称：弹窗一开就弹键盘，会把地图挡掉一半，
        而这一步真正要做的是先在地图上点自己的地。桌面端保留聚焦方便直接输入。 */
@@ -2812,14 +2816,36 @@
    * 继续下拉超过阈值则关闭。桌面端不启用（卡片布局，--sheet-y 被移除）。
    */
   var SHEET = { detent: 'peek', y: 0 };
+
+  /* ---------- 视觉视口：手机键盘的真相 ----------
+     键盘弹起时 Android（interactive-widget=resizes-content）会缩「布局视口」，
+     iOS 只缩「视觉视口」，布局视口和内联的 100dvh 都不动 —— 抽屉就被键盘顶出屏幕、
+     表单输入框与水印互相错位。统一把 visualViewport 的实时高度/偏移写进
+     --vvh / --vv-top，CSS 用它们钉住弹窗，抽屉、水印、输入框便一起跟着键盘走。 */
+  var VV = { h: 0, top: 0 };
+  function sheetVh() { return VV.h || window.innerHeight || 640; }
   function isSheetMobile() {
     return window.matchMedia && window.matchMedia('(max-width:640px)').matches;
   }
   function detentPx(name) {
-    var vh = window.innerHeight || 640;
-    if (name === 'form') return Math.round(vh * 0.06);
-    if (name === 'map') return Math.round(vh * 0.66);
-    return Math.round(vh * 0.42);              // peek
+    var vh = sheetVh();
+    /* 抽屉是整屏高、靠位移下移，所以这里的值就是「屏幕顶部留出的地图高度」 */
+    if (name === 'form') return Math.round(vh * 0.14);
+    if (name === 'map') return Math.round(vh * 0.74);
+    return Math.round(vh * 0.50);              // peek
+  }
+  /* 水印锚在「抽屉上沿之上」的可见地图条里：既不会被抽屉盖住（合规要看得到），
+     也不会隔着半透明抽屉浮在表单上。地图条太窄时退回屏幕底部，
+     免得和「高德地图·河北」「路网/卫星」两个胶囊挤在同一行。 */
+  function updateMapWatermark() {
+    var stage = $('mapStage');
+    if (!stage) return;
+    var band = sheetVh() - SHEET.y;
+    stage.style.setProperty('--wm-bottom', (band > 140 ? band + 8 : 8) + 'px');
+    /* 地图条窄到放不下浮层时（表单展开），收起「已选点」浮标 ——
+       它会和抽屉里的位置摘要重复，半掩在抽屉后面反而像渲染错位 */
+    var modal = document.querySelector('.plot-modal');
+    if (modal) modal.classList.toggle('map-tight', isSheetMobile() && band < 170);
   }
   function setSheetDetent(name, animate) {
     SHEET.detent = name;
@@ -2829,65 +2855,196 @@
     var y = detentPx(name); SHEET.y = y;
     if (animate !== false) s.classList.remove('dragging');
     s.style.setProperty('--sheet-y', y + 'px');
+    s.style.setProperty('--sheet-pad', y + 'px');   // 滚动区底部留白 = 抽屉挂到屏幕外的那一截
+    updateMapWatermark();
   }
   function sheetDismiss() {
     var s = $('plotSheet');
-    var vh = window.innerHeight || 640;
-    if (s) { s.classList.remove('dragging'); s.style.setProperty('--sheet-y', vh + 'px'); }
+    if (s) { s.classList.remove('dragging'); s.style.setProperty('--sheet-y', sheetVh() + 'px'); }
     setTimeout(closeModal, 240);
   }
 
   /**
-   * 抽屉把手：pointer 事件跟随手指，松手按位置 + 速度吸附到最近档位，
-   * 下拉过界关闭。这才是"拽"的手感，而不是点一下切换。
+   * 抽屉手势：整块可拖（高德/微信那种手感），但绝不抢表单的活。
+   *  - 触摸走 touch 事件（no-passive）：起拖 7px 后 preventDefault 接管，
+   *    既跟手，又不会让底下的内容跟着一起滚；
+   *  - 输入框 / 按钮 / 下拉 / 折叠标题一律不接管，点就是点，输入就是输入；
+   *  - 表单展开（form 档）时内容优先滚动，只有滚到顶再往下拉才收起抽屉；
+   *  - 把手与标题栏始终可拖，也是键盘（方向键）能操作的入口。
    */
   function bindSheetDrag() {
-    var g = $('sheetGrab');
-    if (!g || g.__bound) return;
-    g.__bound = true;
-    var s = null, y0 = null, startY = 0, lastY = 0, lastT = 0, v = 0;
+    var sheet = $('plotSheet');
+    if (!sheet || sheet.__bound) return;
+    sheet.__bound = true;
 
-    function down(e) {
-      if (!isSheetMobile()) return;
-      s = $('plotSheet'); if (!s) return;
-      y0 = e.clientY; startY = SHEET.y; v = 0; lastY = e.clientY; lastT = Date.now();
-      try { g.setPointerCapture(e.pointerId); } catch (err) { /* 旧浏览器忽略 */ }
-      s.classList.add('dragging');
+    var st = null;            // 当前手势：{y0,startY,lastY,lastT,v,active,pendCollapse}
+    var DRAG_MIN = 7;         // 起拖阈值，小于它就是「点」
+
+    function bodyEl() { return sheet.querySelector('.modal-body'); }
+    function isCtl(el) {
+      return !!(el && el.closest && el.closest(
+        'input,textarea,select,button,a,label,summary,[contenteditable="true"],[data-nodrag]'));
     }
-    function move(e) {
-      if (y0 === null || !s) return;
-      var ny = startY + (e.clientY - y0);
-      var top = detentPx('form'), vh = window.innerHeight || 640, max = vh * 0.9;
-      if (ny < top) ny = top + (ny - top) * 0.28;          // 顶部橡皮筋
-      if (ny > max) ny = max + (ny - max) * 0.2;           // 底部橡皮筋
-      SHEET.y = ny; s.style.setProperty('--sheet-y', ny + 'px');
-      var now = Date.now(), dt = now - lastT;
-      if (dt > 0) { v = (e.clientY - lastY) / dt; lastY = e.clientY; lastT = now; }
+    function begin(y, fromHandle, target) {
+      if (!isSheetMobile()) return null;
+      if (!fromHandle && isCtl(target)) return null;
+      var inBody = !!(target && target.closest && target.closest('.modal-body'));
+      var body = bodyEl();
+      var atForm = SHEET.detent === 'form';
+      /* 表单展开、内容已滚离顶部：这一下是在滚内容，不是拖抽屉 */
+      if (!fromHandle && atForm && inBody && body && body.scrollTop > 2) return null;
+      return {
+        y0: y, startY: SHEET.y, lastY: y, lastT: Date.now(), v: 0, active: false,
+        pendCollapse: !fromHandle && atForm && inBody
+      };
     }
-    function up() {
-      if (y0 === null || !s) return;
-      s.classList.remove('dragging');
-      var vh = window.innerHeight || 640;
-      if (SHEET.y > vh * 0.84 || (SHEET.y > vh * 0.76 && v > 0.35)) { y0 = null; sheetDismiss(); return; }
+    function move(y, ev) {
+      if (!st) return;
+      var dy = y - st.y0;
+      if (!st.active) {
+        if (Math.abs(dy) < DRAG_MIN) return;
+        if (st.pendCollapse && dy < 0) { st = null; return; }   // 上滑看内容：交还给滚动
+        st.active = true;
+        sheet.classList.add('dragging');
+        /* 一开拖就收键盘：键盘、抽屉、地图不该抢同一块屏 */
+        var ae = document.activeElement;
+        if (ae && sheet.contains(ae) && ae.blur) ae.blur();
+      }
+      if (ev && ev.cancelable) ev.preventDefault();
+      var vh = sheetVh(), ny = st.startY + dy;
+      var top = detentPx('form'), max = vh * 0.98;
+      if (ny < top) ny = top + (ny - top) * 0.28;      // 顶部橡皮筋
+      if (ny > max) ny = max + (ny - max) * 0.2;       // 底部橡皮筋
+      SHEET.y = ny;
+      sheet.style.setProperty('--sheet-y', ny + 'px');
+      var now = Date.now(), dt = now - st.lastT;
+      if (dt > 0) { st.v = (y - st.lastY) / dt; st.lastY = y; st.lastT = now; }
+    }
+    function finish() {
+      if (!st) return;
+      var g2 = st; st = null;
+      if (!g2.active) return;
+      sheet.classList.remove('dragging');
+      var vh = sheetVh();
+      if (SHEET.y > vh * 0.84 || (SHEET.y > vh * 0.74 && g2.v > 0.5)) { sheetDismiss(); return; }
       var order = ['form', 'peek', 'map'], best = 'peek', bd = Infinity, i, d;
-      for (i = 0; i < order.length; i++) { d = Math.abs(SHEET.y - detentPx(order[i])); if (d < bd) { bd = d; best = order[i]; } }
-      if (v < -0.6) best = (SHEET.y < detentPx('peek')) ? 'form' : 'peek';
-      else if (v > 0.6) best = (SHEET.y < detentPx('map')) ? 'peek' : 'map';
+      for (i = 0; i < order.length; i++) {
+        d = Math.abs(SHEET.y - detentPx(order[i]));
+        if (d < bd) { bd = d; best = order[i]; }
+      }
+      /* 甩动优先于距离：快速上推直接跳上一档 */
+      if (g2.v < -0.6) best = (SHEET.y < detentPx('peek')) ? 'form' : 'peek';
+      else if (g2.v > 0.6) best = (SHEET.y < detentPx('map')) ? 'peek' : 'map';
       setSheetDetent(best);
-      y0 = null;
     }
-    g.addEventListener('pointerdown', down);
-    g.addEventListener('pointermove', move);
-    g.addEventListener('pointerup', up);
-    g.addEventListener('pointercancel', function () { if (s) { s.classList.remove('dragging'); setSheetDetent(SHEET.detent); } y0 = null; });
-    g.addEventListener('keydown', function (e) {
-      if (!isSheetMobile()) return;
-      var order = ['map', 'peek', 'form'], idx = order.indexOf(SHEET.detent);
-      if (e.key === 'ArrowUp') { e.preventDefault(); setSheetDetent(order[Math.min(order.length - 1, idx + 1)]); }
-      else if (e.key === 'ArrowDown') { e.preventDefault(); setSheetDetent(order[Math.max(0, idx - 1)]); }
+    function cancel() {
+      if (!st) return;
+      st = null;
+      sheet.classList.remove('dragging');
+      setSheetDetent(SHEET.detent);
+    }
+
+    /* 触摸：no-passive 才能在接管后真正拦住滚动 */
+    sheet.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) { st = null; return; }
+      st = begin(e.touches[0].clientY, false, e.target);
+    }, { passive: true });
+    sheet.addEventListener('touchmove', function (e) {
+      if (!st || e.touches.length !== 1) return;
+      move(e.touches[0].clientY, e);
+    }, { passive: false });
+    sheet.addEventListener('touchend', finish);
+    sheet.addEventListener('touchcancel', cancel);
+
+    /* 鼠标/触控笔：触摸已被上面的 touch 分支处理，这里跳过，免得同一手势跑两遍 */
+    sheet.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'touch') return;
+      var fromHandle = !!(e.target.closest && e.target.closest('#sheetGrab,.modal-head'));
+      st = begin(e.clientY, fromHandle, e.target);
+      if (st) { try { sheet.setPointerCapture(e.pointerId); } catch (err) { /* 旧浏览器忽略 */ } }
     });
-    // 旋转/缩放后按当前档位重新落位
-    window.addEventListener('resize', function () { if ($('plotMask').classList.contains('on')) setSheetDetent(SHEET.detent, false); });
+    sheet.addEventListener('pointermove', function (e) {
+      if (e.pointerType === 'touch' || !st) return;
+      move(e.clientY, null);
+    });
+    sheet.addEventListener('pointerup', function (e) { if (e.pointerType !== 'touch') finish(); });
+    sheet.addEventListener('pointercancel', function (e) { if (e.pointerType !== 'touch') cancel(); });
+
+    var g = $('sheetGrab');
+    if (g) {
+      /* 轻点把手 = 展开/收起：不想拖的人也能一按到位 */
+      g.addEventListener('click', function () {
+        if (!isSheetMobile()) return;
+        setSheetDetent(SHEET.detent === 'form' ? 'peek' : 'form');
+      });
+      g.addEventListener('keydown', function (e) {
+        if (!isSheetMobile()) return;
+        var order = ['map', 'peek', 'form'], idx = order.indexOf(SHEET.detent);
+        if (e.key === 'ArrowUp') { e.preventDefault(); setSheetDetent(order[Math.min(order.length - 1, idx + 1)]); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); setSheetDetent(order[Math.max(0, idx - 1)]); }
+      });
+    }
+
+    /* 聚焦输入控件：先把抽屉拉到 form 档，等键盘落定再把它滚进可视区 */
+    sheet.addEventListener('focusin', function (e) {
+      if (!isSheetMobile()) return;
+      var el = e.target;
+      if (!el || !el.matches || !el.matches('input,textarea,select')) return;
+      if (SHEET.detent !== 'form') setSheetDetent('form');
+      setTimeout(keepFocusVisible, 260);
+      setTimeout(keepFocusVisible, 560);
+    });
+  }
+
+  /* ---------- 键盘避让：把当前焦点控件滚回可视区 ---------- */
+  function keepFocusVisible() {
+    var el = document.activeElement;
+    var body = document.querySelector('.plot-modal .modal-body');
+    if (!el || !body || !body.contains(el)) return;
+    var r = el.getBoundingClientRect(), br = body.getBoundingClientRect();
+    var pad = 16;
+    if (r.bottom > br.bottom - pad) body.scrollTop += Math.ceil(r.bottom - (br.bottom - pad));
+    else if (r.top < br.top + pad) body.scrollTop -= Math.ceil((br.top + pad) - r.top);
+  }
+
+  /* ---------- 视口同步：键盘开合 / 横竖屏 / 地址栏伸缩 ---------- */
+  function syncViewport() {
+    var vv = window.visualViewport;
+    var h = Math.round(vv ? vv.height : window.innerHeight);
+    var top = Math.round(vv ? vv.offsetTop : 0);
+    if (!h) return;
+    var changed = Math.abs(h - VV.h) > 1 || Math.abs(top - VV.top) > 1;
+    VV.h = h; VV.top = top;
+    var de = document.documentElement;
+    de.style.setProperty('--vvh', h + 'px');
+    de.style.setProperty('--vv-top', top + 'px');
+    if (!changed) return;
+    var mask = $('plotMask');
+    if (!mask || !mask.classList.contains('on')) return;
+    /* 可视高度变了：档位按新高度重算，并让高德重排一次 ——
+       否则地图还按旧高度排版，水印会停在旧位置「浮」在表单上 */
+    setSheetDetent(SHEET.detent, false);
+    if (MAP.instance) setTimeout(function () { MAP.instance.resize(); }, 50);
+    keepFocusVisible();
+  }
+  function bindViewport() {
+    if (bindViewport._bound) return;
+    bindViewport._bound = true;
+    syncViewport();
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncViewport);
+      window.visualViewport.addEventListener('scroll', syncViewport);
+    }
+    window.addEventListener('resize', syncViewport);
+    window.addEventListener('orientationchange', function () { setTimeout(syncViewport, 150); });
+    /* 收键盘后也校一次：iOS 的 focusout 时机不稳 */
+    document.addEventListener('focusout', function () {
+      setTimeout(function () {
+        if (!isSheetMobile()) return;
+        var mask = $('plotMask');
+        if (mask && mask.classList.contains('on')) syncViewport();
+      }, 120);
+    });
   }
 
   function showFormResults(list) {

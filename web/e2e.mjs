@@ -419,6 +419,65 @@ async function waitData(timeoutMs) {
     check(await ev(`(function(){var m=document.getElementById('mapStage').getBoundingClientRect();
       return m.height > window.innerHeight * 0.8;})()`), 'map fills the screen behind the sheet');
 
+    /* 真·触摸手势：从任意元素上按下拖动（验证「整块可拖」与「输入框不误触」） */
+    const touchDrag = (sel, dy, steps) => ev(`(function(){
+      var el=document.querySelector(${JSON.stringify(sel)});
+      if(!el) return 'no-element';
+      var r=el.getBoundingClientRect(), x=Math.round(r.left+Math.min(r.width/2,60)), y=Math.round(r.top+r.height/2);
+      function T(yy){return new Touch({identifier:1,target:el,clientX:x,clientY:yy});}
+      el.dispatchEvent(new TouchEvent('touchstart',{bubbles:true,cancelable:true,touches:[T(y)],targetTouches:[T(y)],changedTouches:[T(y)]}));
+      for(var i=1;i<=${steps||8};i++){
+        var yy=y+${dy}*i/${steps||8};
+        el.dispatchEvent(new TouchEvent('touchmove',{bubbles:true,cancelable:true,touches:[T(yy)],targetTouches:[T(yy)],changedTouches:[T(yy)]}));
+      }
+      el.dispatchEvent(new TouchEvent('touchend',{bubbles:true,cancelable:true,touches:[],targetTouches:[],changedTouches:[T(y+${dy})]}));
+      return 'ok';
+    })()`);
+
+    // 水印：不允许溢出地图层，且要锚在抽屉上沿之上（合规可见、不压表单）
+    check(await ev(`(function(){
+      var box=document.getElementById('amapBox');
+      var d=document.createElement('div'); d.className='amap-copyright'; d.textContent='© 测试';
+      box.appendChild(d);
+      var r=d.getBoundingClientRect(), m=document.getElementById('mapStage').getBoundingClientRect();
+      var s=document.getElementById('plotSheet').getBoundingClientRect();
+      var cs=getComputedStyle(d);
+      var ok = cs.position==='absolute' && r.bottom<=m.bottom+1 && r.bottom<=s.top+1 && cs.opacity!=='0';
+      d.remove();
+      return ok;
+    })()`), 'map watermark stays inside the map and above the sheet');
+
+    // 从表单正文（非把手、非控件）上拉，整块都能拖
+    await touchDrag('.fgroup-h', -300);
+    await sleep(460);
+    const yBody = await sheetY();
+    check(yBody < y0 - 150, 'dragging the form body (not just the handle) expands the sheet: ' + Math.round(yBody));
+
+    // 从输入框上拖：不动抽屉（输入不该被手势抢走）
+    const yBeforeInput = await sheetY();
+    await touchDrag('#fName', 160);
+    await sleep(420);
+    check(Math.abs((await sheetY()) - yBeforeInput) < 4,
+      'dragging on an input does not move the sheet');
+
+    // 键盘：可视高度变小后，弹窗、抽屉、焦点控件都留在可视区内
+    await ev("document.getElementById('fName').focus();");
+    await sleep(400);
+    await device(390, 520, true, 2);
+    await sleep(700);
+    const kb = await ev(`(function(){
+      var mask=document.getElementById('plotMask').getBoundingClientRect();
+      var sh=document.getElementById('plotSheet').getBoundingClientRect();
+      var f=document.getElementById('fName').getBoundingClientRect();
+      return { mask: Math.round(mask.height), sheetTop: Math.round(sh.top),
+               inputBottom: Math.round(f.bottom), vh: window.innerHeight };
+    })()`);
+    check(kb.mask === 520 && kb.sheetTop > 40 && kb.sheetTop < 140,
+      'keyboard shrinks the modal and re-seats the sheet: ' + JSON.stringify(kb));
+    check(kb.inputBottom <= kb.vh, 'focused input stays above the keyboard');
+    await device(390, 844, true, 2);
+    await sleep(400);
+
     // 上拉：抽屉跟手上移，吸附到 form（位移变小）
     await ev(`(function(){var g=document.getElementById('sheetGrab');
       function pe(t,y){g.dispatchEvent(new PointerEvent(t,{bubbles:true,clientY:y,clientX:180,pointerId:7}));}
