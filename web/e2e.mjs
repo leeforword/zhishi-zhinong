@@ -303,9 +303,9 @@ async function waitData(timeoutMs) {
     // 预设城市按钮必须已移除
     check(await ev("!document.getElementById('presetChips')"), 'preset city chips removed');
 
-    // 名称已改为农时窗
-    check(/农时窗/.test(await ev("document.querySelector('.brand-name').textContent")), 'brand renamed to 农时窗');
-    check(/农时窗/.test(await ev("document.title")), 'document title renamed');
+    // 名称已改为知时智农
+    check(/知时智农/.test(await ev("document.querySelector('.brand-name').textContent")), 'brand renamed to 知时智农');
+    check(/知时智农/.test(await ev("document.title")), 'document title renamed');
 
     /* ---------- 5 ---------- */
     console.log('\n== 5. add plot ==');

@@ -7,7 +7,7 @@
  *   PNG 的结构其实很简单（签名 + IHDR + IDAT + IEND），
  *   Node 内置 zlib 就能压缩，所以这里手写了一个约 60 行的编码器。
  *
-* 图形设计（v6.1「农时窗」）：
+* 图形设计（v6.2 定名「知时智农」）：
  *   底：亮翡翠 → 深翡翠的对角渐变（呼应品牌主色 #0E6B4A / 深色 #0A4F37）
  *   标：白色「窗」框 + 十字格 + 左上格**一轮日出与地平线**——
  *       「窗」是产品核心（那一小段时间窗口），日出＝看天时下地，
@@ -180,7 +180,7 @@ function droplet(x, y, cx, ccy, R) {
 }
 
 /**
- * 「农时窗」图形（单位坐标），scale 用于缩到 maskable 安全区
+ * 「知时智农」图形（单位坐标），scale 用于缩到 maskable 安全区
  *   - 外框：圆角「窗」框（边框 + 十字格条）
  *   - 左上格：日出（太阳圆盘 + 地平线）
  *   - 变体 wheat：换成麦穗；drop：保留旧版药滴，便于回滚
@@ -274,7 +274,7 @@ function drawIcon(size, rounded, glyphScale) {
    五、矢量版（favicon.svg，浏览器标签页用）
    ============================================================ */
 const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <title>农时窗</title>
+  <title>知时智农</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
       <stop offset="0" stop-color="#1FB98A"/>
