@@ -37,6 +37,7 @@ const SHELL = [
   './place.js',
   './logic.js',
   './chem.js',
+  './irrig.js',
   './content.js',
   './kb.js',
   './ensemble.js',

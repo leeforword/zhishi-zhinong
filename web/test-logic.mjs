@@ -273,5 +273,50 @@ console.log('\n===== 城市字典 =====');
 check(Object.keys(T.CITIES).length >= 20, `城市字典 ${Object.keys(T.CITIES).length} 个`);
 check(T.CITIES['衡水'] && T.CITIES['安国'], '含衡水、安国等县级市');
 
+/* ==========================================================
+   灌溉决策层（irrig.js）：生育期定位 / 墒情估算 / 定额与时机
+   ========================================================== */
+console.log('\n===== 灌溉决策层 =====');
+require('./irrig.js');
+const IR = globalThis.TianZhiIrrig;
+check(!!IR && IR.SOURCES.length >= 8, `灌溉依据 ${IR ? IR.SOURCES.length : 0} 份（≥8）`);
+check(IR.SOURCES.every((s) => s.url && s.issuer && s.note), '每条灌溉依据都有机构、原文链接与要点');
+
+check(IR.stageOf('wheat', '2026-04-10').key === 'jointing', '4 月中 → 冬小麦拔节—孕穗');
+check(IR.stageOf('wheat', '2026-12-20').key === 'winter', '12 月下 → 冬小麦越冬期（跨年区间）');
+check(IR.stageOf('maize', '2026-08-05').key === 'bell', '8 月初 → 夏玉米大喇叭口');
+check(IR.stageOf('wheat', '2026-04-10').critical === true, '拔节—孕穗标记为需水临界期');
+
+// ET0：华北 4 月晴好天气应在 2.5–6 mm/日 之间
+const et0 = IR.et0Of('2026-04-10', 22, 8, 38.9);
+check(et0 > 2.5 && et0 < 6.5, `ET0(Hargreaves) ${et0} mm/日 落在合理区间`);
+
+// 连续无雨 → 墒情下滑并给出「该浇」；同一天有 15mm 雨 → 不宜浇
+const dry = IR.plan({ crop: 'wheat', lat: 38.9, days: [
+  { date: '2026-04-10', tmin: 9, tmax: 24, dayRain: 0, dayProb: 5 },
+  { date: '2026-04-11', tmin: 10, tmax: 26, dayRain: 0, dayProb: 5 }
+] });
+check(dry[1].sm < dry[0].sm, `无雨两天墒情下降 ${dry[0].sm}% → ${dry[1].sm}%`);
+check(dry[0].status === 'warn' && dry[0].need, '拔节期没雨 → 提示该浇');
+check(/方\/亩/.test(dry[0].why), '结论里带灌水定额（方/亩）');
+
+const wet = IR.plan({ crop: 'maize', lat: 38.9, days: [
+  { date: '2026-08-05', tmin: 24, tmax: 32, dayRain: 16, dayProb: 90 }
+] });
+check(wet[0].status === 'bad' && !wet[0].need, '大喇叭口期当天 16mm 雨 → 不宜灌溉');
+
+// 越冬水窗口：日均温 3–5℃ 才算适期
+const nw = IR.winterWindow([{ tmin: -1, tmax: 7, dayRain: 0, dayProb: 0 }]);
+check(nw.inRange === true, `日均温 ${nw.tmean}℃ 落在 3–5℃ 冬灌适期`);
+const nw2 = IR.winterWindow([{ tmin: 8, tmax: 20, dayRain: 0, dayProb: 0 }]);
+check(nw2.inRange === false, '日均温 14℃ 不算冬灌适期');
+
+// 问答两行结论：首行结论、次行原因，且带生育期
+const ans = IR.answer({ crop: 'wheat', lat: 38.9, days: [
+  { date: '2026-04-10', tmin: 9, tmax: 24, dayRain: 0, dayProb: 5 }
+] });
+check(ans.brief.split('\n').length === 2, '灌溉首答是两行');
+check(/拔节/.test(ans.brief) && /墒情|下限/.test(ans.brief), '首答写清生育期与墒情');
+
 console.log(`\n===== 结果: 通过 ${pass} / 失败 ${fail} =====`);
 process.exit(fail ? 1 : 0);

@@ -81,7 +81,7 @@ for (const f of REQUIRED) {
 /* ---------- 2. 语法 ---------- */
 head('== 2. 语法检查 ==');
 const RUNTIME_JS = ['config.js', 'settings.js', 'llm.js', 'weather.js', 'hebei-geo.js',
-  'place.js', 'logic.js', 'chem.js', 'content.js', 'ensemble.js', 'app.js', 'pwa.js', 'sw.js'];
+  'place.js', 'logic.js', 'chem.js', 'irrig.js', 'content.js', 'ensemble.js', 'app.js', 'pwa.js', 'sw.js'];
 for (const f of RUNTIME_JS) {
   const p = path.join(WEB, f);
   if (!exists(p)) continue;

@@ -1262,7 +1262,7 @@ html.zz-chat #zzBar{display:none!important}
 .btn:hover{background:#0A4F37}
 
 /* ---- 图表两列 ---- */
-.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch;margin-top:12px}
 .chart-card{display:flex;flex-direction:column;min-width:0;padding:13px 14px 11px}
 .chart-card.wide{grid-column:1/-1}
 .chart-card .cbox-h{min-height:20px;margin-bottom:6px;row-gap:2px}
@@ -2310,18 +2310,18 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
   position:absolute;z-index:0;right:0;bottom:0;
   width:46%;height:64%;
   object-fit:cover;object-position:64% 56%;
-  mix-blend-mode:multiply;opacity:.32;
+  mix-blend-mode:multiply;opacity:.46;
   pointer-events:none;user-select:none;
   -webkit-mask-image:radial-gradient(125% 110% at 100% 100%,#000 0%,rgba(0,0,0,.72) 38%,rgba(0,0,0,.28) 66%,transparent 86%);
   mask-image:radial-gradient(125% 110% at 100% 100%,#000 0%,rgba(0,0,0,.72) 38%,rgba(0,0,0,.28) 66%,transparent 86%);
 }
 @media (max-width:640px){
-  .decision > .d-art{width:60%;height:52%;right:-2%;bottom:0;opacity:.24;
+  .decision > .d-art{width:64%;height:56%;right:-2%;bottom:0;opacity:.38;
     -webkit-mask-image:radial-gradient(120% 105% at 100% 100%,#000 0%,rgba(0,0,0,.6) 40%,transparent 82%);
     mask-image:radial-gradient(120% 105% at 100% 100%,#000 0%,rgba(0,0,0,.6) 40%,transparent 82%)}
 }
 @media (min-width:1100px){
-  .decision > .d-art{width:36%;height:72%;opacity:.30;object-position:60% 50%}
+  .decision > .d-art{width:38%;height:74%;opacity:.40;object-position:60% 50%}
 }
 
 /* 物候横幅：当前生育期插画 + 一行农事提醒，按月份切换，夏玉米季隐藏 */
@@ -2837,10 +2837,10 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
           </details>
         </div>
 
-        <div class="sec-h"><h2>施药依据库</h2><span class="hint" id="chemSrcStat">离线可查</span></div>
+        <div class="sec-h"><h2>依据库</h2><span class="hint" id="chemSrcStat">离线可查</span></div>
         <div class="card pad" id="chemBasisCard">
           <div class="note" style="margin:0">
-            对话里只给要点，原文与药剂档案都放这里；编号、机构、条款与原文链接都可核对。
+            对话里只给要点，原文都放这里；编号、机构、条款与原文链接都可核对。
           </div>
           <details class="std-adv" id="chemSrcAdv">
             <summary>依据文件（<span id="chemSrcCount">0</span> 份）</summary>
@@ -2856,9 +2856,19 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
               <div class="chem-prod-list" id="chemProdList"></div>
             </div>
           </details>
+          <details class="std-adv" id="irrSrcAdv">
+            <summary>灌溉依据（<span id="irrSrcCount">0</span> 份）</summary>
+            <div class="std-adv-body">
+              <div class="note" style="margin:0 0 10px">
+                灌溉结论按<b>生育期下限</b>判：0–40cm 墒情由「ET0 × 作物系数 − 有效降水」估算，
+                没有实测传感器时误差约 ±10%；有墒情仪或烘干法数据时，以实测为准。
+              </div>
+              <div class="chem-src-list" id="irrSrcList"></div>
+            </div>
+          </details>
         </div>
 
-        <div class="sec-h"><h2>关于</h2><span class="hint">v5.10</span></div>
+        <div class="sec-h"><h2>关于</h2><span class="hint">v6.0</span></div>
         <div class="disc">
           <b>打药窗 · 华北平原冬小麦 / 夏玉米农事时机助手</b>
           <p>气象 和风天气 + Open-Meteo · 地图 高德 · 标准 河北省 / 市级公开文件</p>
@@ -3082,6 +3092,7 @@ body.wx-night .bg-veil{background:linear-gradient(180deg,
 <script src="place.js"></script>
 <script src="logic.js"></script>
 <script src="chem.js"></script>
+<script src="irrig.js"></script>
 <script src="content.js"></script>
 <script src="kb.js"></script>
 <script src="ensemble.js"></script>

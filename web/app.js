@@ -1284,14 +1284,17 @@
     var d = result.days[0];
     var it = d.irrigation;
     var word = it.status === 'ok' ? '今天不用浇'
-      : (it.status === 'warn' ? '该安排浇水了' : '今天别浇');
+      : (it.status === 'warn' ? (it.need ? '该安排浇水了' : '注意墒情') : '今天别浇');
+    /* 生育期决定"这一水该不该省"：临界期缺水直接减产，越冬期少水反而蹲苗 */
+    var stageTxt = it.stage ? it.stage + (it.critical ? '（需水临界期）' : '') : '';
     return {
       kind: 'today', day: d, date: d.date, win: null,
       status: it.status === 'ok' ? 'ok' : (it.status === 'warn' ? 'warn' : 'bad'),
-      word: word, why: it.why,
+      word: word,
+      why: it.why + (it.tip ? '。' + it.tip : ''),
       whenDay: '今天 ' + d.date.slice(5).replace('-', '/') + ' ' + d.dow,
-      whenTime: '日出前后',
-      whenLeft: '蒸发最小'
+      whenTime: '10 点前 / 15 点后',
+      whenLeft: stageTxt
     };
   }
 
@@ -1324,11 +1327,16 @@
       ];
     }
     if (task === 'irrigation') {
+      var ir0 = d.irrigation || {};
+      var q = ir0.quota || { flood: ['—', '—'] };
+      var smCls = ir0.sm == null ? '' : (ir0.sm < (ir0.thr || 65) ? 'warn' : 'ok');
       return [
-        { k: '今日降水', v: d.dayRain + ' mm', j: d.dayRain >= 5 ? '够了' : '偏少', cls: d.dayRain >= 5 ? 'ok' : 'warn' },
-        { k: '7 天累计', v: result.weekRain + ' mm', j: result.weekRain >= 15 ? '墒情够' : '偏干', cls: result.weekRain >= 15 ? 'ok' : 'warn' },
-        { k: '降雨概率', v: d.dayProb + '%', j: d.dayProb >= 70 ? '等雨' : '可浇', cls: d.dayProb >= 70 ? 'bad' : 'ok' },
-        { k: '最高气温', v: d.tmax + '℃', j: d.tmax >= 28 ? '蒸发大' : '正常', cls: d.tmax >= 28 ? 'warn' : 'ok' }
+        { k: '墒情（估算）', v: (ir0.sm == null ? '—' : ir0.sm + '%'),
+          j: ir0.thr ? '下限 ' + ir0.thr + '%' : '0–40cm', cls: smCls },
+        { k: '生育期', v: (ir0.stage || '—'),
+          j: ir0.critical ? '需水临界期' : '常规期', cls: ir0.critical ? 'warn' : 'ok' },
+        { k: '建议定额', v: q.flood.join('–') + ' 方/亩', j: '畦灌/沟灌', cls: ir0.need ? 'warn' : 'ok' },
+        { k: '日耗水', v: (ir0.etc == null ? '—' : ir0.etc + ' mm'), j: 'ET0 ' + (ir0.et0 == null ? '—' : ir0.et0), cls: 'ok' }
       ];
     }
     return [
@@ -1802,7 +1810,7 @@
       updateFootSources(w);
       state._ensKey = plot.lat.toFixed(3) + ',' + plot.lon.toFixed(3) + ',' + (w.hourly.time[0] || '');
       state._ensCache = null;
-      var result = T.evaluateWeather(w.hourly, w.daily);
+      var result = T.evaluateWeather(w.hourly, w.daily, { crop: plot.crop, lat: plot.lat });
       state.result = result;
       if (!state.chartDay || !result.days.some(function (d) { return d.date === state.chartDay; })) {
         /* 晚上打开时今天只剩一两个小时，图会像"没画"。此时默认看明天，
@@ -3333,6 +3341,20 @@
       }).join('');
     }
     if ($('chemProdCount')) $('chemProdCount').textContent = CH.PRODUCTS.length;
+
+    /* 灌溉依据：和施药依据并列，格式一致（编号 / 要点 / 机构 / 原文链接） */
+    var IR = window.TianZhiIrrig;
+    if (IR && $('irrSrcList')) {
+      $('irrSrcList').innerHTML = IR.SOURCES.map(function (s) {
+        return '<div class="chem-src">' +
+          '<div class="chem-src-h"><b>' + esc(s.code) + '</b><span>灌溉</span></div>' +
+          '<p>' + esc(s.note) + '</p>' +
+          '<div class="chem-src-m">' + esc(s.issuer) + ' · ' + esc(s.title) +
+          (s.url ? ' · <a href="' + esc(s.url) + '" target="_blank" rel="noopener">原文</a>' : '') +
+          '</div></div>';
+      }).join('');
+      if ($('irrSrcCount')) $('irrSrcCount').textContent = IR.SOURCES.length;
+    }
   }
 
   /** 对话里的「依据库」按钮：跳到我的页，并把依据列表展开到位 */

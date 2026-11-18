@@ -368,11 +368,38 @@
   /* ===========================================================
      五、主评估函数：天气数据 → 农事判断
      =========================================================== */
-  function evaluateWeather(hourly, daily) {
+  function evaluateWeather(hourly, daily, opts) {
     var r = RULES.spray;
     var g = groupByDay(hourly);
     var di = {};
     daily.time.forEach(function (t, i) { di[t] = i; });
+
+    /* 灌溉先算：它要沿 7 天做水量平衡（今天的墒情取决于前几天的雨与蒸发），
+       所以整段算一次、按天取用，而不是在循环里逐天各算各的。
+       没有灌溉模型时退回旧的雨量法，保证不因为一个模块缺失就整页空白。 */
+    var IRR = (typeof globalThis !== 'undefined') ? globalThis.TianZhiIrrig : null;
+    var irrPlan = null;
+    if (IRR && typeof IRR.plan === 'function') {
+      try {
+        irrPlan = IRR.plan({
+          crop: (opts && opts.crop) || 'wheat',
+          lat: (opts && opts.lat) || 38.9,
+          leadRain: 0,
+          days: daily.time.map(function (date) {
+            var j = di[date];
+            return {
+              date: date,
+              tmax: Math.round(daily.temperature_2m_max[j]),
+              tmin: Math.round(daily.temperature_2m_min[j]),
+              dayRain: round1(daily.precipitation_sum[j] || 0),
+              dayProb: daily.precipitation_probability_max ? (daily.precipitation_probability_max[j] || 0) : 0
+            };
+          })
+        });
+      } catch (e) {
+        console.warn('[打药窗] 灌溉模型失败，退回雨量法：', e.message);
+      }
+    }
 
     /* 按「逐日」来建天，而不是按「逐时」——
        和风 168h 是从当前小时往后数的，晚上 23 点之后第一批小时就落到明天 0 点，
@@ -491,23 +518,31 @@
       for (var k = 0; k < daily.precipitation_sum.length; k++) weekRain += (daily.precipitation_sum[k] || 0);
       weekRain = round1(weekRain);
 
-      var irrR = RULES.irrigation;
-      var irrStatus, irrWhy;
-      if (dayRain >= irrR.rain_no_need) {
-        irrStatus = 'bad';
-        irrWhy = '当天降水 ' + dayRain + ' mm，再灌溉就是白浇，建议改日';
-      } else if (dayProb >= irrR.prob_block && dayRain < irrR.rain_no_need) {
-        irrStatus = 'bad';
-        irrWhy = '降雨概率 ' + dayProb + '%，很可能马上有雨，建议等雨后再定';
-      } else if (weekRain >= irrR.rain_7d_enough) {
-        irrStatus = 'ok';
-        irrWhy = '未来 7 天累计降水 ' + weekRain + ' mm，墒情尚可，今日无需灌溉';
-      } else if (tmax >= irrR.hot_temp) {
-        irrStatus = 'warn';
-        irrWhy = '7 天累计降水仅 ' + weekRain + ' mm 且最高温 ' + tmax + '℃，蒸发大，建议安排灌溉';
+      /* 灌溉：优先用 irri.js 的生育期 + 水量平衡结论；
+         模块缺失时才退回「7 天雨量 < 15mm」的旧判据 */
+      var irrStatus, irrWhy, irrDay = null;
+      if (irrPlan && irrPlan[idx]) {
+        irrDay = irrPlan[idx];
+        irrStatus = irrDay.status;
+        irrWhy = irrDay.why;
       } else {
-        irrStatus = 'warn';
-        irrWhy = '7 天累计降水仅 ' + weekRain + ' mm，墒情可能不足，建议适时灌溉';
+        var irrR = RULES.irrigation;
+        if (dayRain >= irrR.rain_no_need) {
+          irrStatus = 'bad';
+          irrWhy = '当天降水 ' + dayRain + ' mm，再灌溉就是白浇，建议改日';
+        } else if (dayProb >= irrR.prob_block && dayRain < irrR.rain_no_need) {
+          irrStatus = 'bad';
+          irrWhy = '降雨概率 ' + dayProb + '%，很可能马上有雨，建议等雨后再定';
+        } else if (weekRain >= irrR.rain_7d_enough) {
+          irrStatus = 'ok';
+          irrWhy = '未来 7 天累计降水 ' + weekRain + ' mm，墒情尚可，今日无需灌溉';
+        } else if (tmax >= irrR.hot_temp) {
+          irrStatus = 'warn';
+          irrWhy = '7 天累计降水仅 ' + weekRain + ' mm 且最高温 ' + tmax + '℃，蒸发大，建议安排灌溉';
+        } else {
+          irrStatus = 'warn';
+          irrWhy = '7 天累计降水仅 ' + weekRain + ' mm，墒情可能不足，建议适时灌溉';
+        }
       }
 
       /* ---- 晾晒 ----
@@ -553,7 +588,16 @@
             return h.hour >= r.hours[0] && h.hour < cutoff && isDew(h, r);
           }).length
         },
-        irrigation: { status: irrStatus, why: irrWhy },
+        irrigation: irrDay
+          ? {
+            status: irrStatus, why: irrWhy,
+            sm: irrDay.sm, et0: irrDay.et0, etc: irrDay.etc,
+            stage: irrDay.stage.name, stageKey: irrDay.stage.key,
+            thr: irrDay.stage.thr,
+            critical: !!irrDay.stage.critical,
+            quota: irrDay.quota, tip: irrDay.tip, need: irrDay.need
+          }
+          : { status: irrStatus, why: irrWhy },
         harvest: { status: harvStatus, why: harvWhy }
       };
     });
@@ -561,7 +605,7 @@
     var total = 0;
     days.forEach(function (d) { total += d.dayRain; });
 
-    return { days: days, weekRain: round1(total) };
+    return { days: days, weekRain: round1(total), irrigationPlan: irrPlan, crop: (opts && opts.crop) || 'wheat' };
   }
 
   function pad2(n) { return String(n).length < 2 ? '0' + n : String(n); }
@@ -642,9 +686,28 @@
         '℃ 之间，降雨概率低于 ' + RULES.spray.prob_block + '%，且前后没有降雨。';
     }
 
-    /* ---- 灌溉 ---- */
+    /* ---- 灌溉 ----
+       走 irri.js：生育期 + 0–40cm 墒情估算 + 各期下限 + 灌水定额。
+       没有该模块时才退回原来的雨量口径。 */
     if (/浇|灌水|灌溉|墒|水肥|补水|旱|缺水/.test(q)) {
       var today = result.days[0];
+      var IRR2 = (typeof globalThis !== 'undefined') ? globalThis.TianZhiIrrig : null;
+      if (IRR2 && result.irrigationPlan && result.irrigationPlan.length) {
+        var ip = result.irrigationPlan[0];
+        var rainDays0 = result.days.filter(function (d) { return d.dayRain >= 1; }).length;
+        var head2 = rainDays0 > 0
+          ? '未来一周累计降水 ' + result.weekRain + ' mm，有 ' + rainDays0 + ' 天可能下雨。'
+          : '未来一周累计降水只有 ' + result.weekRain + ' mm，基本没有有效降水。';
+
+        return tag + ip.stage.name + ' · ' +
+          (ip.status === 'ok' ? '暂不需要灌溉' : (ip.status === 'bad' ? '今天不宜灌溉' : '该安排灌溉了')) +
+          '。\n' + ip.why + '。\n\n' + head2 +
+          '\n\n建议灌水定额：' + IRR2.quotaText(ip.quota) +
+          '\n\n怎么浇：' + ip.tip + '；上午 10 点前或下午 3 点后，避开正午高温；喷灌避开 4 级以上风。' +
+          '\n\n判断依据：0–40cm 相对含水量为估算值（ET0 ' + ip.et0 + ' mm/日 × Kc ' +
+          ip.stage.kc + '，扣有效降水）；各生育期下限与定额见「我的 → 依据库 → 灌溉依据」。';
+      }
+
       var rainDays = result.days.filter(function (d) { return d.dayRain >= 1; }).length;
       var head = rainDays > 0
         ? '未来一周累计降水 ' + result.weekRain + ' mm，有 ' + rainDays + ' 天可能下雨。'
